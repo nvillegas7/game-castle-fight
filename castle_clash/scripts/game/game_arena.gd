@@ -97,55 +97,14 @@ func _on_building_placed(player_id: int, building_data: BuildingData, grid_pos: 
 
 
 func _create_building_visual(bd: BuildingData, player_index: int, grid_pos: Vector2i) -> Node2D:
-	var node := Node2D.new()
 	var screen_pos := grid_to_screen(player_index, grid_pos.x, grid_pos.y)
-
-	node.position = screen_pos + Vector2(
-		bd.grid_size.x * CELL_SIZE * 0.5,
-		bd.grid_size.y * CELL_SIZE * 0.5
-	)
-
 	var w: float = bd.grid_size.x * CELL_SIZE - 4
 	var h: float = bd.grid_size.y * CELL_SIZE - 4
 
-	# Building body with faction color
-	var base_color: Color = Color(0.2, 0.4, 0.8) if player_index == 0 else Color(0.8, 0.3, 0.3)
-	var rect := ColorRect.new()
-	rect.size = Vector2(w, h)
-	rect.position = Vector2(-w * 0.5, -h * 0.5)
-	rect.color = base_color
-	node.add_child(rect)
-
-	# Border for clarity
-	var border := ColorRect.new()
-	border.size = Vector2(w + 2, h + 2)
-	border.position = Vector2(-w * 0.5 - 1, -h * 0.5 - 1)
-	border.color = base_color.lightened(0.3)
-	border.z_index = -1
-	node.add_child(border)
-
-	# Building name + tier stars
-	var tier_stars: String = "*".repeat(bd.tier) + " " if bd.tier > 1 else ""
-	var label := Label.new()
-	label.text = tier_stars + bd.display_name
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 8)
-	label.position = Vector2(-w * 0.5, -h * 0.5 + 2)
-	label.size = Vector2(w, 14)
-	node.add_child(label)
-
-	# Unit type indicator
-	if bd.spawns_unit:
-		var unit_label := Label.new()
-		unit_label.text = bd.spawns_unit.display_name
-		unit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		unit_label.add_theme_font_size_override("font_size", 7)
-		unit_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 0.7))
-		unit_label.position = Vector2(-w * 0.5, h * 0.5 - 14)
-		unit_label.size = Vector2(w, 12)
-		node.add_child(unit_label)
-
-	return node
+	var bv: Node2D = load("res://scripts/game/building_visual.gd").new()
+	bv.position = screen_pos + Vector2(bd.grid_size.x * CELL_SIZE * 0.5, bd.grid_size.y * CELL_SIZE * 0.5)
+	bv.setup(player_index, bd.id, bd.tier, bd.display_name, w, h)
+	return bv
 
 
 func _on_building_destroyed(building_id: int) -> void:
@@ -173,52 +132,13 @@ func _on_unit_spawned(unit_id: int, _unit_type: StringName) -> void:
 
 
 func _create_unit_visual(entity: Dictionary) -> Node2D:
-	var node := Node2D.new()
-	node.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
-
-	var size: float = 8.0
-	var color: Color
-	if entity.team == 0:
-		color = Color(0.3, 0.6, 1.0)
-	else:
-		color = Color(1.0, 0.35, 0.3)
-
-	# Unit body
-	var rect := ColorRect.new()
-	rect.size = Vector2(size * 2, size * 2)
-	rect.position = Vector2(-size, -size)
-	rect.color = color
-	node.add_child(rect)
-
-	# Role label
-	var role_idx: int = entity.get("role", 0)
-	if role_idx >= 0 and role_idx < ROLE_CHARS.size():
-		var label := Label.new()
-		label.text = ROLE_CHARS[role_idx]
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		label.add_theme_font_size_override("font_size", 9)
-		label.position = Vector2(-size, -size)
-		label.size = Vector2(size * 2, size * 2)
-		node.add_child(label)
-
-	# HP bar background (dark)
-	var hp_bg := ColorRect.new()
-	hp_bg.name = "HPBg"
-	hp_bg.size = Vector2(size * 2, 3)
-	hp_bg.position = Vector2(-size, -size - 5)
-	hp_bg.color = Color(0.15, 0.15, 0.15, 0.8)
-	node.add_child(hp_bg)
-
-	# HP bar fill (green -> yellow -> red as HP drops)
-	var hp_fill := ColorRect.new()
-	hp_fill.name = "HPFill"
-	hp_fill.size = Vector2(size * 2, 3)
-	hp_fill.position = Vector2(-size, -size - 5)
-	hp_fill.color = Color(0.2, 0.9, 0.2)
-	node.add_child(hp_fill)
-
-	return node
+	var uv: Node2D = load("res://scripts/game/unit_visual.gd").new()
+	uv.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
+	uv.team = entity.team
+	uv.role = entity.get("role", 0)
+	uv.unit_type = entity.get("unit_type", &"")
+	uv.hp_ratio = 1.0
+	return uv
 
 
 func _on_unit_died(unit_id: int, _killer_id: int) -> void:
@@ -234,23 +154,12 @@ func _sync_unit_positions() -> void:
 		if entity.type != "unit":
 			continue
 		if _unit_visuals.has(entity.id):
-			var visual: Node2D = _unit_visuals[entity.id]
+			var visual = _unit_visuals[entity.id]
 			visual.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
-
-			# Update HP bar
-			var hp_fill: ColorRect = visual.get_node_or_null("HPFill")
-			if hp_fill:
-				var hp_ratio: float = FP.to_float(entity.hp) / FP.to_float(entity.max_hp)
-				hp_ratio = clampf(hp_ratio, 0.0, 1.0)
-				hp_fill.size.x = 16.0 * hp_ratio  # 16 = size * 2
-
-				# Color: green > yellow > red
-				if hp_ratio > 0.6:
-					hp_fill.color = Color(0.2, 0.9, 0.2)
-				elif hp_ratio > 0.3:
-					hp_fill.color = Color(0.9, 0.8, 0.1)
-				else:
-					hp_fill.color = Color(0.9, 0.2, 0.1)
+			# Update HP ratio on the chibi visual
+			var max_hp: float = FP.to_float(entity.max_hp)
+			if max_hp > 0:
+				visual.hp_ratio = clampf(FP.to_float(entity.hp) / max_hp, 0.0, 1.0)
 
 
 # --- Castle HP Bars ---

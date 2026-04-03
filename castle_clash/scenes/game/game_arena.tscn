@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/game/game_arena.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/game/building_grid.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/ui/building_menu.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/ui/end_screen.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/game/castle_visual.gd" id="6"]
 
 [node name="GameArena" type="Node2D"]
 script = ExtResource("1")
@@ -18,51 +19,55 @@ color = Color(0.12, 0.12, 0.18, 1)
 offset_top = 40.0
 offset_right = 80.0
 offset_bottom = 680.0
-color = Color(0.15, 0.25, 0.45, 1)
+color = Color(0.1, 0.15, 0.28, 1)
 
-[node name="CastleLabel0" type="Label" parent="CastleArea0"]
-layout_mode = 0
-offset_left = 5.0
-offset_top = 280.0
-offset_right = 75.0
-offset_bottom = 320.0
-text = "CASTLE"
-horizontal_alignment = 1
-vertical_alignment = 1
+[node name="CastleVisual0" type="Node2D" parent="CastleArea0"]
+position = Vector2(40, 320)
+script = ExtResource("6")
+team = 0
 
 [node name="CombatLane" type="ColorRect" parent="."]
 offset_left = 432.0
 offset_top = 40.0
 offset_right = 848.0
 offset_bottom = 680.0
-color = Color(0.1, 0.1, 0.14, 1)
+color = Color(0.12, 0.11, 0.1, 1)
 
-[node name="LaneLabel" type="Label" parent="CombatLane"]
+[node name="GroundStripe1" type="ColorRect" parent="CombatLane"]
 layout_mode = 0
-offset_left = 150.0
-offset_top = 300.0
-offset_right = 266.0
-offset_bottom = 340.0
-text = "COMBAT LANE"
-horizontal_alignment = 1
-vertical_alignment = 1
+offset_left = 0.0
+offset_top = 210.0
+offset_right = 416.0
+offset_bottom = 212.0
+color = Color(0.18, 0.16, 0.14, 0.4)
+
+[node name="GroundStripe2" type="ColorRect" parent="CombatLane"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 420.0
+offset_right = 416.0
+offset_bottom = 422.0
+color = Color(0.18, 0.16, 0.14, 0.4)
+
+[node name="CenterLine" type="ColorRect" parent="CombatLane"]
+layout_mode = 0
+offset_left = 207.0
+offset_top = 0.0
+offset_right = 209.0
+offset_bottom = 640.0
+color = Color(0.25, 0.2, 0.15, 0.2)
 
 [node name="CastleArea1" type="ColorRect" parent="."]
 offset_left = 1200.0
 offset_top = 40.0
 offset_right = 1280.0
 offset_bottom = 680.0
-color = Color(0.45, 0.15, 0.15, 1)
+color = Color(0.28, 0.1, 0.1, 1)
 
-[node name="CastleLabel1" type="Label" parent="CastleArea1"]
-layout_mode = 0
-offset_left = 5.0
-offset_top = 280.0
-offset_right = 75.0
-offset_bottom = 320.0
-text = "CASTLE"
-horizontal_alignment = 1
-vertical_alignment = 1
+[node name="CastleVisual1" type="Node2D" parent="CastleArea1"]
+position = Vector2(40, 320)
+script = ExtResource("6")
+team = 1
 
 [node name="CastleHPBar0" type="ColorRect" parent="."]
 offset_left = 70.0

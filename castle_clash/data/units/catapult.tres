@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="UnitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/unit_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"catapult"
+display_name = "Catapult"
+faction = &"kingdom"
+max_hp = 120
+attack_damage = 25
+attack_speed_ticks = 20
+attack_range = 6
+move_speed = 1
+armor = 0
+attack_type = 3
+armor_type = 1
+role = 4

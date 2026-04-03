@@ -1,15 +1,17 @@
-[gd_resource type="Resource" script_class="FactionData" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="FactionData" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://data_scripts/faction_data.gd" id="1"]
 [ext_resource type="Resource" path="res://data/buildings/barracks.tres" id="2"]
 [ext_resource type="Resource" path="res://data/buildings/archer_range.tres" id="3"]
-[ext_resource type="Resource" path="res://data/buildings/knight_hall.tres" id="4"]
+[ext_resource type="Resource" path="res://data/buildings/priest_temple.tres" id="4"]
+[ext_resource type="Resource" path="res://data/buildings/knight_hall.tres" id="5"]
+[ext_resource type="Resource" path="res://data/buildings/siege_workshop.tres" id="6"]
 
 [resource]
 script = ExtResource("1")
 id = &"kingdom"
 display_name = "The Kingdom"
 description = "Balanced faction with strong healing and armor."
-buildings = [ExtResource("2"), ExtResource("3"), ExtResource("4")]
+buildings = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6")]
 primary_color = Color(0.2, 0.4, 0.8, 1.0)
 secondary_color = Color(0.8, 0.75, 0.3, 1.0)

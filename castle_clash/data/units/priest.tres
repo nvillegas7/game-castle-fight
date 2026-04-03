@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="UnitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/unit_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"priest"
+display_name = "Priest"
+faction = &"kingdom"
+max_hp = 60
+attack_damage = 8
+attack_speed_ticks = 15
+attack_range = 4
+move_speed = 2
+armor = 0
+attack_type = 2
+armor_type = 0
+role = 2

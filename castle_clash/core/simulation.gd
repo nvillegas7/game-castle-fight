@@ -436,6 +436,19 @@ func _update_units() -> Array[Dictionary]:
 		if FP.lte(entity.hp, FP.ZERO):
 			continue
 
+		# Casters (role=2) heal allies instead of attacking
+		if entity.role == 2:
+			if entity.attack_cooldown > 0:
+				entity.attack_cooldown -= 1
+			if entity.attack_cooldown <= 0:
+				var healed := _try_heal(entity)
+				if healed:
+					events.append_array(healed)
+					entity.attack_cooldown = entity.attack_speed_ticks
+			# Casters still move with the army
+			_move_unit(entity)
+			continue
+
 		# Phase 1: Acquire target
 		_acquire_target(entity)
 
@@ -450,7 +463,6 @@ func _update_units() -> Array[Dictionary]:
 				var dist_sq := _distance_squared(entity, target)
 				var range_sq := FP.mul(entity.attack_range, entity.attack_range)
 				if FP.lte(dist_sq, range_sq):
-					# In range -- attack if ready
 					if entity.attack_cooldown <= 0:
 						events.append_array(_perform_attack(entity, target))
 						entity.attack_cooldown = entity.attack_speed_ticks
@@ -521,6 +533,52 @@ func _perform_attack(attacker: Dictionary, target: Dictionary) -> Array[Dictiona
 		"target_id": target.id,
 		"damage": final_damage,
 		"target_hp": target.hp,
+	}]
+
+
+## Caster heals the nearest damaged ally in range.
+func _try_heal(healer: Dictionary) -> Array[Dictionary]:
+	var heal_amount: int = healer.attack_damage  # Reuse attack_damage as heal power
+	var range_sq: int = FP.mul(healer.attack_range, healer.attack_range)
+
+	# Find nearest damaged ally in range
+	var best_id: int = -1
+	var best_dist_sq: int = 0x7FFFFFFFFFFFFFF
+	var best_entity = null
+
+	for other in entities:
+		if other.type != "unit":
+			continue
+		if other.team != healer.team:
+			continue
+		if other.id == healer.id:
+			continue
+		if FP.lte(other.hp, FP.ZERO):
+			continue
+		# Only heal damaged units
+		if FP.gte(other.hp, other.max_hp):
+			continue
+		var dist_sq := _distance_squared(healer, other)
+		if FP.lte(dist_sq, range_sq) and dist_sq < best_dist_sq:
+			best_dist_sq = dist_sq
+			best_id = other.id
+			best_entity = other
+
+	if best_entity == null:
+		return []
+
+	# Heal, capped at max HP
+	best_entity.hp = FP.min_fp(
+		FP.add(best_entity.hp, heal_amount),
+		best_entity.max_hp
+	)
+
+	return [{
+		"type": "unit_healed",
+		"healer_id": healer.id,
+		"target_id": best_id,
+		"amount": heal_amount,
+		"target_hp": best_entity.hp,
 	}]
 
 

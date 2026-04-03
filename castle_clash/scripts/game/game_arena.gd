@@ -144,12 +144,14 @@ func _create_unit_visual(entity: Dictionary) -> Node2D:
 	else:
 		color = Color(1.0, 0.35, 0.3)
 
+	# Unit body
 	var rect := ColorRect.new()
 	rect.size = Vector2(size * 2, size * 2)
 	rect.position = Vector2(-size, -size)
 	rect.color = color
 	node.add_child(rect)
 
+	# Role label
 	var role_idx: int = entity.get("role", 0)
 	if role_idx >= 0 and role_idx < ROLE_CHARS.size():
 		var label := Label.new()
@@ -160,6 +162,22 @@ func _create_unit_visual(entity: Dictionary) -> Node2D:
 		label.position = Vector2(-size, -size)
 		label.size = Vector2(size * 2, size * 2)
 		node.add_child(label)
+
+	# HP bar background (dark)
+	var hp_bg := ColorRect.new()
+	hp_bg.name = "HPBg"
+	hp_bg.size = Vector2(size * 2, 3)
+	hp_bg.position = Vector2(-size, -size - 5)
+	hp_bg.color = Color(0.15, 0.15, 0.15, 0.8)
+	node.add_child(hp_bg)
+
+	# HP bar fill (green -> yellow -> red as HP drops)
+	var hp_fill := ColorRect.new()
+	hp_fill.name = "HPFill"
+	hp_fill.size = Vector2(size * 2, 3)
+	hp_fill.position = Vector2(-size, -size - 5)
+	hp_fill.color = Color(0.2, 0.9, 0.2)
+	node.add_child(hp_fill)
 
 	return node
 
@@ -179,6 +197,21 @@ func _sync_unit_positions() -> void:
 		if _unit_visuals.has(entity.id):
 			var visual: Node2D = _unit_visuals[entity.id]
 			visual.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
+
+			# Update HP bar
+			var hp_fill: ColorRect = visual.get_node_or_null("HPFill")
+			if hp_fill:
+				var hp_ratio: float = FP.to_float(entity.hp) / FP.to_float(entity.max_hp)
+				hp_ratio = clampf(hp_ratio, 0.0, 1.0)
+				hp_fill.size.x = 16.0 * hp_ratio  # 16 = size * 2
+
+				# Color: green > yellow > red
+				if hp_ratio > 0.6:
+					hp_fill.color = Color(0.2, 0.9, 0.2)
+				elif hp_ratio > 0.3:
+					hp_fill.color = Color(0.9, 0.8, 0.1)
+				else:
+					hp_fill.color = Color(0.9, 0.2, 0.1)
 
 
 # --- Simple AI Opponent ---

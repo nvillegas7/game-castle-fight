@@ -75,6 +75,15 @@ func _input(event: InputEvent) -> void:
 	# Only the local player's grid processes input
 	if player_index != GameManager.simulation.get_player_index(GameManager.local_player_id):
 		return
+
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		if selected_building != null:
+			deselect_building()
+		else:
+			# Try to sell building at clicked position
+			_try_sell_building(event.position)
+		return
+
 	if selected_building == null:
 		return
 
@@ -86,9 +95,6 @@ func _input(event: InputEvent) -> void:
 		_update_ghost_position(event.position)
 		if ghost_valid:
 			_place_building()
-
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
-		deselect_building()
 
 
 func _update_ghost_position(screen_pos: Vector2) -> void:
@@ -141,3 +147,22 @@ func deselect_building() -> void:
 	ghost_valid = false
 	_is_hovering = false
 	queue_redraw()
+
+
+func _try_sell_building(screen_pos: Vector2) -> void:
+	var local_pos: Vector2 = screen_pos - global_position
+	if local_pos.x < 0 or local_pos.x > GRID_COLS * CELL_SIZE \
+	   or local_pos.y < 0 or local_pos.y > GRID_ROWS * CELL_SIZE:
+		return
+
+	var gx: int = int(local_pos.x) / CELL_SIZE
+	var gy: int = int(local_pos.y) / CELL_SIZE
+
+	# Find building entity at this grid cell
+	var grid: Array = GameManager.simulation.grid_cells[player_index]
+	var entity_id: int = grid[gy][gx]
+	if entity_id == -1:
+		return
+
+	var cmd := Command.sell_building(GameManager.local_player_id, entity_id)
+	NetworkManager.send_command(cmd)

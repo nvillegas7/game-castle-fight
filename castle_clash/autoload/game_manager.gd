@@ -125,9 +125,16 @@ func _advance_simulation_tick() -> void:
 				EventBus.building_destroyed.emit(event.entity_id)
 			"wave_spawned":
 				EventBus.wave_started.emit(event.wave_number)
+			"unit_spawned":
+				EventBus.unit_spawned.emit(event.entity_id, event.unit_type)
+			"castle_damaged":
+				EventBus.castle_damaged.emit(event.team, event.damage, event.remaining_hp)
 			"match_over":
 				state = State.MATCH_OVER
 				set_process(false)
 				EventBus.match_ended.emit(event.winner)
 			"entity_died":
-				EventBus.unit_died.emit(event.id, -1)
+				if event.get("entity_type", "unit") == "building":
+					EventBus.building_destroyed.emit(event.id)
+				else:
+					EventBus.unit_died.emit(event.id, -1)

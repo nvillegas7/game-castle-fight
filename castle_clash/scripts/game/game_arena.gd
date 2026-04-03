@@ -26,16 +26,27 @@ const AI_THINK_INTERVAL: float = 3.0  # Seconds between AI decisions
 var _ai_timer: float = 2.0  # Start slightly earlier so AI places before first wave
 
 
+@onready var wave_label: Label = $UILayer/WaveAnnouncement
+@onready var castle_hp_bar_0: ColorRect = $CastleHPBar0
+@onready var castle_hp_bar_1: ColorRect = $CastleHPBar1
+
+var _wave_announce_timer: float = 0.0
+
+
 func _ready() -> void:
 	EventBus.building_placed.connect(_on_building_placed)
 	EventBus.building_destroyed.connect(_on_building_destroyed)
 	EventBus.unit_spawned.connect(_on_unit_spawned)
 	EventBus.unit_died.connect(_on_unit_died)
+	EventBus.wave_started.connect(_on_wave_announced)
 
 	grid_overlay_0.player_index = 0
 	grid_overlay_1.player_index = 1
 
 	building_menu.building_selected.connect(_on_building_selected)
+
+	if wave_label:
+		wave_label.visible = false
 
 	GameManager.start_test_match()
 
@@ -46,6 +57,8 @@ func _process(delta: float) -> void:
 	if GameManager.simulation == null:
 		return
 	_sync_unit_positions()
+	_update_castle_hp_bars()
+	_update_wave_announcement(delta)
 	_update_ai(delta)
 
 
@@ -92,19 +105,45 @@ func _create_building_visual(bd: BuildingData, player_index: int, grid_pos: Vect
 		bd.grid_size.y * CELL_SIZE * 0.5
 	)
 
+	var w: float = bd.grid_size.x * CELL_SIZE - 4
+	var h: float = bd.grid_size.y * CELL_SIZE - 4
+
+	# Building body with faction color
+	var base_color: Color = Color(0.2, 0.4, 0.8) if player_index == 0 else Color(0.8, 0.3, 0.3)
 	var rect := ColorRect.new()
-	rect.size = Vector2(bd.grid_size.x * CELL_SIZE - 4, bd.grid_size.y * CELL_SIZE - 4)
-	rect.position = -rect.size * 0.5
-	rect.color = Color(0.2, 0.4, 0.8) if player_index == 0 else Color(0.8, 0.3, 0.3)
+	rect.size = Vector2(w, h)
+	rect.position = Vector2(-w * 0.5, -h * 0.5)
+	rect.color = base_color
 	node.add_child(rect)
 
+	# Border for clarity
+	var border := ColorRect.new()
+	border.size = Vector2(w + 2, h + 2)
+	border.position = Vector2(-w * 0.5 - 1, -h * 0.5 - 1)
+	border.color = base_color.lightened(0.3)
+	border.z_index = -1
+	node.add_child(border)
+
+	# Building name + tier stars
+	var tier_stars: String = "*".repeat(bd.tier) + " " if bd.tier > 1 else ""
 	var label := Label.new()
-	label.text = bd.display_name
+	label.text = tier_stars + bd.display_name
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 9)
-	label.position = Vector2(-bd.grid_size.x * CELL_SIZE * 0.5, -8)
-	label.size = Vector2(bd.grid_size.x * CELL_SIZE, 16)
+	label.add_theme_font_size_override("font_size", 8)
+	label.position = Vector2(-w * 0.5, -h * 0.5 + 2)
+	label.size = Vector2(w, 14)
 	node.add_child(label)
+
+	# Unit type indicator
+	if bd.spawns_unit:
+		var unit_label := Label.new()
+		unit_label.text = bd.spawns_unit.display_name
+		unit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		unit_label.add_theme_font_size_override("font_size", 7)
+		unit_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 0.7))
+		unit_label.position = Vector2(-w * 0.5, h * 0.5 - 14)
+		unit_label.size = Vector2(w, 12)
+		node.add_child(unit_label)
 
 	return node
 
@@ -212,6 +251,45 @@ func _sync_unit_positions() -> void:
 					hp_fill.color = Color(0.9, 0.8, 0.1)
 				else:
 					hp_fill.color = Color(0.9, 0.2, 0.1)
+
+
+# --- Castle HP Bars ---
+
+func _update_castle_hp_bars() -> void:
+	if not castle_hp_bar_0 or not castle_hp_bar_1:
+		return
+	var c0: Dictionary = GameManager.simulation.castles[0]
+	var c1: Dictionary = GameManager.simulation.castles[1]
+
+	var ratio_0: float = clampf(FP.to_float(c0.hp) / FP.to_float(c0.max_hp), 0.0, 1.0)
+	var ratio_1: float = clampf(FP.to_float(c1.hp) / FP.to_float(c1.max_hp), 0.0, 1.0)
+
+	castle_hp_bar_0.scale.y = ratio_0
+	castle_hp_bar_1.scale.y = ratio_1
+
+	castle_hp_bar_0.color = Color(0.2, 0.8, 0.3) if ratio_0 > 0.3 else Color(0.9, 0.2, 0.1)
+	castle_hp_bar_1.color = Color(0.2, 0.8, 0.3) if ratio_1 > 0.3 else Color(0.9, 0.2, 0.1)
+
+
+# --- Wave Announcement ---
+
+func _on_wave_announced(wave_number: int) -> void:
+	if wave_label:
+		wave_label.text = "WAVE %d" % wave_number
+		wave_label.visible = true
+		wave_label.modulate.a = 1.0
+		_wave_announce_timer = 2.0
+
+
+func _update_wave_announcement(delta: float) -> void:
+	if _wave_announce_timer <= 0:
+		return
+	_wave_announce_timer -= delta
+	if _wave_announce_timer <= 0:
+		if wave_label:
+			wave_label.visible = false
+	elif _wave_announce_timer < 1.0 and wave_label:
+		wave_label.modulate.a = _wave_announce_timer
 
 
 # --- Simple AI Opponent ---

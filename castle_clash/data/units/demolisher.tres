@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="UnitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/unit_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"demolisher"
+display_name = "Demolisher"
+faction = &"horde"
+max_hp = 90
+attack_damage = 30
+attack_speed_ticks = 18
+attack_range = 5
+move_speed = 2
+armor = 0
+attack_type = 3
+armor_type = 1
+role = 4

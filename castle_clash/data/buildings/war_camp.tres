@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/building_data.gd" id="1"]
+[ext_resource type="Resource" path="res://data/units/grunt.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"war_camp"
+display_name = "War Camp"
+faction = &"horde"
+gold_cost = 45
+sell_refund_percent = 50
+spawns_unit = ExtResource("2")
+units_per_wave = 2
+tier = 1
+requires_building = &""
+grid_size = Vector2i(2, 2)

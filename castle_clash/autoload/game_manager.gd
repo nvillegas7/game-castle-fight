@@ -45,11 +45,17 @@ func submit_command(command: Dictionary) -> void:
 	command_buffer.add_command(current_tick + 1, command)
 
 
+## Selected faction for the local player (set by main menu).
+var selected_faction: StringName = &"kingdom"
+
+
 ## Start a test match for offline single-player development.
 func start_test_match() -> void:
+	# AI opponent gets the other faction
+	var ai_faction: StringName = &"horde" if selected_faction == &"kingdom" else &"kingdom"
 	var player_data := [
-		{ "id": 0, "team": 0, "faction": &"kingdom" },
-		{ "id": 1, "team": 1, "faction": &"kingdom" },
+		{ "id": 0, "team": 0, "faction": selected_faction },
+		{ "id": 1, "team": 1, "faction": ai_faction },
 	]
 	local_player_id = 0
 

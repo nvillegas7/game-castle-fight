@@ -20,6 +20,11 @@ var _unit_visuals: Dictionary = {}      # entity_id -> Node2D
 
 const ROLE_CHARS := ["M", "R", "C", "F", "S"]  # Melee, Ranged, Caster, Flying, Siege
 
+# --- Simple AI for player 1 ---
+const AI_PLAYER_ID: int = 1
+const AI_THINK_INTERVAL: float = 3.0  # Seconds between AI decisions
+var _ai_timer: float = 2.0  # Start slightly earlier so AI places before first wave
+
 
 func _ready() -> void:
 	EventBus.building_placed.connect(_on_building_placed)
@@ -35,12 +40,13 @@ func _ready() -> void:
 	GameManager.start_test_match()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if GameManager.state != GameManager.State.PLAYING:
 		return
 	if GameManager.simulation == null:
 		return
 	_sync_unit_positions()
+	_update_ai(delta)
 
 
 func _on_building_selected(bd: BuildingData) -> void:
@@ -173,3 +179,46 @@ func _sync_unit_positions() -> void:
 		if _unit_visuals.has(entity.id):
 			var visual: Node2D = _unit_visuals[entity.id]
 			visual.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
+
+
+# --- Simple AI Opponent ---
+
+func _update_ai(delta: float) -> void:
+	_ai_timer -= delta
+	if _ai_timer > 0:
+		return
+	_ai_timer = AI_THINK_INTERVAL
+
+	var sim: Simulation = GameManager.simulation
+	var ai_index: int = sim.get_player_index(AI_PLAYER_ID)
+	if ai_index == -1:
+		return
+
+	var faction: FactionData = GameManager.get_player_faction(AI_PLAYER_ID)
+	if faction == null:
+		return
+
+	var gold: int = GameManager.get_player_gold(AI_PLAYER_ID)
+
+	# Pick a random affordable building (prefer T1 early, T2 later)
+	var affordable: Array[BuildingData] = []
+	for bd: BuildingData in faction.buildings:
+		if bd.gold_cost <= gold:
+			# Check tech prereq
+			if bd.requires_building == &"" or sim.player_has_building(ai_index, bd.requires_building):
+				affordable.append(bd)
+
+	if affordable.is_empty():
+		return
+
+	# Pick randomly
+	var bd: BuildingData = affordable[randi() % affordable.size()]
+
+	# Find a valid grid position (try random spots)
+	for _attempt in 20:
+		var gx: int = randi() % (GRID_COLS - bd.grid_size.x + 1)
+		var gy: int = randi() % (GRID_ROWS - bd.grid_size.y + 1)
+		if sim.can_place_building(AI_PLAYER_ID, bd.id, gx, gy):
+			var cmd := Command.place_building(AI_PLAYER_ID, bd.id, gx, gy)
+			GameManager.submit_command(cmd)
+			return

@@ -1,0 +1,24 @@
+# Godot 4 generated files
+castle_clash/.godot/
+
+# Export builds
+castle_clash/export/
+castle_clash/build/
+*.pck
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Secrets
+.env
+*.key
+*.pem

@@ -104,8 +104,12 @@ func _draw() -> void:
 	# --- HP Bar ---
 	_draw_hp_bar(base_y)
 
-	# --- Shadow ---
-	draw_ellipse(Rect2(-6, base_y + 13, 12, 4), Color(0, 0, 0, 0.15))
+	# --- Shadow (oval approximation) ---
+	var shadow_pts := PackedVector2Array()
+	for i in 12:
+		var angle: float = i * TAU / 12.0
+		shadow_pts.append(Vector2(cos(angle) * 6, base_y + 15 + sin(angle) * 2))
+	draw_colored_polygon(shadow_pts, Color(0, 0, 0, 0.15))
 
 
 func _draw_headgear(head_y: float, primary: Color, dark: Color, accent: Color) -> void:

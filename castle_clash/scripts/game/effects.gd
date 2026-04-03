@@ -1,6 +1,7 @@
 ## Visual effects: damage numbers, death poof, heal sparkle, projectiles, spawn burst.
 ## All effects are self-contained Node2D scripts that auto-free after their animation.
 class_name Effects
+extends RefCounted
 
 
 ## Floating damage number that rises and fades.

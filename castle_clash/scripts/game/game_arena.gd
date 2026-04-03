@@ -2,6 +2,9 @@
 ## and wires UI to the grid overlay.
 extends Node2D
 
+const UnitVisualScript = preload("res://scripts/game/unit_visual.gd")
+const BuildingVisualScript = preload("res://scripts/game/building_visual.gd")
+
 const CELL_SIZE: int = 32
 const GRID_COLS: int = 11
 const GRID_ROWS: int = 20
@@ -114,7 +117,7 @@ func _create_building_visual(bd: BuildingData, player_index: int, grid_pos: Vect
 	var w: float = bd.grid_size.x * CELL_SIZE - 4
 	var h: float = bd.grid_size.y * CELL_SIZE - 4
 
-	var bv: Node2D = load("res://scripts/game/building_visual.gd").new()
+	var bv: Node2D = BuildingVisualScript.new()
 	bv.position = screen_pos + Vector2(bd.grid_size.x * CELL_SIZE * 0.5, bd.grid_size.y * CELL_SIZE * 0.5)
 	bv.setup(player_index, bd.id, bd.tier, bd.display_name, w, h)
 	return bv
@@ -153,7 +156,7 @@ func _on_unit_spawned(unit_id: int, _unit_type: StringName) -> void:
 
 
 func _create_unit_visual(entity: Dictionary) -> Node2D:
-	var uv: Node2D = load("res://scripts/game/unit_visual.gd").new()
+	var uv: Node2D = UnitVisualScript.new()
 	uv.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
 	uv.team = entity.team
 	uv.role = entity.get("role", 0)
@@ -233,12 +236,18 @@ func _update_castle_hp_bars() -> void:
 		return
 	var c0: Dictionary = GameManager.simulation.castles[0]
 	var c1: Dictionary = GameManager.simulation.castles[1]
+	var max_h: float = 640.0  # Full bar height (680-40)
 
 	var ratio_0: float = clampf(FP.to_float(c0.hp) / FP.to_float(c0.max_hp), 0.0, 1.0)
 	var ratio_1: float = clampf(FP.to_float(c1.hp) / FP.to_float(c1.max_hp), 0.0, 1.0)
 
-	castle_hp_bar_0.scale.y = ratio_0
-	castle_hp_bar_1.scale.y = ratio_1
+	# Resize height from bottom (adjust offset_top to grow downward)
+	var h0: float = max_h * ratio_0
+	var h1: float = max_h * ratio_1
+	castle_hp_bar_0.offset_top = 40.0 + (max_h - h0)
+	castle_hp_bar_0.offset_bottom = 680.0
+	castle_hp_bar_1.offset_top = 40.0 + (max_h - h1)
+	castle_hp_bar_1.offset_bottom = 680.0
 
 	castle_hp_bar_0.color = Color(0.2, 0.8, 0.3) if ratio_0 > 0.3 else Color(0.9, 0.2, 0.1)
 	castle_hp_bar_1.color = Color(0.2, 0.8, 0.3) if ratio_1 > 0.3 else Color(0.9, 0.2, 0.1)

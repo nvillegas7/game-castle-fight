@@ -75,8 +75,13 @@ func _draw() -> void:
 	var hw: float = width * 0.5
 	var hh: float = height * 0.5
 
-	# Shadow
-	draw_ellipse(Rect2(-hw + 2, hh - 4, width - 4, 8), Color(0, 0, 0, 0.12))
+	# Shadow (oval approximation)
+	var shadow_pts := PackedVector2Array()
+	var sw: float = (width - 4) * 0.5
+	for i in 12:
+		var angle: float = i * TAU / 12.0
+		shadow_pts.append(Vector2(cos(angle) * sw, hh - 0 + sin(angle) * 3))
+	draw_colored_polygon(shadow_pts, Color(0, 0, 0, 0.12))
 
 	match _shape:
 		SHAPE_FORT:
@@ -164,9 +169,14 @@ func _draw_temple(p: Dictionary, hw: float, hh: float) -> void:
 	# Temple body
 	draw_rect(Rect2(-hw + 6, -hh + 20, width - 12, hh + hh - 24), p.wall)
 
-	# Dome roof
-	draw_arc(Vector2(0, -hh + 20), hw - 6, PI, 0, 16, p.roof, (hw - 6))
-	draw_arc(Vector2(0, -hh + 20), hw - 6, PI, 0, 16, p.roof_dark, 1.5)
+	# Dome roof (filled semicircle via polygon)
+	var dome_pts := PackedVector2Array()
+	var dome_r: float = hw - 6
+	for i in 17:
+		var angle: float = PI + (float(i) / 16.0) * PI
+		dome_pts.append(Vector2(cos(angle) * dome_r, -hh + 20 + sin(angle) * dome_r))
+	draw_colored_polygon(dome_pts, p.roof)
+	draw_arc(Vector2(0, -hh + 20), dome_r, PI, 0, 16, p.roof_dark, 1.5)
 
 	# Cross / totem on top
 	draw_rect(Rect2(-1.5, -hh + 2, 3, 12), p.accent)

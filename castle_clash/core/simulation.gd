@@ -125,12 +125,14 @@ func step(commands: Array) -> Dictionary:
 	# 4. Remove dead entities
 	events.append_array(_cleanup_dead())
 
-	# 5. Check win condition
-	for castle in castles:
-		if FP.lte(castle.hp, FP.ZERO):
-			match_over = true
-			winning_team = 1 - castle.team
-			events.append({ "type": "match_over", "winner": winning_team })
+	# 5. Check win condition (only first castle to fall wins)
+	if not match_over:
+		for castle in castles:
+			if FP.lte(castle.hp, FP.ZERO):
+				match_over = true
+				winning_team = 1 - castle.team
+				events.append({ "type": "match_over", "winner": winning_team })
+				break
 
 	# 6. Income tick
 	if tick % INCOME_INTERVAL_TICKS == 0:

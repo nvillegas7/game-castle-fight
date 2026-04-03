@@ -64,7 +64,9 @@ var _time: float = 0.0
 
 func _process(delta: float) -> void:
 	_time += delta
-	queue_redraw()
+	# Only redraw animated buildings (mine sparkle) to save GPU
+	if _shape == SHAPE_MINE:
+		queue_redraw()
 
 
 func setup(p_team: int, p_building_type: StringName, p_tier: int, p_name: String, p_w: float, p_h: float) -> void:

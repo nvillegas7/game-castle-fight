@@ -74,7 +74,8 @@ func _draw_ghost() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	# Only the local player's grid processes input
+	if GameManager.simulation == null:
+		return
 	if player_index != GameManager.simulation.get_player_index(GameManager.local_player_id):
 		return
 
@@ -118,11 +119,14 @@ func _update_ghost_position(screen_pos: Vector2) -> void:
 	gy = clampi(gy, 0, GRID_ROWS - selected_building.grid_size.y)
 	ghost_grid_pos = Vector2i(gx, gy)
 
-	ghost_valid = GameManager.simulation.can_place_building(
-		GameManager.local_player_id,
-		selected_building.id,
-		gx, gy
-	)
+	if GameManager.simulation:
+		ghost_valid = GameManager.simulation.can_place_building(
+			GameManager.local_player_id,
+			selected_building.id,
+			gx, gy
+		)
+	else:
+		ghost_valid = false
 
 
 func _place_building() -> void:
@@ -152,6 +156,8 @@ func deselect_building() -> void:
 
 
 func _try_sell_building(screen_pos: Vector2) -> void:
+	if GameManager.simulation == null:
+		return
 	var local_pos: Vector2 = screen_pos - global_position
 	if local_pos.x < 0 or local_pos.x > GRID_COLS * CELL_SIZE \
 	   or local_pos.y < 0 or local_pos.y > GRID_ROWS * CELL_SIZE:

@@ -23,15 +23,18 @@ static func create_damage_number(value: int, pos: Vector2, is_heal: bool = false
 	label.size = Vector2(48, 20)
 	node.add_child(label)
 
-	# Scale punch + float up + fade
+	# Scale punch + float up + fade (deferred until in scene tree)
 	node.scale = Vector2(1.5, 1.5)
-	var tween := node.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(node, "scale", Vector2(1.0, 1.0), 0.12).set_ease(Tween.EASE_OUT)
-	tween.tween_property(node, "position:y", pos.y - 35, 0.7).set_ease(Tween.EASE_OUT)
-	tween.tween_property(node, "modulate:a", 0.0, 0.7).set_delay(0.25)
-	tween.set_parallel(false)
-	tween.tween_callback(node.queue_free)
+	var target_y: float = pos.y - 35
+	node.tree_entered.connect(func():
+		var tween := node.create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(node, "scale", Vector2(1.0, 1.0), 0.12).set_ease(Tween.EASE_OUT)
+		tween.tween_property(node, "position:y", target_y, 0.7).set_ease(Tween.EASE_OUT)
+		tween.tween_property(node, "modulate:a", 0.0, 0.7).set_delay(0.25)
+		tween.set_parallel(false)
+		tween.tween_callback(node.queue_free)
+	, CONNECT_ONE_SHOT)
 
 	return node
 

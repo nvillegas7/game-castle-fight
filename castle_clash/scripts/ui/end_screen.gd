@@ -12,7 +12,8 @@ extends Control
 func _ready() -> void:
 	visible = false
 	EventBus.match_ended.connect(_on_match_ended)
-	restart_button.pressed.connect(_on_restart)
+	if restart_button:
+		restart_button.pressed.connect(_on_restart)
 	if menu_button:
 		menu_button.pressed.connect(_on_menu)
 

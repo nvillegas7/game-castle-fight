@@ -160,9 +160,9 @@ func _advance_simulation_tick() -> void:
 					Vector2i(event.grid_x, event.grid_y)
 				)
 			"gold_changed":
-				EventBus.gold_changed.emit(event.player_id, event.new_gold)
+				EventBus.gold_changed.emit(event.player_id, FP.to_int(event.new_gold))
 			"income":
-				EventBus.gold_changed.emit(event.player_id, event.new_gold)
+				EventBus.gold_changed.emit(event.player_id, FP.to_int(event.new_gold))
 			"building_destroyed":
 				EventBus.building_destroyed.emit(event.entity_id)
 			"wave_spawned":

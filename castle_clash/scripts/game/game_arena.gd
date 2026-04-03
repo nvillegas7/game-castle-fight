@@ -162,6 +162,7 @@ func _create_unit_visual(entity: Dictionary) -> Node2D:
 	uv.role = entity.get("role", 0)
 	uv.unit_type = entity.get("unit_type", &"")
 	uv.hp_ratio = 1.0
+	uv.facing = 1.0 if entity.team == 0 else -1.0
 	return uv
 
 
@@ -170,10 +171,16 @@ func _on_unit_died(unit_id: int, _killer_id: int) -> void:
 		var visual = _unit_visuals[unit_id]
 		var death_pos: Vector2 = visual.position
 		var team_color := Color(0.3, 0.6, 1.0) if visual.team == 0 else Color(1.0, 0.35, 0.3)
-		# Death poof effect
+		# Death poof
 		units_layer.add_child(Effects.create_death_poof(death_pos, team_color))
-		visual.queue_free()
+		# Shrink-out tween instead of instant vanish
 		_unit_visuals.erase(unit_id)
+		var tween := visual.create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(visual, "scale", Vector2(0.0, 0.0), 0.15).set_ease(Tween.EASE_IN)
+		tween.tween_property(visual, "modulate:a", 0.0, 0.15)
+		tween.set_parallel(false)
+		tween.tween_callback(visual.queue_free)
 
 
 func _on_unit_attacked(_attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float) -> void:
@@ -236,12 +243,11 @@ func _update_castle_hp_bars() -> void:
 		return
 	var c0: Dictionary = GameManager.simulation.castles[0]
 	var c1: Dictionary = GameManager.simulation.castles[1]
-	var max_h: float = 640.0  # Full bar height (680-40)
+	var max_h: float = 640.0
 
 	var ratio_0: float = clampf(FP.to_float(c0.hp) / FP.to_float(c0.max_hp), 0.0, 1.0)
 	var ratio_1: float = clampf(FP.to_float(c1.hp) / FP.to_float(c1.max_hp), 0.0, 1.0)
 
-	# Resize height from bottom (adjust offset_top to grow downward)
 	var h0: float = max_h * ratio_0
 	var h1: float = max_h * ratio_1
 	castle_hp_bar_0.offset_top = 40.0 + (max_h - h0)
@@ -249,8 +255,17 @@ func _update_castle_hp_bars() -> void:
 	castle_hp_bar_1.offset_top = 40.0 + (max_h - h1)
 	castle_hp_bar_1.offset_bottom = 680.0
 
-	castle_hp_bar_0.color = Color(0.2, 0.8, 0.3) if ratio_0 > 0.3 else Color(0.9, 0.2, 0.1)
-	castle_hp_bar_1.color = Color(0.2, 0.8, 0.3) if ratio_1 > 0.3 else Color(0.9, 0.2, 0.1)
+	# Smooth color gradient from green to red
+	castle_hp_bar_0.color = Color(0.15, 0.85, 0.25).lerp(Color(0.9, 0.15, 0.08), 1.0 - ratio_0)
+	castle_hp_bar_1.color = Color(0.15, 0.85, 0.25).lerp(Color(0.9, 0.15, 0.08), 1.0 - ratio_1)
+
+	# Sync castle visual damage state
+	var cv0 = get_node_or_null("CastleArea0/CastleVisual0")
+	var cv1 = get_node_or_null("CastleArea1/CastleVisual1")
+	if cv0:
+		cv0.hp_ratio = ratio_0
+	if cv1:
+		cv1.hp_ratio = ratio_1
 
 
 # --- Wave Announcement ---
@@ -260,7 +275,14 @@ func _on_wave_announced(wave_number: int) -> void:
 		wave_label.text = "WAVE %d" % wave_number
 		wave_label.visible = true
 		wave_label.modulate.a = 1.0
-		_wave_announce_timer = 2.0
+		wave_label.add_theme_font_size_override("font_size", 36)
+		wave_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		wave_label.add_theme_constant_override("outline_size", 4)
+		# Scale punch
+		wave_label.scale = Vector2(1.4, 1.4)
+		var tween := wave_label.create_tween()
+		tween.tween_property(wave_label, "scale", Vector2(1.0, 1.0), 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		_wave_announce_timer = 2.5
 
 
 func _update_wave_announcement(delta: float) -> void:

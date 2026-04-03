@@ -24,20 +24,22 @@ func _draw() -> void:
 
 
 func _draw_grid_lines() -> void:
-	var grid_color := Color(1.0, 1.0, 1.0, 0.1)
-	var width: int = GRID_COLS * CELL_SIZE
-	var height: int = GRID_ROWS * CELL_SIZE
+	# Team-tinted grid lines
+	var grid_color := Color(0.4, 0.6, 1.0, 0.12) if player_index == 0 else Color(1.0, 0.4, 0.35, 0.12)
+	var w: int = GRID_COLS * CELL_SIZE
+	var h: int = GRID_ROWS * CELL_SIZE
 
 	for row in GRID_ROWS + 1:
 		var y: float = row * CELL_SIZE
-		draw_line(Vector2(0, y), Vector2(width, y), grid_color, 1.0)
+		draw_line(Vector2(0, y), Vector2(w, y), grid_color, 1.0)
 
 	for col in GRID_COLS + 1:
 		var x: float = col * CELL_SIZE
-		draw_line(Vector2(x, 0), Vector2(x, height), grid_color, 1.0)
+		draw_line(Vector2(x, 0), Vector2(x, h), grid_color, 1.0)
 
-	# Border
-	draw_rect(Rect2(0, 0, width, height), Color(1.0, 1.0, 1.0, 0.25), false, 2.0)
+	# Team-colored border
+	var border_col := Color(0.3, 0.5, 1.0, 0.35) if player_index == 0 else Color(1.0, 0.3, 0.25, 0.35)
+	draw_rect(Rect2(0, 0, w, h), border_col, false, 2.0)
 
 
 func _draw_occupied_cells() -> void:
@@ -46,7 +48,7 @@ func _draw_occupied_cells() -> void:
 	if player_index >= GameManager.simulation.grid_cells.size():
 		return
 	var grid: Array = GameManager.simulation.grid_cells[player_index]
-	var occupied_color := Color(0.5, 0.5, 0.5, 0.15)
+	var occupied_color := Color(0.4, 0.5, 0.7, 0.18) if player_index == 0 else Color(0.7, 0.4, 0.3, 0.18)
 	for row in GRID_ROWS:
 		for col in GRID_COLS:
 			if grid[row][col] != -1:

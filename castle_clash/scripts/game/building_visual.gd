@@ -59,6 +59,14 @@ const TYPE_TO_SHAPE := {
 }
 
 
+var _time: float = 0.0
+
+
+func _process(delta: float) -> void:
+	_time += delta
+	queue_redraw()
+
+
 func setup(p_team: int, p_building_type: StringName, p_tier: int, p_name: String, p_w: float, p_h: float) -> void:
 	team = p_team
 	building_type = p_building_type
@@ -75,13 +83,13 @@ func _draw() -> void:
 	var hw: float = width * 0.5
 	var hh: float = height * 0.5
 
-	# Shadow (oval approximation)
+	# Shadow (oval)
 	var shadow_pts := PackedVector2Array()
 	var sw: float = (width - 4) * 0.5
-	for i in 12:
-		var angle: float = i * TAU / 12.0
-		shadow_pts.append(Vector2(cos(angle) * sw, hh - 0 + sin(angle) * 3))
-	draw_colored_polygon(shadow_pts, Color(0, 0, 0, 0.12))
+	for i in 20:
+		var angle: float = i * TAU / 20.0
+		shadow_pts.append(Vector2(cos(angle) * sw, hh + sin(angle) * 3))
+	draw_colored_polygon(shadow_pts, Color(0, 0, 0, 0.22))
 
 	match _shape:
 		SHAPE_FORT:
@@ -97,11 +105,16 @@ func _draw() -> void:
 		SHAPE_MINE:
 			_draw_mine(p, hw, hh)
 
-	# Tier stars
+	# Building footprint outline
+	draw_rect(Rect2(-hw + 3, -hh + 5, width - 6, height - 9), Color(0, 0, 0, 0.35), false, 1.5)
+
+	# Tier stars with shadow and highlight
 	if tier > 1:
 		for i in tier:
-			var star_x: float = -((tier - 1) * 5.0) * 0.5 + i * 5.0
-			draw_circle(Vector2(star_x, -hh + 3), 2.0, p.accent)
+			var star_x: float = -((tier - 1) * 6.0) * 0.5 + i * 6.0
+			draw_circle(Vector2(star_x, -hh + 5), 2.8, Color(0, 0, 0, 0.5))
+			draw_circle(Vector2(star_x, -hh + 4), 2.8, p.accent)
+			draw_circle(Vector2(star_x, -hh + 3.5), 1.3, Color(1, 1, 1, 0.35))
 
 	# Name label below
 	# (Drawn by game_arena as a Label node for text rendering)
@@ -293,6 +306,7 @@ func _draw_mine(p: Dictionary, hw: float, hh: float) -> void:
 	draw_line(Vector2(hw - 12, -hh + 20), Vector2(hw - 6, hh - 12), p.wood, 1.5)
 	draw_rect(Rect2(hw - 14, -hh + 18, 6, 3), Color(0.5, 0.5, 0.55))
 
-	# Income indicator: coin sparkle
-	draw_circle(Vector2(0, -hh + 10), 5, Color(1.0, 0.85, 0.2, 0.6))
+	# Income indicator: pulsing coin sparkle
+	var sparkle_a: float = 0.4 + sin(_time * 4.0) * 0.25
+	draw_circle(Vector2(0, -hh + 10), 5.5, Color(1.0, 0.85, 0.2, sparkle_a))
 	draw_circle(Vector2(0, -hh + 10), 3, Color(1.0, 0.9, 0.3))

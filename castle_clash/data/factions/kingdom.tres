@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="FactionData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/faction_data.gd" id="1"]
+[ext_resource type="Resource" path="res://data/buildings/barracks.tres" id="2"]
+[ext_resource type="Resource" path="res://data/buildings/archer_range.tres" id="3"]
+[ext_resource type="Resource" path="res://data/buildings/knight_hall.tres" id="4"]
+
+[resource]
+script = ExtResource("1")
+id = &"kingdom"
+display_name = "The Kingdom"
+description = "Balanced faction with strong healing and armor."
+buildings = [ExtResource("2"), ExtResource("3"), ExtResource("4")]
+primary_color = Color(0.2, 0.4, 0.8, 1.0)
+secondary_color = Color(0.8, 0.75, 0.3, 1.0)

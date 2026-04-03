@@ -1,6 +1,6 @@
 ## Manages connection to Nakama relay server.
 ## Stub -- real Nakama integration comes in the multiplayer phase.
-## In offline mode, commands are applied locally with no relay.
+## In offline mode, commands go directly to GameManager.
 extends Node
 
 var is_connected: bool = false
@@ -15,8 +15,7 @@ func _ready() -> void:
 ## Send a command to the relay server (or apply locally in offline mode).
 func send_command(command: Dictionary) -> void:
 	if offline_mode:
-		# Directly enqueue for the next tick
-		pass
+		GameManager.submit_command(command)
 	else:
 		# Serialize and send via WebSocket to Nakama
 		pass

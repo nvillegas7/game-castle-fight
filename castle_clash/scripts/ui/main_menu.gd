@@ -5,6 +5,8 @@ extends Control
 @onready var horde_btn: Button = %HordeBtn
 @onready var faction_desc: Label = %FactionDesc
 @onready var play_btn: Button = %PlayBtn
+@onready var online_btn: Button = %OnlineBtn
+@onready var status_label: Label = %StatusLabel
 
 var _selected_faction: StringName = &"kingdom"
 
@@ -18,6 +20,11 @@ func _ready() -> void:
 	kingdom_btn.pressed.connect(_select_kingdom)
 	horde_btn.pressed.connect(_select_horde)
 	play_btn.pressed.connect(_on_play)
+	online_btn.pressed.connect(_on_play_online)
+	EventBus.connected_to_server.connect(_on_connected)
+	EventBus.match_found.connect(_on_match_found)
+	if status_label:
+		status_label.text = ""
 	_update_selection()
 
 
@@ -40,3 +47,25 @@ func _update_selection() -> void:
 func _on_play() -> void:
 	GameManager.selected_faction = _selected_faction
 	get_tree().change_scene_to_file("res://scenes/game/game_arena.tscn")
+
+
+func _on_play_online() -> void:
+	if status_label:
+		status_label.text = "Connecting to server..."
+	online_btn.disabled = true
+	play_btn.disabled = true
+	NetworkManager.local_faction = _selected_faction
+	NetworkManager.connect_to_server()
+
+
+func _on_connected() -> void:
+	if status_label:
+		status_label.text = "Connected! Finding match..."
+	NetworkManager.start_matchmaking(_selected_faction)
+
+
+func _on_match_found(_match_id: String) -> void:
+	if status_label:
+		status_label.text = "Match found! Starting..."
+	# Auto-ready for MVP (skip lobby screen)
+	NetworkManager.set_ready()

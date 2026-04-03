@@ -1,5 +1,5 @@
 ## Manages match lifecycle and bridges the deterministic simulation
-## with the Godot scene tree.
+## with the Godot scene tree. Supports both offline and online (lockstep) modes.
 extends Node
 
 enum State { MENU, LOADING, PLAYING, MATCH_OVER }
@@ -10,12 +10,18 @@ var simulation: Simulation = null
 var command_buffer: CommandBuffer = null
 var local_player_id: int = 0
 
+## Selected faction for the local player (set by main menu).
+var selected_faction: StringName = &"kingdom"
+
 # Simulation runs at 10 ticks/second (100ms per tick).
 const TICK_RATE: int = 10
 const TICK_DURATION_MSEC: int = 1000 / TICK_RATE
+const MAX_STALL_MSEC: int = 5000  # Disconnect timeout
 
 var _tick_accumulator_msec: int = 0
-var _faction_registry: Dictionary = {}  # faction_id -> FactionData
+var _stall_msec: int = 0
+var _faction_registry: Dictionary = {}
+var _checksum_history: Dictionary = {}  # tick -> checksum
 
 
 func _ready() -> void:
@@ -38,42 +44,47 @@ func _load_faction_data() -> void:
 		file_name = dir.get_next()
 
 
-## Called by UI to submit a command for the next tick.
+## Called by UI to submit a command for the next tick (offline mode).
 func submit_command(command: Dictionary) -> void:
 	if state != State.PLAYING:
 		return
 	command_buffer.add_command(current_tick + 1, command)
 
 
-## Selected faction for the local player (set by main menu).
-var selected_faction: StringName = &"kingdom"
-
-
-## Start a test match for offline single-player development.
+## Start an offline test match with AI opponent.
 func start_test_match() -> void:
-	# AI opponent gets the other faction
 	var ai_faction: StringName = &"horde" if selected_faction == &"kingdom" else &"kingdom"
 	var player_data := [
 		{ "id": 0, "team": 0, "faction": selected_faction },
 		{ "id": 1, "team": 1, "faction": ai_faction },
 	]
 	local_player_id = 0
+	_init_simulation(12345, player_data)
 
+
+## Start a networked match (called by NetworkManager after lobby).
+func start_online_match(seed_value: int, player_data: Array, my_player_id: int) -> void:
+	local_player_id = my_player_id
+	_init_simulation(seed_value, player_data)
+
+
+func _init_simulation(seed_value: int, player_data: Array) -> void:
 	simulation = Simulation.new()
 
-	# Register all buildings from all factions
 	var all_buildings: Array = []
 	for faction_id in _faction_registry:
 		var faction: FactionData = _faction_registry[faction_id]
 		all_buildings.append_array(faction.buildings)
 	simulation.register_buildings(all_buildings)
 
-	simulation.initialize(12345, player_data)
+	simulation.initialize(seed_value, player_data)
 	command_buffer = CommandBuffer.new()
 
 	state = State.PLAYING
 	current_tick = 0
 	_tick_accumulator_msec = 0
+	_stall_msec = 0
+	_checksum_history.clear()
 	set_process(true)
 	EventBus.match_started.emit()
 
@@ -98,6 +109,11 @@ func get_player_gold(player_id: int) -> int:
 	return 0
 
 
+## Get a stored checksum for desync comparison.
+func get_checksum_for_tick(tick: int) -> int:
+	return _checksum_history.get(tick, -1)
+
+
 func _process(delta: float) -> void:
 	if state != State.PLAYING:
 		return
@@ -105,6 +121,18 @@ func _process(delta: float) -> void:
 	_tick_accumulator_msec += int(delta * 1000.0)
 
 	while _tick_accumulator_msec >= TICK_DURATION_MSEC:
+		var next_tick: int = current_tick + 1
+
+		# Online lockstep: flush local commands and wait for remote
+		if not NetworkManager.offline_mode:
+			NetworkManager.flush_commands_for_tick(next_tick)
+			if not NetworkManager.is_tick_ready(next_tick):
+				_stall_msec += TICK_DURATION_MSEC
+				if _stall_msec >= MAX_STALL_MSEC:
+					push_error("Tick stall timeout at tick %d" % next_tick)
+				return  # Don't consume accumulator -- retry next frame
+
+		_stall_msec = 0
 		_tick_accumulator_msec -= TICK_DURATION_MSEC
 		_advance_simulation_tick()
 
@@ -115,6 +143,14 @@ func _advance_simulation_tick() -> void:
 	var result := simulation.step(commands)
 	command_buffer.clear_through(current_tick)
 
+	# Track checksums for desync detection
+	var checksum: int = simulation.compute_checksum()
+	_checksum_history[current_tick] = checksum
+	if current_tick > 100:
+		_checksum_history.erase(current_tick - 100)
+	NetworkManager.send_checksum(current_tick, checksum)
+
+	# Dispatch events to visual layer via EventBus
 	for event in result.events:
 		match event.type:
 			"building_placed":

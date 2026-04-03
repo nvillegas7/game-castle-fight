@@ -1,0 +1,36 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: nakama
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localdb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  nakama:
+    image: heroiclabs/nakama:3.22.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint:
+      - /nakama/nakama
+      - --database.address=postgres:localdb@postgres:5432/nakama
+      - --socket.server_key=castleclash_dev
+      - --logger.level=INFO
+    ports:
+      - "7349:7349"   # gRPC
+      - "7350:7350"   # HTTP/WebSocket API
+      - "7351:7351"   # Console (admin:password)
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -10,6 +10,7 @@ extends Resource
 @export_group("Economy")
 @export var gold_cost: int = 50
 @export var sell_refund_percent: int = 50  # 0-100
+@export var income_bonus: int = 0  # Extra gold per income tick (for economy buildings)
 
 @export_group("Spawning")
 @export var spawns_unit: UnitData = null

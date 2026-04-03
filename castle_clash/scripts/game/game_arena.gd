@@ -31,6 +31,9 @@ var _ai_timer: float = 2.0  # Start slightly earlier so AI places before first w
 @onready var castle_hp_bar_1: ColorRect = $CastleHPBar1
 
 var _wave_announce_timer: float = 0.0
+var _shake_intensity: float = 0.0
+var _shake_timer: float = 0.0
+var _original_position: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -39,11 +42,15 @@ func _ready() -> void:
 	EventBus.unit_spawned.connect(_on_unit_spawned)
 	EventBus.unit_died.connect(_on_unit_died)
 	EventBus.wave_started.connect(_on_wave_announced)
+	EventBus.unit_attacked.connect(_on_unit_attacked)
+	EventBus.unit_healed.connect(_on_unit_healed)
+	EventBus.castle_damaged.connect(_on_castle_hit)
 
 	grid_overlay_0.player_index = 0
 	grid_overlay_1.player_index = 1
 
 	building_menu.building_selected.connect(_on_building_selected)
+	_original_position = position
 
 	if wave_label:
 		wave_label.visible = false
@@ -59,6 +66,7 @@ func _process(delta: float) -> void:
 	_sync_unit_positions()
 	_update_castle_hp_bars()
 	_update_wave_announcement(delta)
+	_update_screen_shake(delta)
 	_update_ai(delta)
 
 
@@ -91,6 +99,11 @@ func _on_building_placed(player_id: int, building_data: BuildingData, grid_pos: 
 	buildings_layer.add_child(visual)
 	if entity_id >= 0:
 		_building_visuals[entity_id] = visual
+
+	# Placement animation: pop in
+	visual.scale = Vector2(0.5, 0.5)
+	var tween := visual.create_tween()
+	tween.tween_property(visual, "scale", Vector2(1.0, 1.0), 0.15).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
 	grid_overlay_0.queue_redraw()
 	grid_overlay_1.queue_redraw()
@@ -130,6 +143,14 @@ func _on_unit_spawned(unit_id: int, _unit_type: StringName) -> void:
 	units_layer.add_child(visual)
 	_unit_visuals[unit_id] = visual
 
+	# Spawn animation: scale from 0 to 1 + burst ring
+	visual.scale = Vector2(0.1, 0.1)
+	var tween := visual.create_tween()
+	tween.tween_property(visual, "scale", Vector2(1.0, 1.0), 0.2).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+	var spawn_color := Color(0.3, 0.6, 1.0) if entity.team == 0 else Color(1.0, 0.35, 0.3)
+	units_layer.add_child(Effects.create_spawn_burst(visual.position, spawn_color))
+
 
 func _create_unit_visual(entity: Dictionary) -> Node2D:
 	var uv: Node2D = load("res://scripts/game/unit_visual.gd").new()
@@ -143,8 +164,40 @@ func _create_unit_visual(entity: Dictionary) -> Node2D:
 
 func _on_unit_died(unit_id: int, _killer_id: int) -> void:
 	if _unit_visuals.has(unit_id):
-		_unit_visuals[unit_id].queue_free()
+		var visual = _unit_visuals[unit_id]
+		var death_pos: Vector2 = visual.position
+		var team_color := Color(0.3, 0.6, 1.0) if visual.team == 0 else Color(1.0, 0.35, 0.3)
+		# Death poof effect
+		units_layer.add_child(Effects.create_death_poof(death_pos, team_color))
+		visual.queue_free()
 		_unit_visuals.erase(unit_id)
+
+
+func _on_unit_attacked(_attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float) -> void:
+	var target_pos := Vector2(target_x, target_y)
+	# Damage number
+	units_layer.add_child(Effects.create_damage_number(damage, target_pos))
+	# Hit flash on target visual
+	if _unit_visuals.has(target_id):
+		_unit_visuals[target_id].flash_hit()
+	# Projectile from attacker to target (for ranged units)
+	if _unit_visuals.has(_attacker_id):
+		var attacker_visual = _unit_visuals[_attacker_id]
+		var dist: float = attacker_visual.position.distance_to(target_pos)
+		if dist > 40:  # Only show projectile for ranged attacks
+			var proj_color := Color(0.8, 0.8, 0.4) if attacker_visual.team == 0 else Color(1.0, 0.5, 0.2)
+			units_layer.add_child(Effects.create_projectile(attacker_visual.position, target_pos, proj_color, 0.12))
+
+
+func _on_unit_healed(_healer_id: int, _target_id: int, amount: int, target_x: float, target_y: float) -> void:
+	var target_pos := Vector2(target_x, target_y)
+	units_layer.add_child(Effects.create_heal_sparkle(target_pos))
+	units_layer.add_child(Effects.create_damage_number(amount, target_pos, true))
+
+
+func _on_castle_hit(_team: int, _damage: int, _remaining_hp: int) -> void:
+	_shake_intensity = 4.0
+	_shake_timer = 0.2
 
 
 # --- Position Sync ---
@@ -160,6 +213,17 @@ func _sync_unit_positions() -> void:
 			var max_hp: float = FP.to_float(entity.max_hp)
 			if max_hp > 0:
 				visual.hp_ratio = clampf(FP.to_float(entity.hp) / max_hp, 0.0, 1.0)
+
+
+# --- Screen Shake ---
+
+func _update_screen_shake(delta: float) -> void:
+	if _shake_timer > 0:
+		_shake_timer -= delta
+		var offset := Vector2(randf_range(-_shake_intensity, _shake_intensity), randf_range(-_shake_intensity, _shake_intensity))
+		position = _original_position + offset
+	else:
+		position = _original_position
 
 
 # --- Castle HP Bars ---

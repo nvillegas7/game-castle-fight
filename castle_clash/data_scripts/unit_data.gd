@@ -15,6 +15,9 @@ extends Resource
 @export var move_speed: int = 2            # Grid cells per second (converted to FP at load)
 @export var armor: int = 0
 
+@export_group("Economy")
+@export var bounty: int = 5  # Gold awarded to enemy team on kill
+
 @export_group("Type Classification")
 @export_enum("Physical", "Pierce", "Magic", "Siege") var attack_type: int = 0
 @export_enum("Light", "Medium", "Heavy", "Fortified") var armor_type: int = 0

@@ -289,6 +289,10 @@ func _handle_place_building(cmd: Dictionary) -> Array[Dictionary]:
 
 	player.gold = FP.sub(player.gold, cost_fp)
 
+	# Income building bonus
+	if bd.income_bonus > 0:
+		player.income = FP.add(player.income, FP.from_int(bd.income_bonus))
+
 	events.append({
 		"type": "building_placed",
 		"entity_id": entity_id,
@@ -404,6 +408,7 @@ func _spawn_wave() -> Array[Dictionary]:
 				"attack_type": ud.attack_type,
 				"armor_type": ud.armor_type,
 				"role": ud.role,
+				"bounty": ud.bounty,
 				"x": spawn_x,
 				"y": FP.add(spawn_y, y_offset),
 				"attack_cooldown": 0,
@@ -628,8 +633,26 @@ func _cleanup_dead() -> Array[Dictionary]:
 				"x": entity.get("x", 0),
 				"y": entity.get("y", 0),
 			})
-			# If building, clear grid cells
+			# Kill bounty: award gold to the opposing team's players
+			if entity.type == "unit":
+				var bounty: int = entity.get("bounty", 0)
+				if bounty > 0:
+					var bounty_fp := FP.from_int(bounty)
+					var enemy_team: int = 1 - entity.team
+					for player in players:
+						if player.team == enemy_team:
+							player.gold = FP.add(player.gold, bounty_fp)
+							events.append({
+								"type": "gold_changed",
+								"player_id": player.id,
+								"new_gold": player.gold,
+							})
+			# If building, clear grid cells and remove income bonus
 			if entity.type == "building":
+				var bd = building_registry.get(entity.building_type)
+				if bd and bd.income_bonus > 0:
+					var pi: int = entity.player_index
+					players[pi].income = FP.sub(players[pi].income, FP.from_int(bd.income_bonus))
 				var grid: Array = grid_cells[entity.player_index]
 				for row in range(entity.grid_y, entity.grid_y + entity.grid_size_y):
 					for col in range(entity.grid_x, entity.grid_x + entity.grid_size_x):

@@ -14,6 +14,7 @@ const SHAPE_TOWER := 1     # Archer Range / Axe Range
 const SHAPE_TEMPLE := 2    # Priest Temple / War Drums
 const SHAPE_CASTLE := 3    # Knight Hall / Berserker Pit
 const SHAPE_WORKSHOP := 4  # Siege Workshop / Demolisher Works
+const SHAPE_MINE := 5      # Gold Mine / Plunder Camp
 
 var _shape: int = SHAPE_FORT
 
@@ -53,6 +54,8 @@ const TYPE_TO_SHAPE := {
 	&"berserker_pit": SHAPE_CASTLE,
 	&"siege_workshop": SHAPE_WORKSHOP,
 	&"demolisher_works": SHAPE_WORKSHOP,
+	&"gold_mine": SHAPE_MINE,
+	&"plunder_camp": SHAPE_MINE,
 }
 
 
@@ -86,6 +89,8 @@ func _draw() -> void:
 			_draw_castle(p, hw, hh)
 		SHAPE_WORKSHOP:
 			_draw_workshop(p, hw, hh)
+		SHAPE_MINE:
+			_draw_mine(p, hw, hh)
 
 	# Tier stars
 	if tier > 1:
@@ -254,3 +259,30 @@ func _draw_workshop(p: Dictionary, hw: float, hh: float) -> void:
 
 	# Chimney / smoke
 	draw_rect(Rect2(hw - 10, -hh + 4, 5, 6), p.wall_light)
+
+
+func _draw_mine(p: Dictionary, hw: float, hh: float) -> void:
+	# Mine entrance (dark cave opening)
+	draw_rect(Rect2(-hw + 4, -hh + 18, width - 8, hh + hh - 22), p.wall)
+
+	# Cave entrance (arch)
+	draw_rect(Rect2(-8, -hh + 24, 16, hh + hh - 28), Color(0.12, 0.1, 0.08))
+	draw_arc(Vector2(0, -hh + 24), 8, PI, 0, 8, Color(0.15, 0.12, 0.1), 8)
+
+	# Wooden frame around entrance
+	draw_rect(Rect2(-10, -hh + 16, 3, hh + hh - 20), p.wood)
+	draw_rect(Rect2(7, -hh + 16, 3, hh + hh - 20), p.wood)
+	draw_rect(Rect2(-10, -hh + 16, 20, 3), p.wood)
+
+	# Gold pile at entrance
+	draw_circle(Vector2(-3, hh - 10), 4, p.accent)
+	draw_circle(Vector2(3, hh - 12), 3, p.accent.lightened(0.2))
+	draw_circle(Vector2(0, hh - 8), 3, p.accent.darkened(0.1))
+
+	# Pickaxe leaning on wall
+	draw_line(Vector2(hw - 12, -hh + 20), Vector2(hw - 6, hh - 12), p.wood, 1.5)
+	draw_rect(Rect2(hw - 14, -hh + 18, 6, 3), Color(0.5, 0.5, 0.55))
+
+	# Income indicator: coin sparkle
+	draw_circle(Vector2(0, -hh + 10), 5, Color(1.0, 0.85, 0.2, 0.6))
+	draw_circle(Vector2(0, -hh + 10), 3, Color(1.0, 0.9, 0.3))

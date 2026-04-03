@@ -26,6 +26,7 @@ func _ready() -> void:
 	if status_label:
 		status_label.text = ""
 	_update_selection()
+	_update_player_stats()
 
 
 func _select_kingdom() -> void:
@@ -69,3 +70,14 @@ func _on_match_found(_match_id: String) -> void:
 		status_label.text = "Match found! Starting..."
 	# Auto-ready for MVP (skip lobby screen)
 	NetworkManager.set_ready()
+
+
+func _update_player_stats() -> void:
+	if status_label:
+		var rank: String = PlayerData.get_rank_name()
+		var record: String = "%dW / %dL" % [PlayerData.games_won, PlayerData.games_played - PlayerData.games_won]
+		var bonus: String = " | First Win Bonus!" if PlayerData.first_win_bonus_available else ""
+		if PlayerData.games_played > 0:
+			status_label.text = "%d Trophies (%s) | %s%s" % [PlayerData.trophies, rank, record, bonus]
+		else:
+			status_label.text = "Welcome, Commander! Pick a faction and fight."

@@ -169,8 +169,24 @@ func _advance_simulation_tick() -> void:
 				EventBus.wave_started.emit(event.wave_number)
 			"unit_spawned":
 				EventBus.unit_spawned.emit(event.entity_id, event.unit_type)
+			"unit_attacked":
+				var target = simulation._find_entity_by_id(event.target_id)
+				if target:
+					EventBus.unit_attacked.emit(
+						event.attacker_id, event.target_id,
+						FP.to_int(event.damage),
+						FP.to_float(target.x), FP.to_float(target.y)
+					)
+			"unit_healed":
+				var healed = simulation._find_entity_by_id(event.target_id)
+				if healed:
+					EventBus.unit_healed.emit(
+						event.healer_id, event.target_id,
+						FP.to_int(event.amount),
+						FP.to_float(healed.x), FP.to_float(healed.y)
+					)
 			"castle_damaged":
-				EventBus.castle_damaged.emit(event.team, event.damage, event.remaining_hp)
+				EventBus.castle_damaged.emit(event.team, FP.to_int(event.damage), FP.to_int(event.remaining_hp))
 			"match_over":
 				state = State.MATCH_OVER
 				set_process(false)

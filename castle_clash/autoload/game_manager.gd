@@ -187,6 +187,8 @@ func _advance_simulation_tick() -> void:
 					)
 			"castle_damaged":
 				EventBus.castle_damaged.emit(event.team, FP.to_int(event.damage), FP.to_int(event.remaining_hp))
+			"skill_proc":
+				EventBus.skill_activated.emit(event.unit_id, StringName(event.skill))
 			"match_over":
 				state = State.MATCH_OVER
 				set_process(false)

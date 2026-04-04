@@ -20,6 +20,7 @@ signal unit_spawned(unit_id: int, unit_type: StringName)
 signal unit_died(unit_id: int, killer_id: int)
 signal unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float)
 signal unit_healed(healer_id: int, target_id: int, amount: int, target_x: float, target_y: float)
+signal skill_activated(unit_id: int, skill_id: StringName)
 
 # -- Castle --
 signal castle_damaged(team: int, damage: int, remaining_hp: int)

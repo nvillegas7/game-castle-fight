@@ -128,6 +128,14 @@ func step(commands: Array) -> Dictionary:
 	# 4. Remove dead entities
 	events.append_array(_cleanup_dead())
 
+	# 4.5. Castle burn damage (from Siege Fire)
+	for castle in castles:
+		if castle.get("burn_timer", 0) > 0:
+			castle.burn_timer -= 1
+			var burn_dmg: int = castle.get("burn_damage", FP.ZERO)
+			castle.hp = FP.sub(castle.hp, burn_dmg)
+			events.append({"type": "castle_damaged", "team": castle.team, "damage": burn_dmg, "remaining_hp": castle.hp, "attacker_id": -1})
+
 	# 5. Check win condition (only first castle to fall wins)
 	if not match_over:
 		for castle in castles:
@@ -457,11 +465,41 @@ func _spawn_from_building(building: Dictionary) -> Array[Dictionary]:
 func _update_units() -> Array[Dictionary]:
 	var events: Array[Dictionary] = []
 
+	# Pre-pass: clear temp buffs, tick debuffs
+	for entity in entities:
+		if entity.type != "unit":
+			continue
+		entity["drums_buffed"] = false
+		if entity.get("rend_timer", 0) > 0:
+			entity.rend_timer -= 1
+
+	# Pre-pass: apply War Drums aura
+	for entity in entities:
+		if entity.type != "unit" or FP.lte(entity.hp, FP.ZERO):
+			continue
+		if entity.get("skill_id", &"") == &"war_drums":
+			var aura_range_sq: int = FP.mul(FP.from_int(entity.skill_param_2), FP.from_int(entity.skill_param_2))
+			for other in entities:
+				if other.type != "unit" or other.team != entity.team or other.id == entity.id:
+					continue
+				if FP.lte(other.hp, FP.ZERO):
+					continue
+				if FP.lte(_distance_squared_2d(entity, other), aura_range_sq):
+					other["drums_buffed"] = true
+
+	# Main unit loop
 	for entity in entities:
 		if entity.type != "unit":
 			continue
 		if FP.lte(entity.hp, FP.ZERO):
 			continue
+
+		# Tick skill cooldown
+		if entity.get("skill_cooldown", 0) > 0:
+			entity.skill_cooldown -= 1
+
+		# Passive threshold skills
+		events.append_array(_check_passive_skills(entity))
 
 		# Casters (role=2) heal allies instead of attacking
 		if entity.role == 2:
@@ -472,7 +510,9 @@ func _update_units() -> Array[Dictionary]:
 				if healed:
 					events.append_array(healed)
 					entity.attack_cooldown = entity.attack_speed_ticks
-			# Casters still move with the army
+				# Holy Light AoE heal skill
+				if entity.get("skill_id", &"") == &"holy_light" and entity.skill_cooldown <= 0:
+					events.append_array(_skill_holy_light(entity))
 			_move_unit(entity)
 			continue
 
@@ -492,14 +532,17 @@ func _update_units() -> Array[Dictionary]:
 				if FP.lte(dist_sq, range_sq):
 					if entity.attack_cooldown <= 0:
 						events.append_array(_perform_attack(entity, target))
-						entity.attack_cooldown = entity.attack_speed_ticks
+						# Drums buff: reduce cooldown by 15%
+						var cd: int = entity.attack_speed_ticks
+						if entity.get("drums_buffed", false):
+							cd = maxi(1, int(cd * 0.85))
+						entity.attack_cooldown = cd
+						# Active skills that trigger after attack
+						events.append_array(_check_attack_skills(entity))
 					attacked = true
 
 		if not attacked:
-			# Phase 3: Move toward enemy
 			_move_unit(entity)
-
-			# Phase 4: Check if reached castle zone
 			events.append_array(_check_castle_damage(entity))
 
 	return events
@@ -589,6 +632,7 @@ func _move_unit(unit: Dictionary) -> void:
 
 
 func _perform_attack(attacker: Dictionary, target: Dictionary) -> Array[Dictionary]:
+	var events: Array[Dictionary] = []
 	var multiplier: int = damage_table[attacker.attack_type][target.armor_type]
 	var raw_damage: int = FP.mul(attacker.attack_damage, multiplier)
 
@@ -596,21 +640,65 @@ func _perform_attack(attacker: Dictionary, target: Dictionary) -> Array[Dictiona
 	var defense: int
 	if attacker.attack_type == 2:  # Magic
 		defense = target.get("magic_defense", FP.ZERO)
-	else:  # Physical, Pierce, Siege
+	else:
 		defense = target.armor
 
 	var final_damage: int = FP.sub(raw_damage, defense)
-	final_damage = FP.max_fp(final_damage, FP.ONE)  # Minimum 1 damage
+	final_damage = FP.max_fp(final_damage, FP.ONE)
+
+	# --- On-hit skill: Shield Wall (target) ---
+	# Footman: -15% Pierce damage when HP > 50%
+	if target.get("skill_id", &"") == &"shield_wall" and attacker.attack_type == 1:
+		var hp_threshold: int = FP.div(target.max_hp, FP.TWO)  # 50%
+		if FP.gt(target.hp, hp_threshold):
+			final_damage = FP.div(FP.mul(final_damage, FP.from_int(target.skill_param_1)), FP.from_int(1000))
+
+	# --- On-hit skill: Rending Throw (attacker) ---
+	# Axe Thrower: 25% chance to apply +20% damage taken debuff
+	if attacker.get("skill_id", &"") == &"rending_throw":
+		if rng.range_int(1, 100) <= attacker.skill_param_1:
+			target["rend_timer"] = attacker.skill_param_2
+			events.append({"type": "skill_proc", "unit_id": attacker.id, "skill": "rending_throw"})
+
+	# --- Rend debuff on target: +20% damage taken ---
+	if target.get("rend_timer", 0) > 0:
+		final_damage = FP.div(FP.mul(final_damage, FP.from_int(1200)), FP.from_int(1000))
 
 	target.hp = FP.sub(target.hp, final_damage)
 
-	return [{
+	events.append({
 		"type": "unit_attacked",
 		"attacker_id": attacker.id,
 		"target_id": target.id,
 		"damage": final_damage,
 		"target_hp": target.hp,
-	}]
+	})
+
+	# --- On-kill skill: Blood Frenzy (attacker) ---
+	# Berserker: +10% base damage per kill, max 5 stacks
+	if FP.lte(target.hp, FP.ZERO) and attacker.get("skill_id", &"") == &"blood_frenzy":
+		if attacker.skill_stacks < attacker.skill_param_2:
+			attacker.skill_stacks += 1
+			var bonus: int = FP.div(attacker.base_attack_damage, FP.from_int(10))
+			attacker.attack_damage = FP.add(attacker.attack_damage, bonus)
+			events.append({"type": "skill_proc", "unit_id": attacker.id, "skill": "blood_frenzy", "stacks": attacker.skill_stacks})
+
+	# --- On-hit skill: Boulder Splash (attacker) ---
+	# Catapult: 40% splash to enemies within param_2 pixels of target
+	if attacker.get("skill_id", &"") == &"boulder_splash":
+		var splash_range_sq: int = FP.mul(FP.from_int(attacker.skill_param_2), FP.from_int(attacker.skill_param_2))
+		var splash_dmg: int = FP.div(FP.mul(final_damage, FP.from_int(attacker.skill_param_1)), FP.from_int(1000))
+		splash_dmg = FP.max_fp(splash_dmg, FP.ONE)
+		for other in entities:
+			if other.type != "unit" or other.team == attacker.team or other.id == target.id:
+				continue
+			if FP.lte(other.hp, FP.ZERO):
+				continue
+			if FP.lte(_distance_squared_2d(target, other), splash_range_sq):
+				other.hp = FP.sub(other.hp, splash_dmg)
+				events.append({"type": "unit_attacked", "attacker_id": attacker.id, "target_id": other.id, "damage": splash_dmg, "target_hp": other.hp})
+
+	return events
 
 
 ## Caster heals the nearest damaged ally in range.
@@ -659,6 +747,103 @@ func _try_heal(healer: Dictionary) -> Array[Dictionary]:
 	}]
 
 
+# --- Skill Helpers ---
+
+## Passive skills that trigger on thresholds (checked every tick).
+func _check_passive_skills(unit: Dictionary) -> Array[Dictionary]:
+	var events: Array[Dictionary] = []
+	var sid: StringName = unit.get("skill_id", &"")
+
+	# Toughness (Grunt): +3 armor when HP < 30%, one-time
+	if sid == &"toughness" and unit.skill_stacks == 0:
+		var threshold: int = FP.div(FP.mul(unit.max_hp, FP.from_int(unit.skill_param_1)), FP.from_int(1000))
+		if FP.lt(unit.hp, threshold):
+			unit.armor = FP.add(unit.armor, FP.from_int(unit.skill_param_2))
+			unit.magic_defense = FP.add(unit.get("magic_defense", FP.ZERO), FP.ONE)
+			unit.skill_stacks = 1
+			events.append({"type": "skill_proc", "unit_id": unit.id, "skill": "toughness"})
+
+	# Charge (Knight): double speed on first target acquisition, one-time
+	if sid == &"charge" and unit.get("charge_available", true) and unit.target_id != -1:
+		unit["charge_available"] = false
+		unit.move_speed = FP.mul(unit.move_speed, FP.TWO)
+		unit["charge_timer"] = unit.skill_param_2  # 15 ticks
+		unit["charge_damage_ready"] = true
+		events.append({"type": "skill_proc", "unit_id": unit.id, "skill": "charge"})
+
+	# Charge timer countdown
+	if unit.get("charge_timer", 0) > 0:
+		unit.charge_timer -= 1
+		if unit.charge_timer <= 0:
+			unit.move_speed = unit.base_move_speed
+
+	return events
+
+
+## Active skills that trigger after a normal attack.
+func _check_attack_skills(entity: Dictionary) -> Array[Dictionary]:
+	var events: Array[Dictionary] = []
+	var sid: StringName = entity.get("skill_id", &"")
+
+	# Volley (Archer): every 50 ticks, fire 3 arrows at 60% damage
+	if sid == &"volley" and entity.skill_cooldown <= 0:
+		entity.skill_cooldown = entity.skill_param_2  # 50 ticks
+		var volley_dmg: int = FP.div(FP.mul(entity.attack_damage, FP.from_int(entity.skill_param_1)), FP.from_int(1000))
+		volley_dmg = FP.max_fp(volley_dmg, FP.ONE)
+		var targets_hit: int = 0
+		var range_sq: int = FP.mul(entity.attack_range, entity.attack_range)
+		for other in entities:
+			if targets_hit >= 3:
+				break
+			if other.type != "unit" or other.team == entity.team:
+				continue
+			if FP.lte(other.hp, FP.ZERO):
+				continue
+			if FP.lte(_distance_squared_x(entity, other), range_sq):
+				other.hp = FP.sub(other.hp, volley_dmg)
+				events.append({"type": "unit_attacked", "attacker_id": entity.id, "target_id": other.id, "damage": volley_dmg, "target_hp": other.hp})
+				targets_hit += 1
+		if targets_hit > 0:
+			events.append({"type": "skill_proc", "unit_id": entity.id, "skill": "volley"})
+
+	# Charge first-hit bonus (Knight): 200% damage on first attack
+	if entity.get("charge_damage_ready", false):
+		entity.charge_damage_ready = false
+		# The attack already happened in _perform_attack, so apply bonus damage to last target
+		if entity.target_id != -1:
+			var target = _find_entity_by_id(entity.target_id)
+			if target and FP.gt(target.hp, FP.ZERO):
+				var bonus: int = entity.attack_damage  # +100% = double total
+				target.hp = FP.sub(target.hp, bonus)
+				events.append({"type": "unit_attacked", "attacker_id": entity.id, "target_id": target.id, "damage": bonus, "target_hp": target.hp})
+				events.append({"type": "skill_proc", "unit_id": entity.id, "skill": "charge_hit"})
+
+	return events
+
+
+## Holy Light (Priest): AoE heal allies within 2 cells.
+func _skill_holy_light(healer: Dictionary) -> Array[Dictionary]:
+	var events: Array[Dictionary] = []
+	healer.skill_cooldown = healer.skill_param_2  # 30 ticks
+	var heal_amount: int = FP.div(healer.attack_damage, FP.TWO)  # 50% of heal power
+	var range_px: int = FP.from_int(2 * CELL_SIZE_PX)
+	var range_sq: int = FP.mul(range_px, range_px)
+	var healed_count: int = 0
+
+	for other in entities:
+		if other.type != "unit" or other.team != healer.team or other.id == healer.id:
+			continue
+		if FP.lte(other.hp, FP.ZERO) or FP.gte(other.hp, other.max_hp):
+			continue
+		if FP.lte(_distance_squared_2d(healer, other), range_sq):
+			other.hp = FP.min_fp(FP.add(other.hp, heal_amount), other.max_hp)
+			healed_count += 1
+
+	if healed_count > 0:
+		events.append({"type": "skill_proc", "unit_id": healer.id, "skill": "holy_light", "count": healed_count})
+	return events
+
+
 func _check_castle_damage(unit: Dictionary) -> Array[Dictionary]:
 	var events: Array[Dictionary] = []
 	var enemy_team: int = 1 - unit.team
@@ -672,10 +857,16 @@ func _check_castle_damage(unit: Dictionary) -> Array[Dictionary]:
 	if in_castle_zone and unit.attack_cooldown <= 0:
 		var castle: Dictionary = castles[enemy_team]
 		if FP.gt(castle.hp, FP.ZERO):
-			# Castle armor type = Fortified (3)
-			var multiplier: int = damage_table[unit.attack_type][3]
+			var multiplier: int = damage_table[unit.attack_type][3]  # Fortified
 			var raw_damage: int = FP.mul(unit.attack_damage, multiplier)
 			var final_damage: int = FP.max_fp(raw_damage, FP.ONE)
+
+			# Siege Fire (Demolisher): +25% castle damage + burn
+			if unit.get("skill_id", &"") == &"siege_fire":
+				final_damage = FP.div(FP.mul(final_damage, FP.from_int(unit.skill_param_1)), FP.from_int(1000))
+				castle["burn_timer"] = unit.skill_param_2
+				castle["burn_damage"] = FP.from_int(5)
+
 			castle.hp = FP.sub(castle.hp, final_damage)
 			unit.attack_cooldown = unit.attack_speed_ticks
 

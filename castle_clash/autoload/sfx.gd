@@ -1,19 +1,18 @@
-## Procedural sound effect system. Generates simple sounds without audio files.
-## Uses AudioStreamGenerator to create beeps, impacts, and chimes programmatically.
+## Procedural sound with layered harmonics, ADSR envelopes, and filter sweeps.
 extends Node
 
 var _players: Array[AudioStreamPlayer] = []
 var _next: int = 0
-const POOL_SIZE: int = 12
-const SAMPLE_RATE: float = 22050.0
+const POOL_SIZE: int = 16
+const SR: float = 22050.0
 
 
 func _ready() -> void:
 	for i in POOL_SIZE:
-		var player := AudioStreamPlayer.new()
-		player.bus = "Master"
-		add_child(player)
-		_players.append(player)
+		var p := AudioStreamPlayer.new()
+		p.bus = "Master"
+		add_child(p)
+		_players.append(p)
 
 
 func _get_player() -> AudioStreamPlayer:
@@ -22,98 +21,151 @@ func _get_player() -> AudioStreamPlayer:
 	return p
 
 
-## Short pitched beep -- used for UI clicks, placement
 func play_place() -> void:
-	_play_tone(440.0, 0.08, 0.3)
+	_play_layered([
+		{"freq": 440, "dur": 0.08, "vol": 0.25, "type": "sine"},
+		{"freq": 880, "dur": 0.05, "vol": 0.1, "type": "sine"},
+	])
 
 
-## Low thud -- unit attack hit
 func play_hit() -> void:
-	_play_tone(120.0, 0.06, 0.25, true)
+	_play_layered([
+		{"freq": 120, "dur": 0.07, "vol": 0.3, "type": "sine", "attack": 0.005},
+		{"freq": 135, "dur": 0.06, "vol": 0.15, "type": "sine"},  # Detuned 2nd osc
+		{"freq": 0, "dur": 0.03, "vol": 0.25, "type": "noise"},   # Noise burst
+	])
 
 
-## Higher pitch quick -- ranged attack
 func play_shoot() -> void:
-	_play_tone(800.0, 0.04, 0.15)
+	_play_layered([
+		{"freq": 800, "dur": 0.04, "vol": 0.12, "type": "sine", "slide": 400},
+		{"freq": 1600, "dur": 0.03, "vol": 0.06, "type": "sine"},
+	])
 
 
-## Descending tone -- unit death
 func play_death() -> void:
-	_play_tone(300.0, 0.12, 0.2, false, -200.0)
+	_play_layered([
+		{"freq": 300, "dur": 0.15, "vol": 0.2, "type": "sine", "slide": -200},
+		{"freq": 150, "dur": 0.12, "vol": 0.1, "type": "sine", "slide": -100},
+		{"freq": 0, "dur": 0.04, "vol": 0.15, "type": "noise"},
+	])
 
 
-## Rising chime -- heal
 func play_heal() -> void:
-	_play_tone(660.0, 0.1, 0.2, false, 200.0)
+	_play_layered([
+		{"freq": 660, "dur": 0.1, "vol": 0.15, "type": "sine", "slide": 200},
+		{"freq": 990, "dur": 0.08, "vol": 0.08, "type": "sine", "slide": 150},
+	])
 
 
-## Deep boom -- castle damage
 func play_castle_hit() -> void:
-	_play_tone(80.0, 0.15, 0.4, true)
+	_play_layered([
+		{"freq": 40, "dur": 0.2, "vol": 0.3, "type": "sine"},    # Sub bass
+		{"freq": 80, "dur": 0.18, "vol": 0.35, "type": "sine"},   # Main boom
+		{"freq": 0, "dur": 0.06, "vol": 0.3, "type": "noise", "attack": 0.002},  # Impact
+	])
 
 
-## Gold sound -- income/sell
 func play_gold() -> void:
-	_play_tone(1200.0, 0.05, 0.15)
-	# Quick second note
-	await get_tree().create_timer(0.06).timeout
-	_play_tone(1500.0, 0.05, 0.12)
+	_play_layered([
+		{"freq": 1200, "dur": 0.05, "vol": 0.12, "type": "sine"},
+		{"freq": 1500, "dur": 0.05, "vol": 0.1, "type": "sine", "delay": 0.06},
+	])
 
 
-## Victory fanfare
 func play_victory() -> void:
-	_play_tone(523.0, 0.15, 0.3)
-	await get_tree().create_timer(0.15).timeout
-	_play_tone(659.0, 0.15, 0.3)
-	await get_tree().create_timer(0.15).timeout
-	_play_tone(784.0, 0.25, 0.35)
+	_play_layered([
+		{"freq": 523, "dur": 0.15, "vol": 0.25, "type": "sine"},
+		{"freq": 659, "dur": 0.15, "vol": 0.25, "type": "sine", "delay": 0.15},
+		{"freq": 784, "dur": 0.3, "vol": 0.3, "type": "sine", "delay": 0.3},
+		{"freq": 1046, "dur": 0.2, "vol": 0.15, "type": "sine", "delay": 0.3},
+	])
 
 
-## Defeat sound
 func play_defeat() -> void:
-	_play_tone(300.0, 0.2, 0.3, false, -100.0)
-	await get_tree().create_timer(0.25).timeout
-	_play_tone(200.0, 0.3, 0.25, false, -50.0)
+	_play_layered([
+		{"freq": 300, "dur": 0.25, "vol": 0.25, "type": "sine", "slide": -100},
+		{"freq": 200, "dur": 0.35, "vol": 0.2, "type": "sine", "slide": -60, "delay": 0.25},
+	])
 
 
-## Skill proc sound -- quick sparkle
 func play_skill() -> void:
-	_play_tone(900.0, 0.06, 0.15)
-	await get_tree().create_timer(0.04).timeout
-	_play_tone(1100.0, 0.06, 0.12)
+	_play_layered([
+		{"freq": 900, "dur": 0.06, "vol": 0.12, "type": "sine"},
+		{"freq": 1100, "dur": 0.06, "vol": 0.1, "type": "sine", "delay": 0.04},
+		{"freq": 1400, "dur": 0.04, "vol": 0.06, "type": "sine", "delay": 0.08},
+	])
 
 
-func _play_tone(freq: float, duration: float, volume: float, noise: bool = false, freq_slide: float = 0.0) -> void:
+func _play_layered(layers: Array) -> void:
+	var max_dur: float = 0.0
+	for layer in layers:
+		var d: float = layer.get("delay", 0.0) + layer.get("dur", 0.1)
+		if d > max_dur:
+			max_dur = d
+
 	var stream := AudioStreamGenerator.new()
-	stream.mix_rate = SAMPLE_RATE
-	stream.buffer_length = duration + 0.05
+	stream.mix_rate = SR
+	stream.buffer_length = max_dur + 0.05
 
 	var player := _get_player()
 	player.stream = stream
-	player.volume_db = linear_to_db(volume)
+	player.volume_db = 0
 	player.play()
 
 	var playback: AudioStreamGeneratorPlayback = player.get_stream_playback()
 	if playback == null:
 		return
 
-	var samples: int = int(duration * SAMPLE_RATE)
-	var phase: float = 0.0
+	var total_samples: int = int(max_dur * SR)
+	var phases: Array[float] = []
+	for l in layers:
+		phases.append(0.0)
 
-	for i in samples:
-		var t: float = float(i) / SAMPLE_RATE
-		var env: float = 1.0 - (t / duration)  # Linear decay
-		env = env * env  # Quadratic decay for punchier sound
+	for i in total_samples:
+		var t: float = float(i) / SR
+		var sample: float = 0.0
 
-		var current_freq: float = freq + freq_slide * (t / duration)
-		var sample: float
+		for li in layers.size():
+			var layer: Dictionary = layers[li]
+			var delay: float = layer.get("delay", 0.0)
+			if t < delay:
+				continue
+			var lt: float = t - delay
+			var dur: float = layer.get("dur", 0.1)
+			if lt > dur:
+				continue
 
-		if noise:
-			# Mix tone with noise for impact sounds
-			sample = sin(phase * TAU) * 0.6 + randf_range(-0.4, 0.4)
-		else:
-			sample = sin(phase * TAU)
+			var vol: float = layer.get("vol", 0.2)
+			var freq: float = layer.get("freq", 440.0)
+			var slide: float = layer.get("slide", 0.0)
+			var attack: float = layer.get("attack", 0.01)
 
-		sample *= env
+			# Current frequency with slide
+			var cur_freq: float = freq + slide * (lt / dur)
+
+			# ADSR envelope
+			var env: float
+			if lt < attack:
+				env = lt / attack  # Attack
+			else:
+				var decay_t: float = (lt - attack) / (dur - attack)
+				env = 1.0 - decay_t * decay_t  # Quadratic decay
+
+			# Oscillator
+			var osc: float
+			var stype: String = layer.get("type", "sine")
+			if stype == "noise":
+				osc = randf_range(-1.0, 1.0)
+			elif stype == "square":
+				osc = 1.0 if fmod(phases[li], 1.0) < 0.5 else -1.0
+			else:
+				osc = sin(phases[li] * TAU)
+
+			sample += osc * env * vol
+
+			if cur_freq > 0:
+				phases[li] += cur_freq / SR
+
+		sample = clampf(sample, -1.0, 1.0)
 		playback.push_frame(Vector2(sample, sample))
-		phase += current_freq / SAMPLE_RATE

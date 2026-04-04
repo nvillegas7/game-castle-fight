@@ -7,10 +7,14 @@ signal building_selected(building_data: BuildingData)
 var _cards: Array[Control] = []
 var _current_faction: FactionData = null
 var _selected_index: int = -1
+var _deck: Array[BuildingData] = []  # Shuffled full deck
+var _hand: Array[BuildingData] = []  # 4 visible cards
+var _next_card: BuildingData = null   # Next card preview
+const HAND_SIZE: int = 4
 
-const CARD_W: float = 84.0
-const CARD_H: float = 105.0
-const CARD_GAP: float = 6.0
+const CARD_W: float = 130.0
+const CARD_H: float = 120.0
+const CARD_GAP: float = 8.0
 const CARD_CORNER: float = 8.0
 
 const ATTACK_NAMES := ["Phys", "Pierce", "Magic", "Siege"]
@@ -31,15 +35,41 @@ func _on_match_started() -> void:
 
 func _build_cards() -> void:
 	for child in get_children():
-		child.queue_free()
+		if child.name != "CardBg":
+			child.queue_free()
 	_cards.clear()
 	_selected_index = -1
 
-	var total_w: float = _current_faction.buildings.size() * (CARD_W + CARD_GAP) - CARD_GAP
+	# Build shuffled deck from faction buildings
+	_deck.clear()
+	for bd: BuildingData in _current_faction.buildings:
+		_deck.append(bd)
+
+	# Draw initial hand (first HAND_SIZE cards)
+	_hand.clear()
+	for i in mini(HAND_SIZE, _deck.size()):
+		_hand.append(_deck[i])
+	_next_card = _deck[HAND_SIZE] if _deck.size() > HAND_SIZE else null
+
+	_rebuild_hand_visuals()
+
+
+func _rebuild_hand_visuals() -> void:
+	# Clear old card visuals
+	for child in get_children():
+		if child.name != "CardBg":
+			child.queue_free()
+	_cards.clear()
+
+	# Main hand: 4 cards
+	var total_w: float = _hand.size() * (CARD_W + CARD_GAP) - CARD_GAP
+	# Add next-card indicator width
+	if _next_card:
+		total_w += CARD_GAP + 50  # Small "next" card
 	var start_x: float = (720.0 - total_w) * 0.5
 
-	for i in _current_faction.buildings.size():
-		var bd: BuildingData = _current_faction.buildings[i]
+	for i in _hand.size():
+		var bd: BuildingData = _hand[i]
 		var card := _CardVisual.new()
 		card.bd = bd
 		card.index = i
@@ -48,6 +78,18 @@ func _build_cards() -> void:
 		card.card_pressed.connect(_on_card_pressed)
 		add_child(card)
 		_cards.append(card)
+
+	# Next card indicator
+	if _next_card:
+		var next_x: float = start_x + _hand.size() * (CARD_W + CARD_GAP)
+		var next_label := Label.new()
+		next_label.text = "NEXT:\n%s" % _next_card.display_name
+		next_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		next_label.add_theme_font_size_override("font_size", 9)
+		next_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.55))
+		next_label.position = Vector2(next_x, 40)
+		next_label.size = Vector2(50, 40)
+		add_child(next_label)
 
 	_update_card_states()
 
@@ -58,8 +100,41 @@ func _on_card_pressed(index: int) -> void:
 	else:
 		_selected_index = index
 	_update_selection()
-	if _selected_index >= 0 and _selected_index < _current_faction.buildings.size():
-		building_selected.emit(_current_faction.buildings[_selected_index])
+	if _selected_index >= 0 and _selected_index < _hand.size():
+		building_selected.emit(_hand[_selected_index])
+
+
+## Called after a building is successfully placed. Cycles the card.
+func card_played(building_type: StringName) -> void:
+	# Find which hand slot was played
+	var played_idx: int = -1
+	for i in _hand.size():
+		if _hand[i].id == building_type:
+			played_idx = i
+			break
+	if played_idx == -1:
+		return
+
+	var played_bd: BuildingData = _hand[played_idx]
+
+	# Replace with next card, cycle played to back of deck
+	if _next_card:
+		_hand[played_idx] = _next_card
+		# Find next in deck after current next
+		var deck_idx: int = _deck.find(_next_card)
+		var next_idx: int = (deck_idx + 1) % _deck.size()
+		# Skip cards already in hand
+		var attempts: int = 0
+		while _deck[next_idx] in _hand and attempts < _deck.size():
+			next_idx = (next_idx + 1) % _deck.size()
+			attempts += 1
+		_next_card = _deck[next_idx] if attempts < _deck.size() else null
+	else:
+		# No next card, just keep the hand
+		pass
+
+	_selected_index = -1
+	_rebuild_hand_visuals()
 
 
 func _on_gold_changed(player_id: int, _new_gold: int) -> void:

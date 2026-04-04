@@ -567,6 +567,9 @@ func _update_units() -> Array[Dictionary]:
 				if FP.lte(_distance_squared_2d(entity, other), aura_range_sq):
 					other["drums_buffed"] = true
 
+	# Unit separation pass: push overlapping same-team units apart
+	_separate_units()
+
 	# Main unit loop
 	for entity in entities:
 		if entity.type != "unit":
@@ -626,6 +629,39 @@ func _update_units() -> Array[Dictionary]:
 			events.append_array(_check_castle_damage(entity))
 
 	return events
+
+
+## Push overlapping same-team units apart so they spread visually.
+func _separate_units() -> void:
+	var sep_dist: int = FP.from_int(14)  # Minimum separation in pixels
+	var sep_dist_sq: int = FP.mul(sep_dist, sep_dist)
+	var push_force: int = FP.from_int(2)  # Pixels per tick push
+
+	# Only check nearby units (simple N^2 but filtered by team + alive)
+	var units: Array = []
+	for e in entities:
+		if e.type == "unit" and FP.gt(e.hp, FP.ZERO):
+			units.append(e)
+
+	for i in units.size():
+		var a: Dictionary = units[i]
+		for j in range(i + 1, units.size()):
+			var b: Dictionary = units[j]
+			if a.team != b.team:
+				continue
+			var dx: int = a.x - b.x
+			var dy: int = a.y - b.y
+			var dist_sq: int = FP.mul(dx, dx) + FP.mul(dy, dy)
+			if dist_sq > 0 and FP.lt(dist_sq, sep_dist_sq):
+				# Push apart along the delta vector
+				var dist: int = FP.sqrt_fp(dist_sq)
+				if dist > 0:
+					var push_x: int = FP.div(FP.mul(dx, push_force), dist)
+					var push_y: int = FP.div(FP.mul(dy, push_force), dist)
+					a.x = FP.add(a.x, push_x)
+					a.y = FP.sub(a.y, push_y)  # Opposite for b
+					b.x = FP.sub(b.x, push_x)
+					b.y = FP.add(b.y, push_y)
 
 
 func _acquire_target(unit: Dictionary) -> void:

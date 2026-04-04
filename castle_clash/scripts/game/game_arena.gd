@@ -107,6 +107,9 @@ func grid_to_screen(player_index: int, grid_x: int, grid_y: int) -> Vector2:
 
 func _on_building_placed(player_id: int, building_data: BuildingData, grid_pos: Vector2i) -> void:
 	SFX.play_place()
+	# Cycle card hand when player places a building
+	if player_id == GameManager.local_player_id:
+		card_hand.card_played(building_data.id)
 	var player_index: int = GameManager.simulation.get_player_index(player_id)
 
 	var entity_id: int = -1
@@ -408,41 +411,83 @@ func _update_ai(delta: float) -> void:
 	if affordable.is_empty():
 		return
 
-	# Smart priority: economy first, then combat, then T2, then tower
+	# Scout player's unit composition
+	var player_melee: int = 0
+	var player_ranged: int = 0
+	var player_siege: int = 0
+	for entity in sim.entities:
+		if entity.type == "unit" and entity.team != AI_PLAYER_ID:
+			match entity.role:
+				0: player_melee += 1
+				1: player_ranged += 1
+				4: player_siege += 1
+
 	var chosen: BuildingData = null
 
-	# Phase 1 (early): build income if we don't have one yet
+	# Phase 1 (early): income building
 	if not has_income and ai_building_count < 3:
 		for bd: BuildingData in affordable:
 			if bd.income_bonus > 0:
 				chosen = bd
 				break
 
-	# Phase 2: ensure we have at least 2 T1 combat buildings
+	# Phase 2: ensure base combat
 	if chosen == null and ai_building_count < 4:
 		for bd: BuildingData in affordable:
 			if bd.spawns_unit and bd.tier == 1:
 				chosen = bd
 				break
 
-	# Phase 3 (mid-game): mix T2 and towers
-	if chosen == null and match_time > 300:  # After 30 seconds
-		# 40% chance to go T2, 20% tower, 40% more T1
+	# Phase 3: reactive counter-building
+	if chosen == null and match_time > 200:
+		# Counter heavy melee -> build ranged/towers
+		if player_melee > player_ranged + 2:
+			for bd: BuildingData in affordable:
+				if bd.spawns_unit and bd.spawns_unit.role == 1:  # Ranged counter
+					chosen = bd
+					break
+			if chosen == null:
+				for bd: BuildingData in affordable:
+					if bd.is_tower:
+						chosen = bd
+						break
+		# Counter heavy ranged -> build melee/T2
+		elif player_ranged > player_melee + 2:
+			for bd: BuildingData in affordable:
+				if bd.tier == 2 and bd.spawns_unit and bd.spawns_unit.role == 0:
+					chosen = bd
+					break
+		# Counter siege -> build anything fast
+		elif player_siege > 1:
+			for bd: BuildingData in affordable:
+				if bd.spawns_unit and bd.tier == 1 and bd.spawns_unit.role == 0:
+					chosen = bd
+					break
+
+	# Phase 4 (late): T2 and towers
+	if chosen == null and match_time > 400:
 		var roll: int = randi() % 100
-		if roll < 40:
+		if roll < 45:
 			for bd: BuildingData in affordable:
 				if bd.tier == 2:
 					chosen = bd
 					break
-		elif roll < 60:
+		elif roll < 65:
 			for bd: BuildingData in affordable:
 				if bd.is_tower:
 					chosen = bd
 					break
 
-	# Fallback: random affordable
+	# Fallback: weighted random (prefer spawners over income)
 	if chosen == null:
-		chosen = affordable[randi() % affordable.size()]
+		var combat: Array[BuildingData] = []
+		for bd: BuildingData in affordable:
+			if bd.spawns_unit or bd.is_tower:
+				combat.append(bd)
+		if not combat.is_empty():
+			chosen = combat[randi() % combat.size()]
+		else:
+			chosen = affordable[randi() % affordable.size()]
 
 	# Smart grid placement: towers near front (high X), income in back (low X)
 	var prefer_front: bool = chosen.is_tower or (chosen.spawns_unit != null)

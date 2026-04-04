@@ -90,17 +90,27 @@ func _input(event: InputEvent) -> void:
 	if selected_building == null:
 		return
 
-	if event is InputEventMouseMotion:
+	# Mouse/touch drag -> update ghost
+	if event is InputEventMouseMotion or event is InputEventScreenDrag:
 		_update_ghost_position(event.position)
 		queue_redraw()
 
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_update_ghost_position(event.position)
+	# Mouse click or touch tap -> try placement
+	var is_tap: bool = false
+	var tap_pos: Vector2 = Vector2.ZERO
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		is_tap = true
+		tap_pos = event.position
+	elif event is InputEventScreenTouch and event.pressed:
+		is_tap = true
+		tap_pos = event.position
+
+	if is_tap:
+		_update_ghost_position(tap_pos)
 		if ghost_valid:
 			_place_building()
 		elif selected_building and _is_hovering:
 			# Failed placement feedback
-			var local_pos: Vector2 = event.position - global_position
 			var gold: int = GameManager.get_player_gold(GameManager.local_player_id)
 			var msg: String = "Blocked!" if gold >= selected_building.gold_cost else "No gold!"
 			var err_node := Effects.create_damage_number(0, event.position, false)

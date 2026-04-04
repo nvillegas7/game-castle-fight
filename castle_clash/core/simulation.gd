@@ -610,7 +610,8 @@ func _update_units() -> Array[Dictionary]:
 		if entity.target_id != -1:
 			var target = _find_entity_by_id(entity.target_id)
 			if target != null and FP.gt(target.hp, FP.ZERO):
-				var dist_sq := _distance_squared_y(entity, target)
+				# Use full 2D distance for attack range (melee must walk close)
+				var dist_sq := _distance_squared_2d(entity, target)
 				var range_sq := FP.mul(entity.attack_range, entity.attack_range)
 				if FP.lte(dist_sq, range_sq):
 					if entity.attack_cooldown <= 0:
@@ -729,9 +730,9 @@ func _move_unit(unit: Dictionary) -> void:
 			var dx: int = target.x - unit.x
 			var dy: int = target.y - unit.y
 
-			# Check if in attack range (Y-distance for same-column combat)
+			# Check if in attack range (full 2D -- melee must walk close)
 			var attack_range_sq: int = FP.mul(unit.attack_range, unit.attack_range)
-			if FP.lte(_distance_squared_y(unit, target), attack_range_sq):
+			if FP.lte(_distance_squared_2d(unit, target), attack_range_sq):
 				return  # In attack range, don't move
 
 			match unit.role:
@@ -929,7 +930,7 @@ func _check_attack_skills(entity: Dictionary) -> Array[Dictionary]:
 				continue
 			if FP.lte(other.hp, FP.ZERO):
 				continue
-			if FP.lte(_distance_squared_y(entity, other), range_sq):
+			if FP.lte(_distance_squared_2d(entity, other), range_sq):
 				other.hp = FP.sub(other.hp, volley_dmg)
 				events.append({"type": "unit_attacked", "attacker_id": entity.id, "target_id": other.id, "damage": volley_dmg, "target_hp": other.hp})
 				targets_hit += 1

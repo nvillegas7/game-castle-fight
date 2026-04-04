@@ -659,9 +659,9 @@ func _separate_units() -> void:
 					var push_x: int = FP.div(FP.mul(dx, push_force), dist)
 					var push_y: int = FP.div(FP.mul(dy, push_force), dist)
 					a.x = FP.add(a.x, push_x)
-					a.y = FP.sub(a.y, push_y)  # Opposite for b
+					a.y = FP.add(a.y, push_y)
 					b.x = FP.sub(b.x, push_x)
-					b.y = FP.add(b.y, push_y)
+					b.y = FP.sub(b.y, push_y)
 
 
 func _acquire_target(unit: Dictionary) -> void:

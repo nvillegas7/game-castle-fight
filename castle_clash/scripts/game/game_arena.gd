@@ -74,6 +74,7 @@ func _ready() -> void:
 		wave_label.visible = false
 
 	GameManager.start_test_match()
+	SFX.start_music()
 
 
 func _process(delta: float) -> void:

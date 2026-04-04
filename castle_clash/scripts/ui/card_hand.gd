@@ -149,9 +149,9 @@ func _update_card_states() -> void:
 	var pi: int = GameManager.simulation.get_player_index(GameManager.local_player_id)
 
 	for i in _cards.size():
-		if i >= _current_faction.buildings.size():
+		if i >= _hand.size():
 			break
-		var bd: BuildingData = _current_faction.buildings[i]
+		var bd: BuildingData = _hand[i]  # Use hand, not faction.buildings
 		var can_afford: bool = gold >= bd.gold_cost
 		var has_prereq: bool = bd.requires_building == &"" or \
 			GameManager.simulation.player_has_building(pi, bd.requires_building)

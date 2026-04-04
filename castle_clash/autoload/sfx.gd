@@ -6,6 +6,9 @@ var _next: int = 0
 const POOL_SIZE: int = 16
 const SR: float = 22050.0
 
+var _music_player: AudioStreamPlayer = null
+var _music_playing: bool = false
+
 
 func _ready() -> void:
 	for i in POOL_SIZE:
@@ -13,6 +16,11 @@ func _ready() -> void:
 		p.bus = "Master"
 		add_child(p)
 		_players.append(p)
+	# Music player
+	_music_player = AudioStreamPlayer.new()
+	_music_player.bus = "Master"
+	_music_player.volume_db = -12  # Quiet background
+	add_child(_music_player)
 
 
 func _get_player() -> AudioStreamPlayer:
@@ -169,3 +177,68 @@ func _play_layered(layers: Array) -> void:
 
 		sample = clampf(sample, -1.0, 1.0)
 		playback.push_frame(Vector2(sample, sample))
+
+
+## Start ambient background music (procedurally generated loop).
+func start_music() -> void:
+	if _music_playing:
+		return
+	_music_playing = true
+	_generate_music_loop()
+
+
+func stop_music() -> void:
+	_music_playing = false
+	if _music_player:
+		_music_player.stop()
+
+
+func _generate_music_loop() -> void:
+	var dur: float = 16.0  # 16 second loop
+	var stream := AudioStreamGenerator.new()
+	stream.mix_rate = SR
+	stream.buffer_length = dur + 0.1
+
+	_music_player.stream = stream
+	_music_player.play()
+	_music_player.finished.connect(_on_music_finished)
+
+	var playback: AudioStreamGeneratorPlayback = _music_player.get_stream_playback()
+	if playback == null:
+		return
+
+	# Simple ambient music: slow arpeggiated chords with reverb-like decay
+	# Key of C minor: C3, Eb3, G3, Bb3, C4
+	var notes := [130.8, 155.6, 196.0, 233.1, 261.6, 196.0, 155.6, 130.8]
+	var note_dur: float = dur / notes.size()  # 2 seconds per note
+	var total_samples: int = int(dur * SR)
+
+	for i in total_samples:
+		var t: float = float(i) / SR
+		var note_idx: int = int(t / note_dur) % notes.size()
+		var note_t: float = fmod(t, note_dur)
+		var freq: float = notes[note_idx]
+
+		# Slow attack, long decay
+		var env: float
+		if note_t < 0.3:
+			env = note_t / 0.3
+		else:
+			env = exp(-(note_t - 0.3) * 1.5)
+
+		# Soft pad sound: sine + quiet octave
+		var sample: float = sin(t * freq * TAU) * 0.6
+		sample += sin(t * freq * 2.0 * TAU) * 0.15  # Octave up
+		sample += sin(t * freq * 0.5 * TAU) * 0.2    # Octave down (bass)
+		sample *= env * 0.12  # Keep very quiet
+
+		# Add subtle noise texture
+		sample += randf_range(-0.003, 0.003)
+
+		sample = clampf(sample, -1.0, 1.0)
+		playback.push_frame(Vector2(sample, sample))
+
+
+func _on_music_finished() -> void:
+	if _music_playing:
+		_generate_music_loop()  # Loop

@@ -34,8 +34,9 @@ func setup(sprite_frames: SpriteFrames, p_team: int, p_role: int) -> void:
 		_sprite = AnimatedSprite2D.new()
 		_sprite.sprite_frames = sprite_frames
 		_sprite.centered = true
-		# Flip based on team (enemy faces opposite)
 		_sprite.flip_h = (team == 1)
+		# Scale down 192px sprites to ~48px game size
+		_sprite.scale = Vector2(0.25, 0.25)
 		add_child(_sprite)
 
 		if sprite_frames.has_animation(ANIM_IDLE):

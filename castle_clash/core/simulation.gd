@@ -393,6 +393,8 @@ func _spawn_wave() -> Array[Dictionary]:
 			# Small Y offset to prevent perfect stacking from same building
 			var y_offset: int = FP.from_int(i * 6)
 
+			var aggro_range_fp: int = FP.from_int(ud.aggro_range * CELL_SIZE_PX)
+
 			var unit := {
 				"id": unit_id,
 				"type": "unit",
@@ -403,14 +405,23 @@ func _spawn_wave() -> Array[Dictionary]:
 				"hp": FP.from_int(ud.max_hp),
 				"max_hp": FP.from_int(ud.max_hp),
 				"attack_damage": FP.from_int(ud.attack_damage),
+				"base_attack_damage": FP.from_int(ud.attack_damage),
 				"attack_speed_ticks": ud.attack_speed_ticks,
 				"attack_range": attack_range_fp,
+				"aggro_range": aggro_range_fp,
 				"move_speed": move_speed_fp,
+				"base_move_speed": move_speed_fp,
 				"armor": FP.from_int(ud.armor),
+				"magic_defense": FP.from_int(ud.magic_defense),
 				"attack_type": ud.attack_type,
 				"armor_type": ud.armor_type,
 				"role": ud.role,
 				"bounty": ud.bounty,
+				"skill_id": ud.skill_id,
+				"skill_param_1": ud.skill_param_1,
+				"skill_param_2": ud.skill_param_2,
+				"skill_cooldown": 0,
+				"skill_stacks": 0,
 				"x": spawn_x,
 				"y": FP.add(spawn_y, y_offset),
 				"attack_cooldown": 0,
@@ -531,7 +542,15 @@ func _move_unit(unit: Dictionary) -> void:
 func _perform_attack(attacker: Dictionary, target: Dictionary) -> Array[Dictionary]:
 	var multiplier: int = damage_table[attacker.attack_type][target.armor_type]
 	var raw_damage: int = FP.mul(attacker.attack_damage, multiplier)
-	var final_damage: int = FP.sub(raw_damage, target.armor)
+
+	# Magic attacks reduced by magic_defense, others by armor
+	var defense: int
+	if attacker.attack_type == 2:  # Magic
+		defense = target.get("magic_defense", FP.ZERO)
+	else:  # Physical, Pierce, Siege
+		defense = target.armor
+
+	var final_damage: int = FP.sub(raw_damage, defense)
 	final_damage = FP.max_fp(final_damage, FP.ONE)  # Minimum 1 damage
 
 	target.hp = FP.sub(target.hp, final_damage)

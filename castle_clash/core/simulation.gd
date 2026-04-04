@@ -487,7 +487,7 @@ func _update_units() -> Array[Dictionary]:
 		if entity.target_id != -1:
 			var target = _find_entity_by_id(entity.target_id)
 			if target != null and FP.gt(target.hp, FP.ZERO):
-				var dist_sq := _distance_squared(entity, target)
+				var dist_sq := _distance_squared_x(entity, target)
 				var range_sq := FP.mul(entity.attack_range, entity.attack_range)
 				if FP.lte(dist_sq, range_sq):
 					if entity.attack_cooldown <= 0:
@@ -506,15 +506,18 @@ func _update_units() -> Array[Dictionary]:
 
 
 func _acquire_target(unit: Dictionary) -> void:
-	# Check if current target is still valid
+	var aggro_sq: int = FP.mul(unit.aggro_range, unit.aggro_range)
+
+	# Check if current target is still valid and in aggro range
 	if unit.target_id != -1:
 		var current = _find_entity_by_id(unit.target_id)
 		if current != null and FP.gt(current.hp, FP.ZERO) and current.team != unit.team:
-			return  # Keep current target
+			if FP.lte(_distance_squared_2d(unit, current), aggro_sq):
+				return  # Keep current target
 
-	# Find nearest living enemy unit
+	# Find nearest living enemy within aggro range (full 2D)
 	var best_id: int = -1
-	var best_dist_sq: int = 0x7FFFFFFFFFFFFFF  # Large number
+	var best_dist_sq: int = 0x7FFFFFFFFFFFFFF
 
 	for other in entities:
 		if other.type != "unit":
@@ -523,7 +526,9 @@ func _acquire_target(unit: Dictionary) -> void:
 			continue
 		if FP.lte(other.hp, FP.ZERO):
 			continue
-		var dist_sq := _distance_squared(unit, other)
+		var dist_sq := _distance_squared_2d(unit, other)
+		if FP.gt(dist_sq, aggro_sq):
+			continue  # Outside aggro range
 		if dist_sq < best_dist_sq:
 			best_dist_sq = dist_sq
 			best_id = other.id
@@ -531,15 +536,50 @@ func _acquire_target(unit: Dictionary) -> void:
 	unit.target_id = best_id
 
 
-## Distance squared between two entities.
-## Uses X-distance only for combat (lane-based game -- units march horizontally).
-## Full 2D distance would prevent units on different Y-lanes from ever fighting.
-func _distance_squared(a: Dictionary, b: Dictionary) -> int:
+## Full 2D distance squared (for aggro detection and combat range).
+func _distance_squared_2d(a: Dictionary, b: Dictionary) -> int:
+	var dx: int = a.x - b.x
+	var dy: int = a.y - b.y
+	return FP.mul(dx, dx) + FP.mul(dy, dy)
+
+
+## X-only distance squared (for attack range checks -- units attack across lanes).
+func _distance_squared_x(a: Dictionary, b: Dictionary) -> int:
 	var dx: int = a.x - b.x
 	return FP.mul(dx, dx)
 
 
 func _move_unit(unit: Dictionary) -> void:
+	# If we have a target, chase it (role-dependent)
+	if unit.target_id != -1:
+		var target = _find_entity_by_id(unit.target_id)
+		if target != null and FP.gt(target.hp, FP.ZERO):
+			var dx: int = target.x - unit.x
+			var dy: int = target.y - unit.y
+
+			# Check if already in attack range (X-distance for combat)
+			var attack_range_sq: int = FP.mul(unit.attack_range, unit.attack_range)
+			if FP.lte(_distance_squared_x(unit, target), attack_range_sq):
+				return  # In attack range, don't move
+
+			match unit.role:
+				0, 3:  # Melee, Flying: full 2D chase
+					var dist_sq: int = FP.mul(dx, dx) + FP.mul(dy, dy)
+					var dist: int = FP.sqrt_fp(dist_sq)
+					if dist > 0:
+						unit.x = FP.add(unit.x, FP.div(FP.mul(dx, unit.move_speed), dist))
+						unit.y = FP.add(unit.y, FP.div(FP.mul(dy, unit.move_speed), dist))
+						# Clamp Y to arena bounds
+						unit.y = FP.clamp_fp(unit.y, FP.from_int(GRID_ORIGIN_Y), FP.from_int(GRID_ORIGIN_Y + GRID_ROWS * CELL_SIZE_PX))
+					return
+				1, 2:  # Ranged, Caster: X-only chase (stay in lane)
+					var sign_x: int = 1 if dx > 0 else -1
+					unit.x = FP.add(unit.x, FP.mul(FP.from_int(sign_x), unit.move_speed))
+					return
+				4:  # Siege: no chasing, march straight
+					pass  # Fall through to default march
+
+	# Default: march toward enemy castle
 	if unit.team == 0:
 		unit.x = FP.add(unit.x, unit.move_speed)
 		unit.x = FP.min_fp(unit.x, FP.from_int(CASTLE_1_X))
@@ -595,7 +635,7 @@ func _try_heal(healer: Dictionary) -> Array[Dictionary]:
 		# Only heal damaged units
 		if FP.gte(other.hp, other.max_hp):
 			continue
-		var dist_sq := _distance_squared(healer, other)
+		var dist_sq := _distance_squared_2d(healer, other)
 		if FP.lte(dist_sq, range_sq) and dist_sq < best_dist_sq:
 			best_dist_sq = dist_sq
 			best_id = other.id

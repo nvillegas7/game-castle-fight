@@ -96,29 +96,11 @@ func _on_building_selected(bd: BuildingData) -> void:
 
 
 func grid_to_screen(player_index: int, grid_x: int, grid_y: int) -> Vector2:
-	# Portrait: grid is horizontal, zone is vertical
 	var zone_y: int = PLAYER_ZONE_Y if player_index == 0 else ENEMY_ZONE_Y
 	return Vector2(
 		GRID_MARGIN_X + grid_x * CELL_SIZE,
 		zone_y + grid_y * CELL_SIZE
 	)
-
-
-## Transform simulation pixel coordinates to portrait screen coordinates.
-## Sim X (horizontal march) -> Screen Y (vertical, inverted for player)
-## Sim Y (vertical lane) -> Screen X
-func sim_to_screen(sim_x_fp: int, sim_y_fp: int) -> Vector2:
-	var sim_x: float = FP.to_float(sim_x_fp)
-	var sim_y: float = FP.to_float(sim_y_fp)
-
-	# Map sim Y (40-680) -> screen X (40-680) -- roughly same range
-	var screen_x: float = remap(sim_y, 40.0, 680.0, 60.0, 660.0)
-
-	# Map sim X (40-1240) -> screen Y (inverted: 40=top castle, 1240=bottom castle)
-	# Combat lane in sim: 432-848 -> screen: ~350-690
-	var screen_y: float = remap(sim_x, 40.0, 1240.0, 55.0, 985.0)
-
-	return Vector2(screen_x, screen_y)
 
 
 # --- Building Visuals ---
@@ -204,7 +186,7 @@ func _on_unit_spawned(unit_id: int, _unit_type: StringName) -> void:
 
 func _create_unit_visual(entity: Dictionary) -> Node2D:
 	var uv: Node2D = UnitVisualScript.new()
-	uv.position = sim_to_screen(entity.x, entity.y)
+	uv.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
 	uv.team = entity.team
 	uv.role = entity.get("role", 0)
 	uv.unit_type = entity.get("unit_type", &"")
@@ -232,8 +214,7 @@ func _on_unit_died(unit_id: int, _killer_id: int) -> void:
 
 
 func _on_unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float) -> void:
-	# Convert sim-space target position to screen space
-	var target_pos := sim_to_screen(FP.from_float_EDITOR(target_x), FP.from_float_EDITOR(target_y))
+	var target_pos := Vector2(target_x, target_y)
 	# Sound
 	if _unit_visuals.has(attacker_id):
 		var av = _unit_visuals[attacker_id]
@@ -259,7 +240,7 @@ func _on_unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: 
 
 func _on_unit_healed(healer_id: int, _target_id: int, amount: int, target_x: float, target_y: float) -> void:
 	SFX.play_heal()
-	var target_pos := sim_to_screen(FP.from_float_EDITOR(target_x), FP.from_float_EDITOR(target_y))
+	var target_pos := Vector2(target_x, target_y)
 	units_layer.add_child(Effects.create_heal_sparkle(target_pos))
 	units_layer.add_child(Effects.create_damage_number(amount, target_pos, true))
 	# Cast animation on healer
@@ -281,19 +262,16 @@ func _sync_unit_positions() -> void:
 			continue
 		if _unit_visuals.has(entity.id):
 			var visual = _unit_visuals[entity.id]
-			var new_pos := sim_to_screen(entity.x, entity.y)
+			var new_pos := Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
 
-			# Detect movement for walk animation
 			var is_moving: bool = new_pos.distance_squared_to(visual.position) > 0.5
 			visual.set_moving(is_moving)
 
-			# Update facing: in portrait, "forward" is up for team 0, down for team 1
-			# But unit visuals face left/right, so face toward target's screen X
+			# Facing: face toward target X position
 			if entity.target_id != -1:
 				var target = GameManager.simulation._find_entity_by_id(entity.target_id)
 				if target:
-					var target_screen := sim_to_screen(target.x, target.y)
-					visual.facing = 1.0 if target_screen.x > new_pos.x else -1.0
+					visual.facing = 1.0 if FP.to_float(target.x) > new_pos.x else -1.0
 
 			visual.position = new_pos
 

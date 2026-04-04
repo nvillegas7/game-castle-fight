@@ -36,17 +36,21 @@ const WAVE_INTERVAL_TICKS: int = 250  # 25 seconds at 10 ticks/sec
 const INCOME_INTERVAL_TICKS: int = 50 # 5 seconds
 const TICKS_PER_SECOND: int = 10
 
-# Grid constants
+# Grid constants (portrait 720x1280)
 const GRID_COLS: int = 11
-const GRID_ROWS: int = 20
-const CELL_SIZE_PX: int = 32
-const GRID_ORIGIN_Y: int = 40
+const GRID_ROWS: int = 10
+const CELL_SIZE_PX: int = 28
+const GRID_ORIGIN_X: int = 206   # (720 - 11*28) / 2
 
-# Arena pixel-space constants
-const TEAM_0_SPAWN_X: int = 432   # Right edge of build zone 0
-const TEAM_1_SPAWN_X: int = 848   # Left edge of build zone 1
-const CASTLE_0_X: int = 40        # Center of castle 0 area
-const CASTLE_1_X: int = 1240      # Center of castle 1 area
+# Arena pixel-space constants (portrait vertical march)
+# Player (team 0) builds at bottom, marches UP (decreasing Y)
+# Enemy (team 1) builds at top, marches DOWN (increasing Y)
+const TEAM_0_SPAWN_Y: int = 695   # Top edge of player build zone
+const TEAM_1_SPAWN_Y: int = 345   # Bottom edge of enemy build zone
+const CASTLE_0_Y: int = 970       # Player castle (bottom)
+const CASTLE_1_Y: int = 70        # Enemy castle (top)
+const ARENA_LEFT: int = 60
+const ARENA_RIGHT: int = 660
 
 
 ## Register all available building types. Call before initialize().
@@ -395,15 +399,10 @@ func _update_towers() -> Array[Dictionary]:
 			entity.tower_cooldown -= 1
 			continue
 
-		# Tower pixel position (center of grid footprint)
-		var tower_x: int
-		if entity.team == 0:
-			tower_x = FP.from_int(GRID_ORIGIN_Y + entity.grid_x * CELL_SIZE_PX + (entity.grid_size_x * CELL_SIZE_PX) / 2)
-			# For team 0, tower is in left build zone. X position:
-			tower_x = FP.from_int(80 + entity.grid_x * CELL_SIZE_PX + (entity.grid_size_x * CELL_SIZE_PX) / 2)
-		else:
-			tower_x = FP.from_int(848 + entity.grid_x * CELL_SIZE_PX + (entity.grid_size_x * CELL_SIZE_PX) / 2)
-		var tower_y: int = FP.from_int(GRID_ORIGIN_Y + entity.grid_y * CELL_SIZE_PX + (entity.grid_size_y * CELL_SIZE_PX) / 2)
+		# Tower pixel position in portrait (centered in grid footprint)
+		var tower_x: int = FP.from_int(GRID_ORIGIN_X + entity.grid_x * CELL_SIZE_PX + (entity.grid_size_x * CELL_SIZE_PX) / 2)
+		var zone_y: int = 695 if entity.team == 0 else 55  # Player zone bottom, enemy zone top
+		var tower_y: int = FP.from_int(zone_y + entity.grid_y * CELL_SIZE_PX + (entity.grid_size_y * CELL_SIZE_PX) / 2)
 
 		# Find nearest enemy unit in range
 		var range_sq: int = FP.mul(entity.tower_range, entity.tower_range)
@@ -475,9 +474,10 @@ func _spawn_from_building(building: Dictionary) -> Array[Dictionary]:
 	var ud = bd.spawns_unit
 	var team: int = building.team
 
-	var spawn_x: int = FP.from_int(TEAM_0_SPAWN_X) if team == 0 else FP.from_int(TEAM_1_SPAWN_X)
-	var spawn_y_px: int = GRID_ORIGIN_Y + building.grid_y * CELL_SIZE_PX + (building.grid_size_y * CELL_SIZE_PX) / 2
-	var spawn_y: int = FP.from_int(spawn_y_px)
+	# Portrait: spawn at building's X center, at build zone edge Y
+	var spawn_x_px: int = GRID_ORIGIN_X + building.grid_x * CELL_SIZE_PX + (building.grid_size_x * CELL_SIZE_PX) / 2
+	var spawn_x: int = FP.from_int(spawn_x_px)
+	var spawn_y: int = FP.from_int(TEAM_0_SPAWN_Y) if team == 0 else FP.from_int(TEAM_1_SPAWN_Y)
 
 	var move_speed_fp: int = FP.div(
 		FP.from_int(ud.move_speed * CELL_SIZE_PX),
@@ -489,7 +489,7 @@ func _spawn_from_building(building: Dictionary) -> Array[Dictionary]:
 	for i in bd.units_per_wave:
 		var unit_id := next_entity_id
 		next_entity_id += 1
-		var y_offset: int = FP.from_int(i * 6)
+		var x_offset: int = FP.from_int(i * 6)  # Small X offset to avoid stacking
 
 		var unit := {
 			"id": unit_id,
@@ -518,8 +518,8 @@ func _spawn_from_building(building: Dictionary) -> Array[Dictionary]:
 			"skill_param_2": ud.skill_param_2,
 			"skill_cooldown": 0,
 			"skill_stacks": 0,
-			"x": spawn_x,
-			"y": FP.add(spawn_y, y_offset),
+			"x": FP.add(spawn_x, x_offset),
+			"y": spawn_y,
 			"attack_cooldown": 0,
 			"target_id": -1,
 		}
@@ -607,7 +607,7 @@ func _update_units() -> Array[Dictionary]:
 		if entity.target_id != -1:
 			var target = _find_entity_by_id(entity.target_id)
 			if target != null and FP.gt(target.hp, FP.ZERO):
-				var dist_sq := _distance_squared_x(entity, target)
+				var dist_sq := _distance_squared_y(entity, target)
 				var range_sq := FP.mul(entity.attack_range, entity.attack_range)
 				if FP.lte(dist_sq, range_sq):
 					if entity.attack_cooldown <= 0:
@@ -666,23 +666,24 @@ func _distance_squared_2d(a: Dictionary, b: Dictionary) -> int:
 	return FP.mul(dx, dx) + FP.mul(dy, dy)
 
 
-## X-only distance squared (for attack range checks -- units attack across lanes).
-func _distance_squared_x(a: Dictionary, b: Dictionary) -> int:
-	var dx: int = a.x - b.x
-	return FP.mul(dx, dx)
+## Y-only distance squared (for attack range in portrait -- units in same column fight).
+func _distance_squared_y(a: Dictionary, b: Dictionary) -> int:
+	var dy: int = a.y - b.y
+	return FP.mul(dy, dy)
 
 
 func _move_unit(unit: Dictionary) -> void:
-	# If we have a target, chase it (role-dependent)
+	# Portrait: units march on Y-axis. Team 0 marches UP (decreasing Y), Team 1 DOWN (increasing Y).
+	# Lane-crossing = moving on X-axis.
 	if unit.target_id != -1:
 		var target = _find_entity_by_id(unit.target_id)
 		if target != null and FP.gt(target.hp, FP.ZERO):
 			var dx: int = target.x - unit.x
 			var dy: int = target.y - unit.y
 
-			# Check if already in attack range (X-distance for combat)
+			# Check if in attack range (Y-distance for same-column combat)
 			var attack_range_sq: int = FP.mul(unit.attack_range, unit.attack_range)
-			if FP.lte(_distance_squared_x(unit, target), attack_range_sq):
+			if FP.lte(_distance_squared_y(unit, target), attack_range_sq):
 				return  # In attack range, don't move
 
 			match unit.role:
@@ -692,23 +693,24 @@ func _move_unit(unit: Dictionary) -> void:
 					if dist > 0:
 						unit.x = FP.add(unit.x, FP.div(FP.mul(dx, unit.move_speed), dist))
 						unit.y = FP.add(unit.y, FP.div(FP.mul(dy, unit.move_speed), dist))
-						# Clamp Y to arena bounds
-						unit.y = FP.clamp_fp(unit.y, FP.from_int(GRID_ORIGIN_Y), FP.from_int(GRID_ORIGIN_Y + GRID_ROWS * CELL_SIZE_PX))
+						unit.x = FP.clamp_fp(unit.x, FP.from_int(ARENA_LEFT), FP.from_int(ARENA_RIGHT))
 					return
-				1, 2:  # Ranged, Caster: X-only chase (stay in lane)
-					var sign_x: int = 1 if dx > 0 else -1
-					unit.x = FP.add(unit.x, FP.mul(FP.from_int(sign_x), unit.move_speed))
+				1, 2:  # Ranged, Caster: Y-only march (stay in column)
+					var sign_y: int = 1 if dy > 0 else -1
+					unit.y = FP.add(unit.y, FP.mul(FP.from_int(sign_y), unit.move_speed))
 					return
 				4:  # Siege: no chasing, march straight
-					pass  # Fall through to default march
+					pass
 
-	# Default: march toward enemy castle
+	# Default: march toward enemy castle on Y-axis
 	if unit.team == 0:
-		unit.x = FP.add(unit.x, unit.move_speed)
-		unit.x = FP.min_fp(unit.x, FP.from_int(CASTLE_1_X))
+		# Team 0 marches UP (decreasing Y toward enemy castle at top)
+		unit.y = FP.sub(unit.y, unit.move_speed)
+		unit.y = FP.max_fp(unit.y, FP.from_int(CASTLE_1_Y))
 	else:
-		unit.x = FP.sub(unit.x, unit.move_speed)
-		unit.x = FP.max_fp(unit.x, FP.from_int(CASTLE_0_X))
+		# Team 1 marches DOWN (increasing Y toward player castle at bottom)
+		unit.y = FP.add(unit.y, unit.move_speed)
+		unit.y = FP.min_fp(unit.y, FP.from_int(CASTLE_0_Y))
 
 
 func _perform_attack(attacker: Dictionary, target: Dictionary) -> Array[Dictionary]:
@@ -879,7 +881,7 @@ func _check_attack_skills(entity: Dictionary) -> Array[Dictionary]:
 				continue
 			if FP.lte(other.hp, FP.ZERO):
 				continue
-			if FP.lte(_distance_squared_x(entity, other), range_sq):
+			if FP.lte(_distance_squared_y(entity, other), range_sq):
 				other.hp = FP.sub(other.hp, volley_dmg)
 				events.append({"type": "unit_attacked", "attacker_id": entity.id, "target_id": other.id, "damage": volley_dmg, "target_hp": other.hp})
 				targets_hit += 1
@@ -929,9 +931,10 @@ func _check_castle_damage(unit: Dictionary) -> Array[Dictionary]:
 	var enemy_team: int = 1 - unit.team
 	var in_castle_zone: bool = false
 
-	if unit.team == 0 and FP.gte(unit.x, FP.from_int(CASTLE_1_X)):
+	# Portrait: Team 0 reaches enemy castle at top (low Y), Team 1 at bottom (high Y)
+	if unit.team == 0 and FP.lte(unit.y, FP.from_int(CASTLE_1_Y)):
 		in_castle_zone = true
-	elif unit.team == 1 and FP.lte(unit.x, FP.from_int(CASTLE_0_X)):
+	elif unit.team == 1 and FP.gte(unit.y, FP.from_int(CASTLE_0_Y)):
 		in_castle_zone = true
 
 	if in_castle_zone and unit.attack_cooldown <= 0:

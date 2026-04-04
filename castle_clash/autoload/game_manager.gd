@@ -192,9 +192,18 @@ func _advance_simulation_tick() -> void:
 			"match_over":
 				state = State.MATCH_OVER
 				set_process(false)
-				EventBus.match_ended.emit(event.winner)
+				_dramatic_match_end(event.winner)
 			"entity_died":
 				if event.get("entity_type", "unit") == "building":
 					EventBus.building_destroyed.emit(event.id)
 				else:
 					EventBus.unit_died.emit(event.id, -1)
+
+
+func _dramatic_match_end(winner: int) -> void:
+	# Slow-mo for 1.5 seconds, then show end screen
+	Engine.time_scale = 0.3
+	SFX.stop_music()
+	await get_tree().create_timer(1.5 * 0.3).timeout  # 1.5s perceived
+	Engine.time_scale = 1.0
+	EventBus.match_ended.emit(winner)

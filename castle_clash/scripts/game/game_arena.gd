@@ -52,6 +52,7 @@ var _wave_announce_timer: float = 0.0
 var _shake_intensity: float = 0.0
 var _shake_timer: float = 0.0
 var _original_position: Vector2 = Vector2.ZERO
+var _prev_gold: int = 0
 
 
 func _ready() -> void:
@@ -75,6 +76,10 @@ func _ready() -> void:
 
 	GameManager.start_test_match()
 	SFX.start_music()
+
+	# Onboarding prompt on first match
+	if PlayerData.games_played == 0:
+		_show_tutorial()
 
 
 func _process(delta: float) -> void:
@@ -187,6 +192,18 @@ func _on_unit_spawned(unit_id: int, _unit_type: StringName) -> void:
 	var spawn_color := Color(0.3, 0.6, 1.0) if entity.team == 0 else Color(1.0, 0.35, 0.3)
 	units_layer.add_child(Effects.create_spawn_burst(visual.position, spawn_color))
 
+	# Spawn trail: find the building that spawned this unit and draw a line
+	var unit_type: StringName = entity.get("unit_type", &"")
+	for bld in GameManager.simulation.entities:
+		if bld.type != "building" or bld.team != entity.team:
+			continue
+		var bd = GameManager.simulation.building_registry.get(bld.building_type)
+		if bd and bd.spawns_unit and bd.spawns_unit.id == unit_type:
+			var bld_screen := grid_to_screen(bld.player_index, bld.grid_x, bld.grid_y)
+			var bld_center := bld_screen + Vector2(bld.grid_size_x * CELL_SIZE * 0.5, bld.grid_size_y * CELL_SIZE * 0.5)
+			units_layer.add_child(Effects.create_projectile(bld_center, visual.position, Color(spawn_color.r, spawn_color.g, spawn_color.b, 0.5), 0.3))
+			break
+
 
 func _create_unit_visual(entity: Dictionary) -> Node2D:
 	var uv: Node2D = UnitVisualScript.new()
@@ -290,16 +307,27 @@ func _update_gold_bar() -> void:
 	if not gold_bar_label or not gold_bar_fill:
 		return
 	var gold: int = GameManager.get_player_gold(GameManager.local_player_id)
-	var income: int = 10  # Default
+	var income: int = 10
 	if GameManager.simulation:
 		var pi: int = GameManager.simulation.get_player_index(GameManager.local_player_id)
 		if pi >= 0 and pi < GameManager.simulation.players.size():
 			income = FP.to_int(GameManager.simulation.players[pi].income)
 	gold_bar_label.text = "Gold: %d (+%d/5s)" % [gold, income]
-	# Fill bar proportionally (max display = 300 gold)
 	var ratio: float = clampf(float(gold) / 300.0, 0.0, 1.0)
-	var max_w: float = 488.0  # 708 - 220
+	var max_w: float = 488.0
 	gold_bar_fill.offset_right = 220.0 + max_w * ratio
+
+	# Gold income popup
+	if gold > _prev_gold and _prev_gold > 0:
+		var diff: int = gold - _prev_gold
+		if diff > 0 and diff <= 20:  # Only show for small income ticks, not bounties
+			var popup := Effects.create_damage_number(diff, Vector2(360, 1010), true)
+			var lbl: Label = popup.get_child(0)
+			if lbl:
+				lbl.text = "+%dg" % diff
+				lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+			get_tree().root.add_child(popup)
+	_prev_gold = gold
 
 
 # --- Screen Shake ---
@@ -342,6 +370,32 @@ func _update_castle_hp_bars() -> void:
 
 
 # --- Wave Announcement ---
+
+func _show_tutorial() -> void:
+	# Simple 3-step onboarding tutorial
+	var steps := [
+		"1. Tap a CARD below to select a building",
+		"2. Tap your GREEN ZONE to place it",
+		"3. Buildings spawn units that FIGHT automatically!",
+	]
+	for i in steps.size():
+		var label := Label.new()
+		label.text = steps[i]
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", 16)
+		label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8))
+		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		label.add_theme_constant_override("outline_size", 3)
+		label.position = Vector2(60, 500 + i * 40)
+		label.size = Vector2(600, 30)
+		label.z_index = 200
+		add_child(label)
+		# Fade out after 8 seconds
+		var fade_tw: Tween = label.create_tween()
+		fade_tw.tween_interval(6.0 + i * 0.5)
+		fade_tw.tween_property(label, "modulate:a", 0.0, 1.5)
+		fade_tw.tween_callback(label.queue_free)
+
 
 func _on_wave_announced(wave_number: int) -> void:
 	if wave_label:

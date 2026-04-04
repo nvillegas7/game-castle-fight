@@ -48,9 +48,9 @@ const H_PRI_S := Color(0.58, 0.12, 0.06)
 const H_DARK := Color(0.45, 0.1, 0.08)
 const H_ACC := Color(0.92, 0.6, 0.2)
 
-const HEAD_R: float = 9.0
-const BODY_W: float = 12.0
-const BODY_H: float = 8.0
+const HEAD_R: float = 11.0
+const BODY_W: float = 14.0
+const BODY_H: float = 10.0
 const OL_W: float = 1.8
 const OUTLINE := Color(0.1, 0.08, 0.12)
 

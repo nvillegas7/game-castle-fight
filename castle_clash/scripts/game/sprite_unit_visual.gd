@@ -37,6 +37,7 @@ func setup(sprite_frames: SpriteFrames, p_team: int, p_role: int) -> void:
 		_sprite.flip_h = (team == 1)
 		# Scale down 192px sprites to ~48px game size
 		_sprite.scale = Vector2(0.25, 0.25)
+		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # Pixel art crisp
 		add_child(_sprite)
 
 		if sprite_frames.has_animation(ANIM_IDLE):
@@ -100,22 +101,30 @@ func _play_current_state() -> void:
 				_sprite.play(ANIM_IDLE)
 
 
+var _prev_facing: float = 1.0
+var _prev_hp: float = 1.0
+var _signals_connected: bool = false
+
 func _process(delta: float) -> void:
 	if _hit_flash > 0:
 		_hit_flash -= delta
 
-	# Update facing
-	if _has_sprites:
+	# Update facing only when changed
+	if _has_sprites and facing != _prev_facing:
 		_sprite.flip_h = (facing < 0)
+		_prev_facing = facing
 
-	_team_ring.queue_redraw()
-	_hp_bar.queue_redraw()
-
-	# Connect draw functions
-	if not _team_ring.draw.is_connected(_draw_team_ring):
+	# Connect draw signals once
+	if not _signals_connected:
 		_team_ring.draw.connect(_draw_team_ring)
-	if not _hp_bar.draw.is_connected(_draw_hp_bar):
 		_hp_bar.draw.connect(_draw_hp_bar)
+		_signals_connected = true
+		_team_ring.queue_redraw()
+
+	# Only redraw HP bar when HP changes
+	if hp_ratio != _prev_hp:
+		_prev_hp = hp_ratio
+		_hp_bar.queue_redraw()
 
 
 func _draw_team_ring() -> void:

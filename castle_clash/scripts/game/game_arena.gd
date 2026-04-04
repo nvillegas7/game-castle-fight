@@ -33,6 +33,12 @@ const GRID_MARGIN_X: int = 206      # (720 - 308) / 2
 @onready var card_hand: Control = $UILayer/CardHand
 @onready var gold_bar_label: Label = $UILayer/GoldBarBg/GoldBarLabel
 @onready var gold_bar_fill: ColorRect = $UILayer/GoldBarBg/GoldBarFill
+@onready var camera: Camera2D = $Camera2D
+
+const ZOOM_MIN: float = 0.5
+const ZOOM_MAX: float = 2.0
+const ZOOM_SPEED: float = 0.1
+var _zoom_level: float = 1.0
 
 var _building_visuals: Dictionary = {}  # entity_id -> Node2D
 var _unit_visuals: Dictionary = {}      # entity_id -> Node2D
@@ -81,6 +87,24 @@ func _ready() -> void:
 	# Onboarding prompt on first match
 	if PlayerData.games_played == 0:
 		_show_tutorial()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Mouse wheel zoom
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_zoom_level = clampf(_zoom_level + ZOOM_SPEED, ZOOM_MIN, ZOOM_MAX)
+			if camera:
+				camera.zoom = Vector2(_zoom_level, _zoom_level)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_zoom_level = clampf(_zoom_level - ZOOM_SPEED, ZOOM_MIN, ZOOM_MAX)
+			if camera:
+				camera.zoom = Vector2(_zoom_level, _zoom_level)
+	# Pinch zoom (touch)
+	elif event is InputEventMagnifyGesture:
+		_zoom_level = clampf(_zoom_level * event.factor, ZOOM_MIN, ZOOM_MAX)
+		if camera:
+			camera.zoom = Vector2(_zoom_level, _zoom_level)
 
 
 func _process(delta: float) -> void:

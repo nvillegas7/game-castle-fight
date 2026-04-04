@@ -105,8 +105,8 @@ func _on_building_placed(player_id: int, building_data: BuildingData, grid_pos: 
 
 	# Placement animation: pop in
 	visual.scale = Vector2(0.5, 0.5)
-	var tween := visual.create_tween()
-	tween.tween_property(visual, "scale", Vector2(1.0, 1.0), 0.15).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	var place_tw: Tween = visual.create_tween()
+	place_tw.tween_property(visual, "scale", Vector2(1.0, 1.0), 0.15).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
 	grid_overlay_0.queue_redraw()
 	grid_overlay_1.queue_redraw()
@@ -148,8 +148,8 @@ func _on_unit_spawned(unit_id: int, _unit_type: StringName) -> void:
 
 	# Spawn animation: scale from 0 to 1 + burst ring
 	visual.scale = Vector2(0.1, 0.1)
-	var tween := visual.create_tween()
-	tween.tween_property(visual, "scale", Vector2(1.0, 1.0), 0.2).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	var spawn_tw: Tween = visual.create_tween()
+	spawn_tw.tween_property(visual, "scale", Vector2(1.0, 1.0), 0.2).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
 	var spawn_color := Color(0.3, 0.6, 1.0) if entity.team == 0 else Color(1.0, 0.35, 0.3)
 	units_layer.add_child(Effects.create_spawn_burst(visual.position, spawn_color))
@@ -175,12 +175,12 @@ func _on_unit_died(unit_id: int, _killer_id: int) -> void:
 		units_layer.add_child(Effects.create_death_poof(death_pos, team_color))
 		# Shrink-out tween instead of instant vanish
 		_unit_visuals.erase(unit_id)
-		var tween := visual.create_tween()
-		tween.set_parallel(true)
-		tween.tween_property(visual, "scale", Vector2(0.0, 0.0), 0.15).set_ease(Tween.EASE_IN)
-		tween.tween_property(visual, "modulate:a", 0.0, 0.15)
-		tween.set_parallel(false)
-		tween.tween_callback(visual.queue_free)
+		var death_tween: Tween = visual.create_tween()
+		death_tween.set_parallel(true)
+		death_tween.tween_property(visual, "scale", Vector2(0.0, 0.0), 0.15).set_ease(Tween.EASE_IN)
+		death_tween.tween_property(visual, "modulate:a", 0.0, 0.15)
+		death_tween.set_parallel(false)
+		death_tween.tween_callback(visual.queue_free)
 
 
 func _on_unit_attacked(_attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float) -> void:
@@ -280,8 +280,8 @@ func _on_wave_announced(wave_number: int) -> void:
 		wave_label.add_theme_constant_override("outline_size", 4)
 		# Scale punch
 		wave_label.scale = Vector2(1.4, 1.4)
-		var tween := wave_label.create_tween()
-		tween.tween_property(wave_label, "scale", Vector2(1.0, 1.0), 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		var wave_tw: Tween = wave_label.create_tween()
+		wave_tw.tween_property(wave_label, "scale", Vector2(1.0, 1.0), 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 		_wave_announce_timer = 2.5
 
 

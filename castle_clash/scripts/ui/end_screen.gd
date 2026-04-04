@@ -35,9 +35,11 @@ func _on_match_ended(winning_team: int) -> void:
 	if won:
 		result_label.text = "VICTORY!"
 		result_label.add_theme_color_override("font_color", Color(0.2, 0.9, 0.3))
+		SFX.play_victory()
 	else:
 		result_label.text = "DEFEAT"
 		result_label.add_theme_color_override("font_color", Color(0.9, 0.2, 0.2))
+		SFX.play_defeat()
 
 	# Match stats
 	var buildings_count: int = 0

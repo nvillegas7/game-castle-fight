@@ -110,3 +110,13 @@ func _update_button_states() -> void:
 		var has_prereq: bool = bd.requires_building == &"" or \
 			GameManager.simulation.player_has_building(player_index, bd.requires_building)
 		_buttons[i].disabled = not (can_afford and has_prereq)
+
+		# Update button text with status indicators
+		var status: String = ""
+		if not has_prereq:
+			status = " [LOCKED: build %s]" % bd.requires_building
+		elif not can_afford:
+			status = " [need %dg]" % bd.gold_cost
+		var tier_str: String = " **" if bd.tier >= 2 else ""
+		var tower_str: String = " [Tower]" if bd.is_tower else ""
+		_buttons[i].text = "%s (%dg)%s%s%s" % [bd.display_name, bd.gold_cost, tier_str, tower_str, status]

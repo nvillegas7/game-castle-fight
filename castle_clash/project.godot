@@ -27,6 +27,7 @@ GameManager="*res://autoload/game_manager.gd"
 NetworkManager="*res://autoload/network_manager.gd"
 AudioManager="*res://autoload/audio_manager.gd"
 PlayerData="*res://autoload/player_data.gd"
+SFX="*res://autoload/sfx.gd"
 
 [display]
 

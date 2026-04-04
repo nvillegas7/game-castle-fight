@@ -90,6 +90,7 @@ func grid_to_screen(player_index: int, grid_x: int, grid_y: int) -> Vector2:
 # --- Building Visuals ---
 
 func _on_building_placed(player_id: int, building_data: BuildingData, grid_pos: Vector2i) -> void:
+	SFX.play_place()
 	var player_index: int = GameManager.simulation.get_player_index(player_id)
 
 	var entity_id: int = -1
@@ -124,6 +125,7 @@ func _create_building_visual(bd: BuildingData, player_index: int, grid_pos: Vect
 
 
 func _on_building_destroyed(building_id: int) -> void:
+	SFX.play_gold()
 	if _building_visuals.has(building_id):
 		var visual = _building_visuals[building_id]
 		var pos: Vector2 = visual.position
@@ -178,6 +180,7 @@ func _create_unit_visual(entity: Dictionary) -> Node2D:
 
 
 func _on_unit_died(unit_id: int, _killer_id: int) -> void:
+	SFX.play_death()
 	if _unit_visuals.has(unit_id):
 		var visual = _unit_visuals[unit_id]
 		var death_pos: Vector2 = visual.position
@@ -196,6 +199,13 @@ func _on_unit_died(unit_id: int, _killer_id: int) -> void:
 
 func _on_unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float) -> void:
 	var target_pos := Vector2(target_x, target_y)
+	# Sound
+	if _unit_visuals.has(attacker_id):
+		var av = _unit_visuals[attacker_id]
+		if av.position.distance_to(target_pos) > 40:
+			SFX.play_shoot()
+		else:
+			SFX.play_hit()
 	# Damage number
 	units_layer.add_child(Effects.create_damage_number(damage, target_pos))
 	# Hit flash on target
@@ -213,6 +223,7 @@ func _on_unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: 
 
 
 func _on_unit_healed(healer_id: int, _target_id: int, amount: int, target_x: float, target_y: float) -> void:
+	SFX.play_heal()
 	var target_pos := Vector2(target_x, target_y)
 	units_layer.add_child(Effects.create_heal_sparkle(target_pos))
 	units_layer.add_child(Effects.create_damage_number(amount, target_pos, true))
@@ -222,6 +233,7 @@ func _on_unit_healed(healer_id: int, _target_id: int, amount: int, target_x: flo
 
 
 func _on_castle_hit(_team: int, _damage: int, _remaining_hp: int) -> void:
+	SFX.play_castle_hit()
 	_shake_intensity = 4.0
 	_shake_timer = 0.2
 
@@ -403,9 +415,20 @@ func _update_ai(delta: float) -> void:
 	if chosen == null:
 		chosen = affordable[randi() % affordable.size()]
 
-	# Find a valid grid position
-	for _attempt in 20:
-		var gx: int = randi() % (GRID_COLS - chosen.grid_size.x + 1)
+	# Smart grid placement: towers near front (high X), income in back (low X)
+	var prefer_front: bool = chosen.is_tower or (chosen.spawns_unit != null)
+	var prefer_back: bool = chosen.income_bonus > 0
+
+	for _attempt in 25:
+		var gx: int
+		if prefer_front:
+			# Front half of grid (closer to combat lane)
+			gx = (GRID_COLS - chosen.grid_size.x) / 2 + randi() % ((GRID_COLS - chosen.grid_size.x + 2) / 2)
+		elif prefer_back:
+			# Back half of grid (farther from combat lane)
+			gx = randi() % ((GRID_COLS - chosen.grid_size.x + 2) / 2)
+		else:
+			gx = randi() % (GRID_COLS - chosen.grid_size.x + 1)
 		var gy: int = randi() % (GRID_ROWS - chosen.grid_size.y + 1)
 		if sim.can_place_building(AI_PLAYER_ID, chosen.id, gx, gy):
 			var cmd := Command.place_building(AI_PLAYER_ID, chosen.id, gx, gy)

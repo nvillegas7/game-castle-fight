@@ -289,8 +289,7 @@ func _on_unit_healed(healer_id: int, _target_id: int, amount: int, target_x: flo
 
 func _on_castle_hit(_team: int, _damage: int, _remaining_hp: int) -> void:
 	SFX.play_castle_hit()
-	_shake_intensity = 4.0
-	_shake_timer = 0.2
+	# No screen shake -- causes dizziness with frequent castle hits
 
 
 # --- Position Sync ---

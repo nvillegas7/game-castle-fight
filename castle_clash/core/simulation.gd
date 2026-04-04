@@ -671,10 +671,10 @@ func _acquire_target(unit: Dictionary) -> void:
 	if unit.target_id != -1:
 		var current = _find_entity_by_id(unit.target_id)
 		if current != null and FP.gt(current.hp, FP.ZERO) and current.team != unit.team:
-			if FP.lte(_distance_squared_2d(unit, current), aggro_sq):
+			if FP.lte(_distance_squared_2d(unit, current), aggro_sq) or _is_enemy_in_castle_zone(current, unit.team):
 				return  # Keep current target
 
-	# Find nearest living enemy within aggro range (full 2D)
+	# Find nearest living enemy (aggro range OR castle defense alert)
 	var best_id: int = -1
 	var best_dist_sq: int = 0x7FFFFFFFFFFFFFF
 
@@ -686,13 +686,25 @@ func _acquire_target(unit: Dictionary) -> void:
 		if FP.lte(other.hp, FP.ZERO):
 			continue
 		var dist_sq := _distance_squared_2d(unit, other)
-		if FP.gt(dist_sq, aggro_sq):
-			continue  # Outside aggro range
+		# Castle defense: always detect enemies attacking our castle
+		var in_range: bool = FP.lte(dist_sq, aggro_sq) or _is_enemy_in_castle_zone(other, unit.team)
+		if not in_range:
+			continue
 		if dist_sq < best_dist_sq:
 			best_dist_sq = dist_sq
 			best_id = other.id
 
 	unit.target_id = best_id
+
+
+## Check if an enemy unit is in our castle zone (threatening our castle).
+func _is_enemy_in_castle_zone(enemy: Dictionary, our_team: int) -> bool:
+	if our_team == 0:
+		# Our castle at bottom (Y=970). Enemy is threatening if Y > 850
+		return FP.gt(enemy.y, FP.from_int(850))
+	else:
+		# Our castle at top (Y=70). Enemy is threatening if Y < 200
+		return FP.lt(enemy.y, FP.from_int(200))
 
 
 ## Full 2D distance squared (for aggro detection and combat range).

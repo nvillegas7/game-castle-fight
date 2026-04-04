@@ -61,7 +61,7 @@ func _on_match_ended(winning_team: int) -> void:
 	]
 
 	# Record to persistent data
-	PlayerData.record_match_result(won, local_faction, waves, buildings_count)
+	PlayerData.record_match_result(won, local_faction, match_time, buildings_count)
 
 	# Trophy change
 	var trophy_change: int = PlayerData.TROPHY_WIN if won else PlayerData.TROPHY_LOSE

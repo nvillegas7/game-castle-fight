@@ -29,7 +29,9 @@ const GRID_MARGIN_X: int = 206      # (720 - 308) / 2
 @onready var grid_overlay_1: Node2D = $BuildZone1/GridOverlay
 @onready var buildings_layer: Node2D = $BuildingsLayer
 @onready var units_layer: Node2D = $UnitsLayer
-@onready var building_menu: PanelContainer = $UILayer/BuildingMenu
+@onready var card_hand: Control = $UILayer/CardHand
+@onready var gold_bar_label: Label = $UILayer/GoldBarBg/GoldBarLabel
+@onready var gold_bar_fill: ColorRect = $UILayer/GoldBarBg/GoldBarFill
 
 var _building_visuals: Dictionary = {}  # entity_id -> Node2D
 var _unit_visuals: Dictionary = {}      # entity_id -> Node2D
@@ -65,7 +67,7 @@ func _ready() -> void:
 	grid_overlay_0.player_index = 0
 	grid_overlay_1.player_index = 1
 
-	building_menu.building_selected.connect(_on_building_selected)
+	card_hand.building_selected.connect(_on_building_selected)
 	_original_position = position
 
 	if wave_label:
@@ -81,6 +83,7 @@ func _process(delta: float) -> void:
 		return
 	_sync_unit_positions()
 	_update_castle_hp_bars()
+	_update_gold_bar()
 	_update_wave_announcement(delta)
 	_update_screen_shake(delta)
 	_update_ai(delta)
@@ -297,6 +300,24 @@ func _sync_unit_positions() -> void:
 			var max_hp: float = FP.to_float(entity.max_hp)
 			if max_hp > 0:
 				visual.hp_ratio = clampf(FP.to_float(entity.hp) / max_hp, 0.0, 1.0)
+
+
+# --- Gold Bar ---
+
+func _update_gold_bar() -> void:
+	if not gold_bar_label or not gold_bar_fill:
+		return
+	var gold: int = GameManager.get_player_gold(GameManager.local_player_id)
+	var income: int = 10  # Default
+	if GameManager.simulation:
+		var pi: int = GameManager.simulation.get_player_index(GameManager.local_player_id)
+		if pi >= 0 and pi < GameManager.simulation.players.size():
+			income = FP.to_int(GameManager.simulation.players[pi].income)
+	gold_bar_label.text = "Gold: %d (+%d/5s)" % [gold, income]
+	# Fill bar proportionally (max display = 300 gold)
+	var ratio: float = clampf(float(gold) / 300.0, 0.0, 1.0)
+	var max_w: float = 488.0  # 708 - 220
+	gold_bar_fill.offset_right = 220.0 + max_w * ratio
 
 
 # --- Screen Shake ---

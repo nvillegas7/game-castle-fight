@@ -1,8 +1,9 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/game/game_arena.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/game/building_grid.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/ui/card_hand.gd" id="7"]
 [ext_resource type="Script" path="res://scripts/ui/building_menu.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/ui/end_screen.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/game/castle_visual.gd" id="6"]
@@ -203,63 +204,49 @@ text = "WAVE 1"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="BuildingMenu" type="PanelContainer" parent="UILayer"]
+[node name="GoldBarBg" type="ColorRect" parent="UILayer"]
 anchors_preset = 0
-offset_left = 0.0
 offset_top = 1000.0
 offset_right = 720.0
+offset_bottom = 1040.0
+color = Color(0.06, 0.06, 0.1, 0.9)
+
+[node name="GoldBarLabel" type="Label" parent="UILayer/GoldBarBg"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 12.0
+offset_top = 6.0
+offset_right = 200.0
+offset_bottom = 32.0
+text = "Gold: 100 (+10/5s)"
+
+[node name="GoldBarFill" type="ColorRect" parent="UILayer/GoldBarBg"]
+unique_name_in_owner = true
+offset_left = 220.0
+offset_top = 10.0
+offset_right = 708.0
+offset_bottom = 30.0
+color = Color(0.8, 0.65, 0.1, 0.7)
+
+[node name="GoldBarTrack" type="ColorRect" parent="UILayer/GoldBarBg"]
+offset_left = 220.0
+offset_top = 10.0
+offset_right = 708.0
+offset_bottom = 30.0
+color = Color(0.15, 0.12, 0.08, 0.6)
+
+[node name="CardHand" type="Control" parent="UILayer"]
+anchors_preset = 0
+offset_top = 1040.0
+offset_right = 720.0
 offset_bottom = 1280.0
-script = ExtResource("4")
+script = ExtResource("7")
 
-[node name="MarginContainer" type="MarginContainer" parent="UILayer/BuildingMenu"]
-layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 4
-
-[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BuildingMenu/MarginContainer"]
-layout_mode = 2
-
-[node name="TitleLabel" type="Label" parent="UILayer/BuildingMenu/MarginContainer/VBoxContainer"]
-layout_mode = 2
-text = "Buildings"
-horizontal_alignment = 1
-
-[node name="ScrollContainer" type="ScrollContainer" parent="UILayer/BuildingMenu/MarginContainer/VBoxContainer"]
-layout_mode = 2
-size_flags_vertical = 3
-horizontal_scroll_mode = 2
-
-[node name="BuildingList" type="VBoxContainer" parent="UILayer/BuildingMenu/MarginContainer/VBoxContainer/ScrollContainer"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="InfoPanel" type="VBoxContainer" parent="UILayer/BuildingMenu/MarginContainer/VBoxContainer"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="InfoSep" type="HSeparator" parent="UILayer/BuildingMenu/MarginContainer/VBoxContainer/InfoPanel"]
-layout_mode = 2
-
-[node name="InfoName" type="Label" parent="UILayer/BuildingMenu/MarginContainer/VBoxContainer/InfoPanel"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Building Name"
-horizontal_alignment = 1
-
-[node name="InfoStats" type="Label" parent="UILayer/BuildingMenu/MarginContainer/VBoxContainer/InfoPanel"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Stats here"
-autowrap_mode = 2
-
-[node name="InfoDesc" type="Label" parent="UILayer/BuildingMenu/MarginContainer/VBoxContainer/InfoPanel"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Cost info"
+[node name="CardBg" type="ColorRect" parent="UILayer/CardHand"]
+layout_mode = 0
+offset_right = 720.0
+offset_bottom = 240.0
+color = Color(0.05, 0.05, 0.1, 0.9)
 
 [node name="EndScreen" type="Control" parent="UILayer"]
 layout_mode = 3

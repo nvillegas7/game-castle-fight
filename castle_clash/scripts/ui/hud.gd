@@ -27,9 +27,11 @@ func _update_gold() -> void:
 func _update_wave_timer() -> void:
 	if GameManager.simulation == null:
 		return
-	var ticks_remaining: int = GameManager.simulation.wave_timer
-	var seconds: int = ticks_remaining / GameManager.TICK_RATE
-	wave_label.text = "Wave %d | Next: %ds" % [GameManager.simulation.wave_number, seconds]
+	# Show match time (buildings spawn on their own timers now)
+	var total_seconds: int = GameManager.current_tick / GameManager.TICK_RATE
+	var minutes: int = total_seconds / 60
+	var secs: int = total_seconds % 60
+	wave_label.text = "Time %d:%02d" % [minutes, secs]
 
 
 func _update_castle_hp() -> void:

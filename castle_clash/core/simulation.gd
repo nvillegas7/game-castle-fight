@@ -113,11 +113,14 @@ func step(commands: Array) -> Dictionary:
 	for cmd in commands:
 		events.append_array(_process_command(cmd))
 
-	# 2. Wave spawning
+	# 2. Per-building spawn timers
+	events.append_array(_update_building_spawns())
+
+	# Match timer (for display only)
 	wave_timer -= 1
 	if wave_timer <= 0:
 		wave_timer = WAVE_INTERVAL_TICKS
-		events.append_array(_spawn_wave())
+		wave_number += 1
 
 	# 3. Update all units
 	events.append_array(_update_units())
@@ -282,6 +285,8 @@ func _handle_place_building(cmd: Dictionary) -> Array[Dictionary]:
 		"grid_size_y": size_y,
 		"hp": FP.from_int(500),
 		"max_hp": FP.from_int(500),
+		"spawn_timer": bd.spawn_interval_ticks if bd.spawns_unit else 0,
+		"spawn_interval": bd.spawn_interval_ticks if bd.spawns_unit else 0,
 	}
 	entities.append(entity)
 
@@ -356,89 +361,93 @@ func _handle_sell_building(cmd: Dictionary) -> Array[Dictionary]:
 
 # --- Wave Spawning ---
 
-func _spawn_wave() -> Array[Dictionary]:
-	wave_number += 1
+## Per-building spawn timer update. Each building has its own cooldown.
+func _update_building_spawns() -> Array[Dictionary]:
 	var events: Array[Dictionary] = []
-	events.append({ "type": "wave_spawned", "wave_number": wave_number })
-
-	# Iterate building entities and spawn their units
 	for entity in entities:
 		if entity.type != "building":
 			continue
-		var bd = building_registry.get(entity.building_type)
-		if bd == null or bd.spawns_unit == null:
-			continue
+		var interval: int = entity.get("spawn_interval", 0)
+		if interval <= 0:
+			continue  # Income building, no spawning
 
-		var ud = bd.spawns_unit
-		var team: int = entity.team
+		entity.spawn_timer -= 1
+		if entity.spawn_timer <= 0:
+			entity.spawn_timer = interval
+			events.append_array(_spawn_from_building(entity))
+	return events
 
-		# Spawn X: at build zone edge facing combat lane
-		var spawn_x: int = FP.from_int(TEAM_0_SPAWN_X) if team == 0 else FP.from_int(TEAM_1_SPAWN_X)
 
-		# Spawn Y: center of the building's grid footprint in pixels
-		var spawn_y_px: int = GRID_ORIGIN_Y + entity.grid_y * CELL_SIZE_PX + (entity.grid_size_y * CELL_SIZE_PX) / 2
-		var spawn_y: int = FP.from_int(spawn_y_px)
+## Spawn units from a single building.
+func _spawn_from_building(building: Dictionary) -> Array[Dictionary]:
+	var events: Array[Dictionary] = []
+	var bd = building_registry.get(building.building_type)
+	if bd == null or bd.spawns_unit == null:
+		return events
 
-		# Convert unit data to simulation FP values
-		var move_speed_fp: int = FP.div(
-			FP.from_int(ud.move_speed * CELL_SIZE_PX),
-			FP.from_int(TICKS_PER_SECOND)
-		)
-		var attack_range_fp: int = FP.from_int(ud.attack_range * CELL_SIZE_PX)
+	var ud = bd.spawns_unit
+	var team: int = building.team
 
-		for i in bd.units_per_wave:
-			var unit_id := next_entity_id
-			next_entity_id += 1
+	var spawn_x: int = FP.from_int(TEAM_0_SPAWN_X) if team == 0 else FP.from_int(TEAM_1_SPAWN_X)
+	var spawn_y_px: int = GRID_ORIGIN_Y + building.grid_y * CELL_SIZE_PX + (building.grid_size_y * CELL_SIZE_PX) / 2
+	var spawn_y: int = FP.from_int(spawn_y_px)
 
-			# Small Y offset to prevent perfect stacking from same building
-			var y_offset: int = FP.from_int(i * 6)
+	var move_speed_fp: int = FP.div(
+		FP.from_int(ud.move_speed * CELL_SIZE_PX),
+		FP.from_int(TICKS_PER_SECOND)
+	)
+	var attack_range_fp: int = FP.from_int(ud.attack_range * CELL_SIZE_PX)
+	var aggro_range_fp: int = FP.from_int(ud.aggro_range * CELL_SIZE_PX)
 
-			var aggro_range_fp: int = FP.from_int(ud.aggro_range * CELL_SIZE_PX)
+	for i in bd.units_per_wave:
+		var unit_id := next_entity_id
+		next_entity_id += 1
+		var y_offset: int = FP.from_int(i * 6)
 
-			var unit := {
-				"id": unit_id,
-				"type": "unit",
-				"unit_type": ud.id,
-				"owner": entity.owner,
-				"player_index": entity.player_index,
-				"team": team,
-				"hp": FP.from_int(ud.max_hp),
-				"max_hp": FP.from_int(ud.max_hp),
-				"attack_damage": FP.from_int(ud.attack_damage),
-				"base_attack_damage": FP.from_int(ud.attack_damage),
-				"attack_speed_ticks": ud.attack_speed_ticks,
-				"attack_range": attack_range_fp,
-				"aggro_range": aggro_range_fp,
-				"move_speed": move_speed_fp,
-				"base_move_speed": move_speed_fp,
-				"armor": FP.from_int(ud.armor),
-				"magic_defense": FP.from_int(ud.magic_defense),
-				"attack_type": ud.attack_type,
-				"armor_type": ud.armor_type,
-				"role": ud.role,
-				"bounty": ud.bounty,
-				"skill_id": ud.skill_id,
-				"skill_param_1": ud.skill_param_1,
-				"skill_param_2": ud.skill_param_2,
-				"skill_cooldown": 0,
-				"skill_stacks": 0,
-				"x": spawn_x,
-				"y": FP.add(spawn_y, y_offset),
-				"attack_cooldown": 0,
-				"target_id": -1,
-			}
-			entities.append(unit)
+		var unit := {
+			"id": unit_id,
+			"type": "unit",
+			"unit_type": ud.id,
+			"owner": building.owner,
+			"player_index": building.player_index,
+			"team": team,
+			"hp": FP.from_int(ud.max_hp),
+			"max_hp": FP.from_int(ud.max_hp),
+			"attack_damage": FP.from_int(ud.attack_damage),
+			"base_attack_damage": FP.from_int(ud.attack_damage),
+			"attack_speed_ticks": ud.attack_speed_ticks,
+			"attack_range": attack_range_fp,
+			"aggro_range": aggro_range_fp,
+			"move_speed": move_speed_fp,
+			"base_move_speed": move_speed_fp,
+			"armor": FP.from_int(ud.armor),
+			"magic_defense": FP.from_int(ud.magic_defense),
+			"attack_type": ud.attack_type,
+			"armor_type": ud.armor_type,
+			"role": ud.role,
+			"bounty": ud.bounty,
+			"skill_id": ud.skill_id,
+			"skill_param_1": ud.skill_param_1,
+			"skill_param_2": ud.skill_param_2,
+			"skill_cooldown": 0,
+			"skill_stacks": 0,
+			"x": spawn_x,
+			"y": FP.add(spawn_y, y_offset),
+			"attack_cooldown": 0,
+			"target_id": -1,
+		}
+		entities.append(unit)
 
-			events.append({
-				"type": "unit_spawned",
-				"entity_id": unit_id,
-				"unit_type": ud.id,
-				"team": team,
-				"player_index": entity.player_index,
-				"x": unit.x,
-				"y": unit.y,
-				"role": ud.role,
-			})
+		events.append({
+			"type": "unit_spawned",
+			"entity_id": unit_id,
+			"unit_type": ud.id,
+			"team": team,
+			"player_index": building.player_index,
+			"x": unit.x,
+			"y": unit.y,
+			"role": ud.role,
+		})
 
 	return events
 

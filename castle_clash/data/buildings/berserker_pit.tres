@@ -12,6 +12,7 @@ gold_cost = 110
 sell_refund_percent = 50
 spawns_unit = ExtResource("2")
 units_per_wave = 1
+spawn_interval_ticks = 280
 tier = 2
 requires_building = &"war_camp"
 grid_size = Vector2i(2, 2)

@@ -15,6 +15,7 @@ extends Resource
 @export_group("Spawning")
 @export var spawns_unit: UnitData = null
 @export var units_per_wave: int = 1
+@export var spawn_interval_ticks: int = 200  # Ticks between spawns (20s at 10tps)
 @export var tier: int = 1  # 1-4
 
 @export_group("Requirements")

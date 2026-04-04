@@ -11,6 +11,7 @@ gold_cost = 80
 sell_refund_percent = 50
 income_bonus = 3
 units_per_wave = 0
+spawn_interval_ticks = 0
 tier = 1
 requires_building = &""
 grid_size = Vector2i(2, 2)

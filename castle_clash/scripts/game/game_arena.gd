@@ -183,26 +183,31 @@ func _on_unit_died(unit_id: int, _killer_id: int) -> void:
 		death_tween.tween_callback(visual.queue_free)
 
 
-func _on_unit_attacked(_attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float) -> void:
+func _on_unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float) -> void:
 	var target_pos := Vector2(target_x, target_y)
 	# Damage number
 	units_layer.add_child(Effects.create_damage_number(damage, target_pos))
-	# Hit flash on target visual
+	# Hit flash on target
 	if _unit_visuals.has(target_id):
 		_unit_visuals[target_id].flash_hit()
-	# Projectile from attacker to target (for ranged units)
-	if _unit_visuals.has(_attacker_id):
-		var attacker_visual = _unit_visuals[_attacker_id]
+	# Attack animation on attacker
+	if _unit_visuals.has(attacker_id):
+		var attacker_visual = _unit_visuals[attacker_id]
+		attacker_visual.play_attack()
+		# Projectile for ranged attacks
 		var dist: float = attacker_visual.position.distance_to(target_pos)
-		if dist > 40:  # Only show projectile for ranged attacks
+		if dist > 40:
 			var proj_color := Color(0.8, 0.8, 0.4) if attacker_visual.team == 0 else Color(1.0, 0.5, 0.2)
 			units_layer.add_child(Effects.create_projectile(attacker_visual.position, target_pos, proj_color, 0.12))
 
 
-func _on_unit_healed(_healer_id: int, _target_id: int, amount: int, target_x: float, target_y: float) -> void:
+func _on_unit_healed(healer_id: int, _target_id: int, amount: int, target_x: float, target_y: float) -> void:
 	var target_pos := Vector2(target_x, target_y)
 	units_layer.add_child(Effects.create_heal_sparkle(target_pos))
 	units_layer.add_child(Effects.create_damage_number(amount, target_pos, true))
+	# Cast animation on healer
+	if _unit_visuals.has(healer_id):
+		_unit_visuals[healer_id].play_cast()
 
 
 func _on_castle_hit(_team: int, _damage: int, _remaining_hp: int) -> void:
@@ -218,8 +223,20 @@ func _sync_unit_positions() -> void:
 			continue
 		if _unit_visuals.has(entity.id):
 			var visual = _unit_visuals[entity.id]
-			visual.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
-			# Update HP ratio on the chibi visual
+			var new_pos := Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
+
+			# Detect movement for walk animation
+			var is_moving: bool = new_pos.distance_squared_to(visual.position) > 0.5
+			visual.set_moving(is_moving)
+
+			# Update facing based on target
+			if entity.target_id != -1:
+				var target = GameManager.simulation._find_entity_by_id(entity.target_id)
+				if target:
+					visual.facing = 1.0 if FP.to_float(target.x) > new_pos.x else -1.0
+
+			visual.position = new_pos
+
 			var max_hp: float = FP.to_float(entity.max_hp)
 			if max_hp > 0:
 				visual.hp_ratio = clampf(FP.to_float(entity.hp) / max_hp, 0.0, 1.0)

@@ -207,9 +207,9 @@ func _generate_music_loop() -> void:
 	if playback == null:
 		return
 
-	# Simple ambient music: slow arpeggiated chords with reverb-like decay
-	# Key of C minor: C3, Eb3, G3, Bb3, C4
-	var notes := [130.8, 155.6, 196.0, 233.1, 261.6, 196.0, 155.6, 130.8]
+	# Medieval-style ambient: D major pentatonic arpeggiated pad
+	# D3, F#3, A3, D4, A3, F#3, E3, D3 (warm, KR-inspired)
+	var notes := [146.8, 185.0, 220.0, 293.7, 220.0, 185.0, 164.8, 146.8]
 	var note_dur: float = dur / notes.size()  # 2 seconds per note
 	var total_samples: int = int(dur * SR)
 

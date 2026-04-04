@@ -208,21 +208,21 @@ class _CardVisual extends Control:
 		var border_col: Color
 
 		if not enabled:
-			bg_top = Color(0.12, 0.12, 0.15)
-			bg_bot = Color(0.08, 0.08, 0.1)
-			border_col = Color(0.25, 0.25, 0.3, 0.4)
+			bg_top = Color(0.15, 0.12, 0.1)
+			bg_bot = Color(0.1, 0.08, 0.06)
+			border_col = Color(0.3, 0.25, 0.2, 0.4)
 		elif _is_selected:
-			bg_top = Color(0.25, 0.28, 0.4)
-			bg_bot = Color(0.18, 0.2, 0.3)
+			bg_top = Color(0.32, 0.25, 0.15)
+			bg_bot = Color(0.25, 0.18, 0.1)
 			border_col = Color(1.0, 0.85, 0.2, 0.9)
 		elif _hover:
-			bg_top = Color(0.22, 0.24, 0.35)
-			bg_bot = Color(0.16, 0.18, 0.26)
-			border_col = Color(0.5, 0.55, 0.65, 0.6)
+			bg_top = Color(0.28, 0.22, 0.14)
+			bg_bot = Color(0.2, 0.15, 0.1)
+			border_col = Color(0.6, 0.5, 0.35, 0.6)
 		else:
-			bg_top = Color(0.18, 0.2, 0.28)
-			bg_bot = Color(0.12, 0.13, 0.2)
-			border_col = Color(0.35, 0.38, 0.48, 0.5)
+			bg_top = Color(0.24, 0.18, 0.12)
+			bg_bot = Color(0.16, 0.12, 0.08)
+			border_col = Color(0.45, 0.38, 0.28, 0.5)
 
 		# Shadow
 		draw_rect(Rect2(2, 2, w, h), Color(0, 0, 0, 0.3))

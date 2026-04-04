@@ -93,6 +93,11 @@ func _process(delta: float) -> void:
 	_update_wave_announcement(delta)
 	_update_screen_shake(delta)
 	_update_ai(delta)
+	# Kill streak decay
+	if _kill_streak_timer > 0:
+		_kill_streak_timer -= delta
+		if _kill_streak_timer <= 0:
+			_kill_streak = 0
 
 
 func _on_building_selected(bd: BuildingData) -> void:
@@ -216,8 +221,21 @@ func _create_unit_visual(entity: Dictionary) -> Node2D:
 	return uv
 
 
+var _kill_streak: int = 0
+var _kill_streak_timer: float = 0.0
+
 func _on_unit_died(unit_id: int, _killer_id: int) -> void:
 	SFX.play_death()
+	# Micro-shake on kills for physicality
+	_shake_intensity = 1.5
+	_shake_timer = 0.05
+	# Track kill streak for multi-kill punch
+	_kill_streak += 1
+	_kill_streak_timer = 0.5
+	if _kill_streak >= 3:
+		_shake_intensity = 3.0
+		_shake_timer = 0.1
+		_kill_streak = 0
 	if _unit_visuals.has(unit_id):
 		var visual = _unit_visuals[unit_id]
 		var death_pos: Vector2 = visual.position
@@ -371,30 +389,56 @@ func _update_castle_hp_bars() -> void:
 
 # --- Wave Announcement ---
 
+var _tutorial_active: bool = false
+var _tutorial_arrow: Label = null
+
 func _show_tutorial() -> void:
-	# Simple 3-step onboarding tutorial
-	var steps := [
-		"1. Tap a CARD below to select a building",
-		"2. Tap your GREEN ZONE to place it",
-		"3. Buildings spawn units that FIGHT automatically!",
-	]
-	for i in steps.size():
-		var label := Label.new()
-		label.text = steps[i]
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.add_theme_font_size_override("font_size", 16)
-		label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8))
-		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-		label.add_theme_constant_override("outline_size", 3)
-		label.position = Vector2(60, 500 + i * 40)
-		label.size = Vector2(600, 30)
-		label.z_index = 200
-		add_child(label)
-		# Fade out after 8 seconds
-		var fade_tw: Tween = label.create_tween()
-		fade_tw.tween_interval(6.0 + i * 0.5)
-		fade_tw.tween_property(label, "modulate:a", 0.0, 1.5)
-		fade_tw.tween_callback(label.queue_free)
+	_tutorial_active = true
+
+	# Step 1: Pulsing arrow pointing at card hand
+	_tutorial_arrow = Label.new()
+	_tutorial_arrow.text = "TAP A CARD TO BUILD!"
+	_tutorial_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tutorial_arrow.add_theme_font_size_override("font_size", 18)
+	_tutorial_arrow.add_theme_color_override("font_color", Color(1.0, 0.95, 0.3))
+	_tutorial_arrow.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	_tutorial_arrow.add_theme_constant_override("outline_size", 4)
+	_tutorial_arrow.position = Vector2(160, 1010)
+	_tutorial_arrow.size = Vector2(400, 30)
+	_tutorial_arrow.z_index = 200
+	add_child(_tutorial_arrow)
+
+	# Pulsing animation
+	var pulse_tw: Tween = _tutorial_arrow.create_tween().set_loops()
+	pulse_tw.tween_property(_tutorial_arrow, "modulate:a", 0.4, 0.5)
+	pulse_tw.tween_property(_tutorial_arrow, "modulate:a", 1.0, 0.5)
+
+	# Connect to building_placed to advance tutorial
+	EventBus.building_placed.connect(_on_tutorial_building_placed, CONNECT_ONE_SHOT)
+
+
+func _on_tutorial_building_placed(_pid: int, _bd: BuildingData, _gp: Vector2i) -> void:
+	if _tutorial_arrow:
+		_tutorial_arrow.queue_free()
+		_tutorial_arrow = null
+
+	# Step 2: Show "Units spawn automatically" message
+	var msg := Label.new()
+	msg.text = "Units will spawn and FIGHT for you!"
+	msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	msg.add_theme_font_size_override("font_size", 16)
+	msg.add_theme_color_override("font_color", Color(0.9, 1.0, 0.8))
+	msg.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	msg.add_theme_constant_override("outline_size", 3)
+	msg.position = Vector2(110, 500)
+	msg.size = Vector2(500, 30)
+	msg.z_index = 200
+	add_child(msg)
+	var fade_tw: Tween = msg.create_tween()
+	fade_tw.tween_interval(4.0)
+	fade_tw.tween_property(msg, "modulate:a", 0.0, 1.5)
+	fade_tw.tween_callback(msg.queue_free)
+	_tutorial_active = false
 
 
 func _on_wave_announced(wave_number: int) -> void:

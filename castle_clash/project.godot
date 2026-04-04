@@ -28,6 +28,7 @@ NetworkManager="*res://autoload/network_manager.gd"
 AudioManager="*res://autoload/audio_manager.gd"
 PlayerData="*res://autoload/player_data.gd"
 SFX="*res://autoload/sfx.gd"
+SpriteRegistry="*res://autoload/sprite_registry.gd"
 
 [display]
 

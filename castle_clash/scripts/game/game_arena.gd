@@ -3,6 +3,7 @@
 extends Node2D
 
 const UnitVisualScript = preload("res://scripts/game/unit_visual.gd")
+const SpriteUnitVisualScript = preload("res://scripts/game/sprite_unit_visual.gd")
 const BuildingVisualScript = preload("res://scripts/game/building_visual.gd")
 
 # Portrait layout (720x1280)
@@ -211,14 +212,26 @@ func _on_unit_spawned(unit_id: int, _unit_type: StringName) -> void:
 
 
 func _create_unit_visual(entity: Dictionary) -> Node2D:
-	var uv: Node2D = UnitVisualScript.new()
-	uv.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
-	uv.team = entity.team
-	uv.role = entity.get("role", 0)
-	uv.unit_type = entity.get("unit_type", &"")
-	uv.hp_ratio = 1.0
-	uv.facing = 1.0 if entity.team == 0 else -1.0
-	return uv
+	var ut: StringName = entity.get("unit_type", &"")
+	var sprite_frames: SpriteFrames = SpriteRegistry.get_unit_sprites(ut)
+
+	# Use sprite-based visual if sprites available, else procedural
+	if sprite_frames:
+		var sv: Node2D = SpriteUnitVisualScript.new()
+		sv.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
+		sv.setup(sprite_frames, entity.team, entity.get("role", 0))
+		sv.unit_type = ut
+		sv.facing = 1.0 if entity.team == 0 else -1.0
+		return sv
+	else:
+		var uv: Node2D = UnitVisualScript.new()
+		uv.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
+		uv.team = entity.team
+		uv.role = entity.get("role", 0)
+		uv.unit_type = ut
+		uv.hp_ratio = 1.0
+		uv.facing = 1.0 if entity.team == 0 else -1.0
+		return uv
 
 
 var _kill_streak: int = 0

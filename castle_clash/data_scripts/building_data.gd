@@ -18,8 +18,15 @@ extends Resource
 @export var spawn_interval_ticks: int = 200  # Ticks between spawns (20s at 10tps)
 @export var tier: int = 1  # 1-4
 
+@export_group("Tower")
+@export var is_tower: bool = false              # Attacks enemies directly instead of spawning units
+@export var tower_damage: int = 0               # Damage per attack
+@export var tower_range: int = 4                # Range in grid cells
+@export var tower_attack_speed: int = 15        # Ticks between attacks
+@export_enum("Physical", "Pierce", "Magic", "Siege") var tower_attack_type: int = 0
+
 @export_group("Requirements")
-@export var requires_building: StringName = &""  # Tech tree prerequisite
+@export var requires_building: StringName = &""
 
 @export_group("Grid")
 @export var grid_size: Vector2i = Vector2i(1, 1)

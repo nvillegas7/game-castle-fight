@@ -15,6 +15,7 @@ const SHAPE_TEMPLE := 2    # Priest Temple / War Drums
 const SHAPE_CASTLE := 3    # Knight Hall / Berserker Pit
 const SHAPE_WORKSHOP := 4  # Siege Workshop / Demolisher Works
 const SHAPE_MINE := 5      # Gold Mine / Plunder Camp
+const SHAPE_DEF_TOWER := 6 # Guard Tower / Flame Tower
 
 var _shape: int = SHAPE_FORT
 
@@ -56,6 +57,8 @@ const TYPE_TO_SHAPE := {
 	&"demolisher_works": SHAPE_WORKSHOP,
 	&"gold_mine": SHAPE_MINE,
 	&"plunder_camp": SHAPE_MINE,
+	&"guard_tower": SHAPE_DEF_TOWER,
+	&"flame_tower": SHAPE_DEF_TOWER,
 }
 
 
@@ -106,6 +109,8 @@ func _draw() -> void:
 			_draw_workshop(p, hw, hh)
 		SHAPE_MINE:
 			_draw_mine(p, hw, hh)
+		SHAPE_DEF_TOWER:
+			_draw_defense_tower(p, hw, hh)
 
 	# Building footprint outline
 	draw_rect(Rect2(-hw + 3, -hh + 5, width - 6, height - 9), Color(0, 0, 0, 0.35), false, 1.5)
@@ -312,3 +317,53 @@ func _draw_mine(p: Dictionary, hw: float, hh: float) -> void:
 	var sparkle_a: float = 0.4 + sin(_time * 4.0) * 0.25
 	draw_circle(Vector2(0, -hh + 10), 5.5, Color(1.0, 0.85, 0.2, sparkle_a))
 	draw_circle(Vector2(0, -hh + 10), 3, Color(1.0, 0.9, 0.3))
+
+
+func _draw_defense_tower(p: Dictionary, hw: float, hh: float) -> void:
+	# Tall narrow tower with battlements and weapon on top
+	var tw: float = width * 0.5
+
+	# Stone base (wider)
+	draw_rect(Rect2(-hw + 4, hh - 14, width - 8, 14), p.wall_light)
+
+	# Tower body (narrow, tall)
+	draw_rect(Rect2(-tw * 0.5, -hh + 10, tw, hh + hh - 24), p.wall)
+
+	# Battlements at top
+	for i in 3:
+		var bx: float = -tw * 0.5 + 2 + i * (tw - 4) / 3.0
+		draw_rect(Rect2(bx, -hh + 4, 6, 8), p.wall)
+
+	# Weapon platform
+	draw_rect(Rect2(-tw * 0.5 - 3, -hh + 10, tw + 6, 3), p.wood)
+
+	# Weapon on top (animated rotation toward enemies)
+	var weapon_angle: float = sin(_time * 1.5) * 0.3
+	var weapon_len: float = 10.0
+	var wx: float = sin(weapon_angle) * weapon_len
+	var wy: float = -cos(weapon_angle) * weapon_len
+	var base_pos := Vector2(0, -hh + 6)
+
+	if building_type == &"guard_tower":
+		# Crossbow / ballista shape
+		draw_line(base_pos, base_pos + Vector2(wx, wy), p.wood, 2.5)
+		# Crossbar
+		var perp := Vector2(wy, -wx).normalized() * 5
+		draw_line(base_pos + Vector2(wx * 0.3, wy * 0.3) - perp,
+				  base_pos + Vector2(wx * 0.3, wy * 0.3) + perp, p.wood, 1.5)
+	else:
+		# Flame brazier
+		draw_line(base_pos, base_pos + Vector2(wx * 0.5, wy * 0.5), p.wood, 2.0)
+		# Flame
+		var flame_y: float = -hh + 2 + sin(_time * 7.0) * 1.5
+		draw_circle(Vector2(0, flame_y), 4, Color(1.0, 0.5, 0.1, 0.6))
+		draw_circle(Vector2(0, flame_y - 1), 2.5, Color(1.0, 0.8, 0.2, 0.7))
+		draw_circle(Vector2(0, flame_y - 2.5), 1.5, Color(1.0, 1.0, 0.5, 0.5))
+
+	# Window slits
+	draw_rect(Rect2(-tw * 0.5 + 3, -hh + 20, 2, 6), Color(0.15, 0.12, 0.1))
+	draw_rect(Rect2(tw * 0.5 - 5, -hh + 20, 2, 6), Color(0.15, 0.12, 0.1))
+
+	# Range indicator (subtle pulsing circle)
+	var range_alpha: float = 0.06 + sin(_time * 2.0) * 0.03
+	draw_arc(Vector2(0, 0), hw * 2.5, 0, TAU, 20, Color(p.accent.r, p.accent.g, p.accent.b, range_alpha), 1.0)

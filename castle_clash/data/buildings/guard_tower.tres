@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/building_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"guard_tower"
+display_name = "Guard Tower"
+faction = &"kingdom"
+gold_cost = 70
+sell_refund_percent = 50
+income_bonus = 0
+units_per_wave = 0
+spawn_interval_ticks = 0
+tier = 1
+is_tower = true
+tower_damage = 10
+tower_range = 5
+tower_attack_speed = 12
+tower_attack_type = 1
+requires_building = &""
+grid_size = Vector2i(2, 2)

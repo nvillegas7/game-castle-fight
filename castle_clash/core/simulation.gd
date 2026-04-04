@@ -122,6 +122,9 @@ func step(commands: Array) -> Dictionary:
 		wave_timer = WAVE_INTERVAL_TICKS
 		wave_number += 1
 
+	# 2.5. Tower attacks
+	events.append_array(_update_towers())
+
 	# 3. Update all units
 	events.append_array(_update_units())
 
@@ -295,6 +298,12 @@ func _handle_place_building(cmd: Dictionary) -> Array[Dictionary]:
 		"max_hp": FP.from_int(500),
 		"spawn_timer": bd.spawn_interval_ticks if bd.spawns_unit else 0,
 		"spawn_interval": bd.spawn_interval_ticks if bd.spawns_unit else 0,
+		"is_tower": bd.is_tower,
+		"tower_damage": FP.from_int(bd.tower_damage) if bd.is_tower else 0,
+		"tower_range": FP.from_int(bd.tower_range * CELL_SIZE_PX) if bd.is_tower else 0,
+		"tower_attack_speed": bd.tower_attack_speed if bd.is_tower else 0,
+		"tower_attack_type": bd.tower_attack_type if bd.is_tower else 0,
+		"tower_cooldown": 0,
 	}
 	entities.append(entity)
 
@@ -368,6 +377,71 @@ func _handle_sell_building(cmd: Dictionary) -> Array[Dictionary]:
 
 
 # --- Wave Spawning ---
+
+## Per-building spawn timer update. Each building has its own cooldown.
+## Tower buildings attack nearest enemy unit in range.
+func _update_towers() -> Array[Dictionary]:
+	var events: Array[Dictionary] = []
+	for entity in entities:
+		if entity.type != "building" or not entity.get("is_tower", false):
+			continue
+
+		if entity.get("tower_cooldown", 0) > 0:
+			entity.tower_cooldown -= 1
+			continue
+
+		# Tower pixel position (center of grid footprint)
+		var tower_x: int
+		if entity.team == 0:
+			tower_x = FP.from_int(GRID_ORIGIN_Y + entity.grid_x * CELL_SIZE_PX + (entity.grid_size_x * CELL_SIZE_PX) / 2)
+			# For team 0, tower is in left build zone. X position:
+			tower_x = FP.from_int(80 + entity.grid_x * CELL_SIZE_PX + (entity.grid_size_x * CELL_SIZE_PX) / 2)
+		else:
+			tower_x = FP.from_int(848 + entity.grid_x * CELL_SIZE_PX + (entity.grid_size_x * CELL_SIZE_PX) / 2)
+		var tower_y: int = FP.from_int(GRID_ORIGIN_Y + entity.grid_y * CELL_SIZE_PX + (entity.grid_size_y * CELL_SIZE_PX) / 2)
+
+		# Find nearest enemy unit in range
+		var range_sq: int = FP.mul(entity.tower_range, entity.tower_range)
+		var best_id: int = -1
+		var best_dist: int = 0x7FFFFFFFFFFFFFF
+		var best_target = null
+
+		for other in entities:
+			if other.type != "unit" or other.team == entity.team:
+				continue
+			if FP.lte(other.hp, FP.ZERO):
+				continue
+			var dx: int = tower_x - other.x
+			var dy: int = tower_y - other.y
+			var dist_sq: int = FP.mul(dx, dx) + FP.mul(dy, dy)
+			if FP.lte(dist_sq, range_sq) and dist_sq < best_dist:
+				best_dist = dist_sq
+				best_id = other.id
+				best_target = other
+
+		if best_target != null:
+			# Apply damage
+			var multiplier: int = damage_table[entity.tower_attack_type][best_target.armor_type]
+			var raw_dmg: int = FP.mul(entity.tower_damage, multiplier)
+			var defense: int
+			if entity.tower_attack_type == 2:
+				defense = best_target.get("magic_defense", FP.ZERO)
+			else:
+				defense = best_target.armor
+			var final_dmg: int = FP.max_fp(FP.sub(raw_dmg, defense), FP.ONE)
+			best_target.hp = FP.sub(best_target.hp, final_dmg)
+			entity.tower_cooldown = entity.tower_attack_speed
+
+			events.append({
+				"type": "unit_attacked",
+				"attacker_id": entity.id,
+				"target_id": best_id,
+				"damage": final_dmg,
+				"target_hp": best_target.hp,
+			})
+
+	return events
+
 
 ## Per-building spawn timer update. Each building has its own cooldown.
 func _update_building_spawns() -> Array[Dictionary]:

@@ -511,10 +511,12 @@ func _acquire_target(unit: Dictionary) -> void:
 	unit.target_id = best_id
 
 
+## Distance squared between two entities.
+## Uses X-distance only for combat (lane-based game -- units march horizontally).
+## Full 2D distance would prevent units on different Y-lanes from ever fighting.
 func _distance_squared(a: Dictionary, b: Dictionary) -> int:
 	var dx: int = a.x - b.x
-	var dy: int = a.y - b.y
-	return FP.mul(dx, dx) + FP.mul(dy, dy)
+	return FP.mul(dx, dx)
 
 
 func _move_unit(unit: Dictionary) -> void:

@@ -18,7 +18,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.08, 0.08, 0.14, 1)
+color = Color(0.06, 0.06, 0.12, 1)
 
 [node name="VBox" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -27,13 +27,13 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -200.0
-offset_top = -180.0
-offset_right = 200.0
-offset_bottom = 180.0
+offset_left = -280.0
+offset_top = -400.0
+offset_right = 280.0
+offset_bottom = 400.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 20
 alignment = 1
 
 [node name="Title" type="Label" parent="VBox"]
@@ -48,47 +48,47 @@ horizontal_alignment = 1
 
 [node name="Spacer1" type="Control" parent="VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 8)
+custom_minimum_size = Vector2(0, 40)
 
 [node name="FactionRow" type="HBoxContainer" parent="VBox"]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 20
 alignment = 1
 
 [node name="KingdomBtn" type="Button" parent="VBox/FactionRow"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(180, 60)
+custom_minimum_size = Vector2(240, 80)
 text = "The Kingdom"
 
 [node name="HordeBtn" type="Button" parent="VBox/FactionRow"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(180, 60)
+custom_minimum_size = Vector2(240, 80)
 text = "The Horde"
 
 [node name="FactionDesc" type="Label" parent="VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(380, 60)
+custom_minimum_size = Vector2(500, 80)
 text = "The Kingdom - Balanced faction with healing priests and heavy knights."
 horizontal_alignment = 1
 autowrap_mode = 2
 
 [node name="Spacer2" type="Control" parent="VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 8)
+custom_minimum_size = Vector2(0, 30)
 
 [node name="PlayBtn" type="Button" parent="VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 56)
-text = "PLAY OFFLINE (vs AI)"
+custom_minimum_size = Vector2(0, 80)
+text = "BATTLE (vs AI)"
 
 [node name="OnlineBtn" type="Button" parent="VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 56)
+custom_minimum_size = Vector2(0, 64)
 text = "PLAY ONLINE (1v1)"
 
 [node name="StatusLabel" type="Label" parent="VBox"]

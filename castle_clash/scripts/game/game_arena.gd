@@ -5,12 +5,25 @@ extends Node2D
 const UnitVisualScript = preload("res://scripts/game/unit_visual.gd")
 const BuildingVisualScript = preload("res://scripts/game/building_visual.gd")
 
-const CELL_SIZE: int = 32
+# Portrait layout (720x1280)
+const CELL_SIZE: int = 28
 const GRID_COLS: int = 11
-const GRID_ROWS: int = 20
-const GRID_ORIGIN_Y: int = 40
-const ZONE_0_ORIGIN_X: int = 80
-const ZONE_1_ORIGIN_X: int = 848
+const GRID_ROWS: int = 10
+
+# Vertical zones
+const HUD_H: int = 50
+const ENEMY_ZONE_Y: int = 55
+const ENEMY_ZONE_H: int = 290      # y=55-345
+const COMBAT_Y: int = 350
+const COMBAT_H: int = 340           # y=350-690
+const PLAYER_ZONE_Y: int = 695
+const PLAYER_ZONE_H: int = 290      # y=695-985
+const GOLD_BAR_Y: int = 990
+const CARD_HAND_Y: int = 1040
+
+# Horizontal grid centering
+const GRID_W: int = 11 * 28         # 308px
+const GRID_MARGIN_X: int = 206      # (720 - 308) / 2
 
 @onready var grid_overlay_0: Node2D = $BuildZone0/GridOverlay
 @onready var grid_overlay_1: Node2D = $BuildZone1/GridOverlay
@@ -80,11 +93,29 @@ func _on_building_selected(bd: BuildingData) -> void:
 
 
 func grid_to_screen(player_index: int, grid_x: int, grid_y: int) -> Vector2:
-	var origin_x: int = ZONE_0_ORIGIN_X if player_index == 0 else ZONE_1_ORIGIN_X
+	# Portrait: grid is horizontal, zone is vertical
+	var zone_y: int = PLAYER_ZONE_Y if player_index == 0 else ENEMY_ZONE_Y
 	return Vector2(
-		origin_x + grid_x * CELL_SIZE,
-		GRID_ORIGIN_Y + grid_y * CELL_SIZE
+		GRID_MARGIN_X + grid_x * CELL_SIZE,
+		zone_y + grid_y * CELL_SIZE
 	)
+
+
+## Transform simulation pixel coordinates to portrait screen coordinates.
+## Sim X (horizontal march) -> Screen Y (vertical, inverted for player)
+## Sim Y (vertical lane) -> Screen X
+func sim_to_screen(sim_x_fp: int, sim_y_fp: int) -> Vector2:
+	var sim_x: float = FP.to_float(sim_x_fp)
+	var sim_y: float = FP.to_float(sim_y_fp)
+
+	# Map sim Y (40-680) -> screen X (40-680) -- roughly same range
+	var screen_x: float = remap(sim_y, 40.0, 680.0, 60.0, 660.0)
+
+	# Map sim X (40-1240) -> screen Y (inverted: 40=top castle, 1240=bottom castle)
+	# Combat lane in sim: 432-848 -> screen: ~350-690
+	var screen_y: float = remap(sim_x, 40.0, 1240.0, 55.0, 985.0)
+
+	return Vector2(screen_x, screen_y)
 
 
 # --- Building Visuals ---
@@ -170,7 +201,7 @@ func _on_unit_spawned(unit_id: int, _unit_type: StringName) -> void:
 
 func _create_unit_visual(entity: Dictionary) -> Node2D:
 	var uv: Node2D = UnitVisualScript.new()
-	uv.position = Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
+	uv.position = sim_to_screen(entity.x, entity.y)
 	uv.team = entity.team
 	uv.role = entity.get("role", 0)
 	uv.unit_type = entity.get("unit_type", &"")
@@ -198,7 +229,8 @@ func _on_unit_died(unit_id: int, _killer_id: int) -> void:
 
 
 func _on_unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float) -> void:
-	var target_pos := Vector2(target_x, target_y)
+	# Convert sim-space target position to screen space
+	var target_pos := sim_to_screen(FP.from_float_EDITOR(target_x), FP.from_float_EDITOR(target_y))
 	# Sound
 	if _unit_visuals.has(attacker_id):
 		var av = _unit_visuals[attacker_id]
@@ -224,7 +256,7 @@ func _on_unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: 
 
 func _on_unit_healed(healer_id: int, _target_id: int, amount: int, target_x: float, target_y: float) -> void:
 	SFX.play_heal()
-	var target_pos := Vector2(target_x, target_y)
+	var target_pos := sim_to_screen(FP.from_float_EDITOR(target_x), FP.from_float_EDITOR(target_y))
 	units_layer.add_child(Effects.create_heal_sparkle(target_pos))
 	units_layer.add_child(Effects.create_damage_number(amount, target_pos, true))
 	# Cast animation on healer
@@ -246,17 +278,19 @@ func _sync_unit_positions() -> void:
 			continue
 		if _unit_visuals.has(entity.id):
 			var visual = _unit_visuals[entity.id]
-			var new_pos := Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
+			var new_pos := sim_to_screen(entity.x, entity.y)
 
 			# Detect movement for walk animation
 			var is_moving: bool = new_pos.distance_squared_to(visual.position) > 0.5
 			visual.set_moving(is_moving)
 
-			# Update facing based on target
+			# Update facing: in portrait, "forward" is up for team 0, down for team 1
+			# But unit visuals face left/right, so face toward target's screen X
 			if entity.target_id != -1:
 				var target = GameManager.simulation._find_entity_by_id(entity.target_id)
 				if target:
-					visual.facing = 1.0 if FP.to_float(target.x) > new_pos.x else -1.0
+					var target_screen := sim_to_screen(target.x, target.y)
+					visual.facing = 1.0 if target_screen.x > new_pos.x else -1.0
 
 			visual.position = new_pos
 
@@ -283,19 +317,15 @@ func _update_castle_hp_bars() -> void:
 		return
 	var c0: Dictionary = GameManager.simulation.castles[0]
 	var c1: Dictionary = GameManager.simulation.castles[1]
-	var max_h: float = 640.0
+	var max_w: float = 398.0  # 559 - 161
 
 	var ratio_0: float = clampf(FP.to_float(c0.hp) / FP.to_float(c0.max_hp), 0.0, 1.0)
 	var ratio_1: float = clampf(FP.to_float(c1.hp) / FP.to_float(c1.max_hp), 0.0, 1.0)
 
-	var h0: float = max_h * ratio_0
-	var h1: float = max_h * ratio_1
-	castle_hp_bar_0.offset_top = 40.0 + (max_h - h0)
-	castle_hp_bar_0.offset_bottom = 680.0
-	castle_hp_bar_1.offset_top = 40.0 + (max_h - h1)
-	castle_hp_bar_1.offset_bottom = 680.0
+	# Horizontal bars: resize width from left
+	castle_hp_bar_0.offset_right = 161.0 + max_w * ratio_0
+	castle_hp_bar_1.offset_right = 161.0 + max_w * ratio_1
 
-	# Smooth color gradient from green to red
 	castle_hp_bar_0.color = Color(0.15, 0.85, 0.25).lerp(Color(0.9, 0.15, 0.08), 1.0 - ratio_0)
 	castle_hp_bar_1.color = Color(0.15, 0.85, 0.25).lerp(Color(0.9, 0.15, 0.08), 1.0 - ratio_1)
 

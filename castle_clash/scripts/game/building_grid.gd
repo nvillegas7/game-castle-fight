@@ -2,9 +2,9 @@
 ## Attached to a Node2D inside each team's build zone.
 extends Node2D
 
-const CELL_SIZE: int = 32
+const CELL_SIZE: int = 28
 const GRID_COLS: int = 11
-const GRID_ROWS: int = 20
+const GRID_ROWS: int = 10
 
 ## Which player this grid belongs to (set by parent).
 var player_index: int = 0

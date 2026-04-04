@@ -17,6 +17,11 @@ var wave_timer: int = 0
 var match_over: bool = false
 var winning_team: int = -1
 
+# Match stats per team [team_0, team_1]
+var units_spawned: Array[int] = [0, 0]
+var units_killed: Array[int] = [0, 0]  # Enemies killed by this team
+var total_damage: Array[int] = [0, 0]
+
 # Grid state -- one 2D array per player
 var grid_cells: Array = []
 
@@ -520,6 +525,7 @@ func _spawn_from_building(building: Dictionary) -> Array[Dictionary]:
 		}
 		entities.append(unit)
 
+		units_spawned[team] += 1
 		events.append({
 			"type": "unit_spawned",
 			"entity_id": unit_id,
@@ -962,6 +968,11 @@ func _cleanup_dead() -> Array[Dictionary]:
 	for i in range(entities.size() - 1, -1, -1):
 		var entity: Dictionary = entities[i]
 		if FP.lte(entity.get("hp", FP.ONE), FP.ZERO):
+			# Track kill stat
+			if entity.type == "unit":
+				var enemy_team: int = 1 - entity.get("team", 0)
+				if enemy_team >= 0 and enemy_team < 2:
+					units_killed[enemy_team] += 1
 			events.append({
 				"type": "entity_died",
 				"id": entity.id,

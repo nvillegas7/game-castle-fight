@@ -125,7 +125,18 @@ func _create_building_visual(bd: BuildingData, player_index: int, grid_pos: Vect
 
 func _on_building_destroyed(building_id: int) -> void:
 	if _building_visuals.has(building_id):
-		_building_visuals[building_id].queue_free()
+		var visual = _building_visuals[building_id]
+		var pos: Vector2 = visual.position
+		# Sell/destroy feedback: poof + gold refund text
+		units_layer.add_child(Effects.create_death_poof(pos, Color(0.6, 0.5, 0.3)))
+		# Show refund amount if it was a sell (gold went up)
+		var refund_node := Effects.create_damage_number(0, pos, true)
+		var lbl: Label = refund_node.get_child(0)
+		if lbl:
+			lbl.text = "SOLD"
+			lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+		units_layer.add_child(refund_node)
+		visual.queue_free()
 		_building_visuals.erase(building_id)
 	grid_overlay_0.queue_redraw()
 	grid_overlay_1.queue_redraw()
@@ -331,26 +342,72 @@ func _update_ai(delta: float) -> void:
 		return
 
 	var gold: int = GameManager.get_player_gold(AI_PLAYER_ID)
+	var match_time: int = GameManager.current_tick
 
-	# Pick a random affordable building (prefer T1 early, T2 later)
+	# Count AI's current buildings by type
+	var ai_building_count: int = 0
+	var has_income: bool = false
+	var has_t1_combat: bool = false
+	for entity in sim.entities:
+		if entity.type == "building" and entity.player_index == ai_index:
+			ai_building_count += 1
+			var bd_check = sim.building_registry.get(entity.building_type)
+			if bd_check and bd_check.income_bonus > 0:
+				has_income = true
+			if bd_check and bd_check.spawns_unit and bd_check.tier == 1:
+				has_t1_combat = true
+
+	# Build affordable list
 	var affordable: Array[BuildingData] = []
 	for bd: BuildingData in faction.buildings:
 		if bd.gold_cost <= gold:
-			# Check tech prereq
 			if bd.requires_building == &"" or sim.player_has_building(ai_index, bd.requires_building):
 				affordable.append(bd)
 
 	if affordable.is_empty():
 		return
 
-	# Pick randomly
-	var bd: BuildingData = affordable[randi() % affordable.size()]
+	# Smart priority: economy first, then combat, then T2, then tower
+	var chosen: BuildingData = null
 
-	# Find a valid grid position (try random spots)
+	# Phase 1 (early): build income if we don't have one yet
+	if not has_income and ai_building_count < 3:
+		for bd: BuildingData in affordable:
+			if bd.income_bonus > 0:
+				chosen = bd
+				break
+
+	# Phase 2: ensure we have at least 2 T1 combat buildings
+	if chosen == null and ai_building_count < 4:
+		for bd: BuildingData in affordable:
+			if bd.spawns_unit and bd.tier == 1:
+				chosen = bd
+				break
+
+	# Phase 3 (mid-game): mix T2 and towers
+	if chosen == null and match_time > 300:  # After 30 seconds
+		# 40% chance to go T2, 20% tower, 40% more T1
+		var roll: int = randi() % 100
+		if roll < 40:
+			for bd: BuildingData in affordable:
+				if bd.tier == 2:
+					chosen = bd
+					break
+		elif roll < 60:
+			for bd: BuildingData in affordable:
+				if bd.is_tower:
+					chosen = bd
+					break
+
+	# Fallback: random affordable
+	if chosen == null:
+		chosen = affordable[randi() % affordable.size()]
+
+	# Find a valid grid position
 	for _attempt in 20:
-		var gx: int = randi() % (GRID_COLS - bd.grid_size.x + 1)
-		var gy: int = randi() % (GRID_ROWS - bd.grid_size.y + 1)
-		if sim.can_place_building(AI_PLAYER_ID, bd.id, gx, gy):
-			var cmd := Command.place_building(AI_PLAYER_ID, bd.id, gx, gy)
+		var gx: int = randi() % (GRID_COLS - chosen.grid_size.x + 1)
+		var gy: int = randi() % (GRID_ROWS - chosen.grid_size.y + 1)
+		if sim.can_place_building(AI_PLAYER_ID, chosen.id, gx, gy):
+			var cmd := Command.place_building(AI_PLAYER_ID, chosen.id, gx, gy)
 			GameManager.submit_command(cmd)
 			return

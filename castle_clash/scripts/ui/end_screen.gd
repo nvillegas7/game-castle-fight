@@ -40,16 +40,23 @@ func _on_match_ended(winning_team: int) -> void:
 		result_label.add_theme_color_override("font_color", Color(0.9, 0.2, 0.2))
 
 	# Match stats
-	var waves: int = GameManager.simulation.wave_number if GameManager.simulation else 0
 	var buildings_count: int = 0
-	var units_count: int = 0
 	if GameManager.simulation:
 		for entity in GameManager.simulation.entities:
 			if entity.owner == GameManager.local_player_id:
 				if entity.type == "building":
 					buildings_count += 1
 
-	detail_label.text = "Waves: %d | Buildings: %d" % [waves, buildings_count]
+	var match_time: int = GameManager.current_tick / GameManager.TICK_RATE
+	var minutes: int = match_time / 60
+	var secs: int = match_time % 60
+
+	var spawned: int = GameManager.simulation.units_spawned[local_team] if GameManager.simulation else 0
+	var killed: int = GameManager.simulation.units_killed[local_team] if GameManager.simulation else 0
+
+	detail_label.text = "Time: %d:%02d | Buildings: %d\nUnits Spawned: %d | Enemies Killed: %d" % [
+		minutes, secs, buildings_count, spawned, killed
+	]
 
 	# Record to persistent data
 	PlayerData.record_match_result(won, local_faction, waves, buildings_count)

@@ -1,4 +1,4 @@
-## Top HUD bar showing gold, wave timer, and castle HP.
+## Top HUD bar showing gold, match time, and both castle HPs.
 extends Control
 
 @onready var gold_label: Label = %GoldLabel
@@ -27,7 +27,6 @@ func _update_gold() -> void:
 func _update_wave_timer() -> void:
 	if GameManager.simulation == null:
 		return
-	# Show match time (buildings spawn on their own timers now)
 	var total_seconds: int = GameManager.current_tick / GameManager.TICK_RATE
 	var minutes: int = total_seconds / 60
 	var secs: int = total_seconds % 60
@@ -43,10 +42,14 @@ func _update_castle_hp() -> void:
 			local_team = player.team
 			break
 
-	var castle: Dictionary = GameManager.simulation.castles[local_team]
-	var hp: int = FP.to_int(castle.hp)
-	var max_hp: int = FP.to_int(castle.max_hp)
-	castle_label.text = "Castle: %d / %d" % [hp, max_hp]
+	var enemy_team: int = 1 - local_team
+	var my_castle: Dictionary = GameManager.simulation.castles[local_team]
+	var enemy_castle: Dictionary = GameManager.simulation.castles[enemy_team]
+	var my_hp: int = FP.to_int(my_castle.hp)
+	var my_max: int = FP.to_int(my_castle.max_hp)
+	var en_hp: int = FP.to_int(enemy_castle.hp)
+	var en_max: int = FP.to_int(enemy_castle.max_hp)
+	castle_label.text = "You: %d/%d | Enemy: %d/%d" % [my_hp, my_max, en_hp, en_max]
 
 
 func _on_gold_changed(player_id: int, _new_gold: int) -> void:

@@ -98,6 +98,18 @@ func _input(event: InputEvent) -> void:
 		_update_ghost_position(event.position)
 		if ghost_valid:
 			_place_building()
+		elif selected_building and _is_hovering:
+			# Failed placement feedback
+			var local_pos: Vector2 = event.position - global_position
+			var gold: int = GameManager.get_player_gold(GameManager.local_player_id)
+			var msg: String = "Blocked!" if gold >= selected_building.gold_cost else "No gold!"
+			var err_node := Effects.create_damage_number(0, event.position, false)
+			# Override the label text
+			var label: Label = err_node.get_child(0)
+			if label:
+				label.text = msg
+				label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.3))
+			get_tree().root.add_child(err_node)
 
 
 func _update_ghost_position(screen_pos: Vector2) -> void:

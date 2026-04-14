@@ -3,10 +3,23 @@
 extends Node
 
 # --- Configuration ---
-const SERVER_HOST: String = "localhost"
-const SERVER_PORT: int = 7350
+# Auto-detect: localhost uses local Nakama directly (fast),
+# deployed uses Cloudflare tunnel (internet play).
 const SERVER_KEY: String = "castleclash_dev"
-const SERVER_SCHEME: String = "http"
+var server_host: String = "nakama.castlefight.net"
+var server_port: int = 443
+var server_scheme: String = "https"
+
+func _detect_server() -> void:
+	if OS.has_feature("web"):
+		var js_host: String = JavaScriptBridge.eval("window.location.hostname")
+		if js_host == "localhost" or js_host == "127.0.0.1":
+			server_host = "localhost"
+			server_port = 7350
+			server_scheme = "http"
+			print("[NET] Local mode: Nakama at localhost:7350")
+			return
+	print("[NET] Remote mode: Nakama at %s:%d" % [server_host, server_port])
 
 # --- Connection state ---
 enum NetState { OFFLINE, CONNECTING, AUTHENTICATED, MATCHMAKING, IN_LOBBY, IN_MATCH }
@@ -20,9 +33,10 @@ var _socket = null   # NakamaSocket
 
 # --- Match state ---
 var match_id: String = ""
-var local_session_id: String = ""
-var local_player_id: int = -1
-var opponent_session_id: String = ""
+var local_user_id: String = ""      # stable user_id from device auth
+var local_player_id: int = -1       # deterministic 0/1 from sorted user_ids
+var opponent_user_id: String = ""   # opponent's stable user_id
+var opponent_username: String = ""  # opponent display name (for lobby UI)
 var opponent_faction: StringName = &""
 var local_faction: StringName = &"kingdom"
 
@@ -30,10 +44,13 @@ var local_faction: StringName = &"kingdom"
 var _local_commands_sent: Dictionary = {}      # tick -> bool
 var _remote_commands_received: Dictionary = {}  # tick -> bool
 var _local_commands_for_tick: Dictionary = {}   # tick -> Array
+var _sent_command_history: Dictionary = {}     # tick -> Array (last N ticks for redundant send)
+const REDUNDANT_TICKS: int = 3                # include this many previous ticks in each payload
 
 # --- Lobby state ---
 var _opponent_ready: bool = false
 var _local_ready: bool = false
+var _matchmaker_ticket: String = ""  # for cancel matchmaking
 
 # --- Op codes ---
 enum OpCode {
@@ -46,7 +63,7 @@ enum OpCode {
 
 
 func _ready() -> void:
-	pass
+	_detect_server()
 
 
 ## Send a command to the relay server (or apply locally in offline mode).
@@ -62,22 +79,47 @@ func send_command(command: Dictionary) -> void:
 
 
 ## Called by GameManager each tick to flush and send commands for that tick.
+## May be called multiple times for the same tick (while stalling for remote).
+## Commands accumulate in _local_commands_for_tick until the tick advances;
+## each flush re-sends the FULL accumulated set so the remote always gets
+## the latest version. The receiver uses the latest payload for each tick,
+## replacing any earlier (possibly empty) version.
 func flush_commands_for_tick(tick: int) -> void:
 	if offline_mode:
 		return
+	# DON'T erase — commands may be added between flush calls while stalling.
+	# Read the current accumulated commands for this tick.
 	var commands: Array = _local_commands_for_tick.get(tick, [])
-	_local_commands_for_tick.erase(tick)
+
+	# Build payload with current + previous ticks (redundant send for reliability)
+	_sent_command_history[tick] = commands
+	if tick > REDUNDANT_TICKS + 10:
+		_sent_command_history.erase(tick - REDUNDANT_TICKS - 10)
+
+	var all_ticks: Array = []
+	for t in range(maxi(1, tick - REDUNDANT_TICKS), tick + 1):
+		var cmds: Array = _sent_command_history.get(t, [])
+		all_ticks.append({
+			"tick": t,
+			"commands": _serialize_commands(cmds),
+		})
 
 	var payload := JSON.stringify({
 		"tick": tick,
-		"commands": _serialize_commands(commands),
+		"ticks": all_ticks,
 	})
 
 	if _socket:
 		_socket.send_match_state_async(match_id, OpCode.COMMANDS, payload)
 	_local_commands_sent[tick] = true
 
-	# Also add our commands to GameManager's buffer
+
+## Called by GameManager AFTER advancing a tick to commit commands to the local
+## buffer and clean up. This ensures commands placed during stalling frames are
+## included before the tick is processed.
+func commit_tick_commands(tick: int) -> void:
+	var commands: Array = _local_commands_for_tick.get(tick, [])
+	_local_commands_for_tick.erase(tick)
 	for cmd in commands:
 		GameManager.command_buffer.add_command(tick, cmd)
 
@@ -103,6 +145,7 @@ func send_checksum(tick: int, checksum: int) -> void:
 
 func connect_to_server() -> void:
 	net_state = NetState.CONNECTING
+	EventBus.connection_status_changed.emit("Connecting to server...")
 
 	# Load Nakama singleton
 	var Nakama = Engine.get_singleton("Nakama") if Engine.has_singleton("Nakama") else null
@@ -111,27 +154,33 @@ func connect_to_server() -> void:
 		Nakama = get_node_or_null("/root/Nakama")
 	if Nakama == null:
 		push_error("Nakama addon not found. Enable the plugin in Project Settings.")
-		net_state = NetState.OFFLINE
+		_reset_to_offline()
+		EventBus.connection_status_changed.emit("Server not available")
 		return
 
-	_client = Nakama.create_client(SERVER_KEY, SERVER_HOST, SERVER_PORT, SERVER_SCHEME)
+	# Nakama.create_client(key, host, port, scheme, timeout, log_level)
+	# Log level WARNING (2) suppresses the per-message DEBUG/INFO spam in console.
+	# Only errors and warnings are shown. NakamaLogger.LOG_LEVEL: 0=NONE,1=ERROR,2=WARNING,3=INFO,4=VERBOSE,5=DEBUG
+	_client = Nakama.create_client(SERVER_KEY, server_host, server_port, server_scheme, 3, 2)
 
 	# Device ID auth
 	var device_id: String = _get_or_create_device_id()
 	_session = await _client.authenticate_device_async(device_id, null, true)
 	if _session.is_exception():
 		push_error("Auth failed: %s" % _session.get_exception().message)
-		net_state = NetState.OFFLINE
+		_reset_to_offline()
+		EventBus.connection_status_changed.emit("Authentication failed")
 		return
 
-	local_session_id = _session.user_id
+	local_user_id = _session.user_id
 
 	# Open WebSocket
 	_socket = Nakama.create_socket_from(_client)
 	var connected = await _socket.connect_async(_session)
 	if connected.is_exception():
 		push_error("Socket connect failed")
-		net_state = NetState.OFFLINE
+		_reset_to_offline()
+		EventBus.connection_status_changed.emit("Connection failed")
 		return
 
 	offline_mode = false
@@ -140,9 +189,16 @@ func connect_to_server() -> void:
 	_socket.received_matchmaker_matched.connect(_on_matchmaker_matched)
 	_socket.closed.connect(_on_socket_closed)
 	EventBus.connected_to_server.emit()
+	EventBus.connection_status_changed.emit("Connected!")
 
 
 func _get_or_create_device_id() -> String:
+	# Web exports: all tabs on the same origin share IndexedDB, so a persistent
+	# device ID makes every tab authenticate as the same Nakama user. Generate a
+	# unique ID per session so each tab is a distinct player for testing.
+	if OS.has_feature("web"):
+		return "%x%x%x%x" % [randi(), randi(), randi(), randi()]
+	# Native: persist device ID across sessions for stable identity.
 	var config := ConfigFile.new()
 	var path := "user://device_id.cfg"
 	if config.load(path) == OK:
@@ -162,36 +218,78 @@ func start_matchmaking(faction: StringName) -> void:
 		return
 	local_faction = faction
 	net_state = NetState.MATCHMAKING
+	EventBus.connection_status_changed.emit("Finding opponent...")
 
 	var ticket = await _socket.add_matchmaker_async("*", 2, 2)
 	if ticket.is_exception():
 		push_error("Matchmaking failed")
 		net_state = NetState.AUTHENTICATED
+		EventBus.connection_status_changed.emit("Matchmaking failed. Try again.")
+		return
+	_matchmaker_ticket = ticket.ticket
+
+
+## Cancel an in-progress matchmaking search.
+func cancel_matchmaking() -> void:
+	if net_state != NetState.MATCHMAKING or _matchmaker_ticket == "":
+		return
+	if _socket:
+		await _socket.remove_matchmaker_async(_matchmaker_ticket)
+	_matchmaker_ticket = ""
+	net_state = NetState.AUTHENTICATED
+	EventBus.connection_status_changed.emit("Search cancelled")
 
 
 func _on_matchmaker_matched(matched) -> void:
+	EventBus.connection_status_changed.emit("Opponent found! Joining...")
+
 	var joined = await _socket.join_matched_async(matched)
 	if joined.is_exception():
 		push_error("Failed to join match")
+		EventBus.connection_status_changed.emit("Failed to join match")
 		return
 
 	match_id = joined.match_id
 
-	# Assign player IDs by sorting session IDs lexicographically
-	var session_ids: Array = []
-	for p in joined.presences:
-		session_ids.append(p.session_id)
-	session_ids.sort()
+	# Deterministic player assignment from matchmaker result (available BEFORE join).
+	# joined.presences has a race condition — first joiner doesn't see the second.
+	# The matchmaker result contains ALL matched users: self_user + users[].
+	var user_ids: Array = []
+	if matched.self_user != null and matched.self_user.presence != null:
+		var uid: String = matched.self_user.presence.user_id
+		if uid != "" and not user_ids.has(uid):
+			user_ids.append(uid)
+	for u in matched.users:
+		if u.presence != null:
+			var uid: String = u.presence.user_id
+			if uid != "" and not user_ids.has(uid):
+				user_ids.append(uid)
+	# Fallback: ensure self is always in the list
+	if not user_ids.has(local_user_id):
+		user_ids.append(local_user_id)
+	user_ids.sort()
+	local_player_id = user_ids.find(local_user_id)
+	print("[MATCH] matchmaker_ids=%s local=%s player_id=%d" % [str(user_ids), local_user_id, local_player_id])
 
-	local_player_id = session_ids.find(local_session_id)
-	for p in joined.presences:
-		if p.session_id != local_session_id:
-			opponent_session_id = p.session_id
+	# Track opponent info
+	for u in matched.users:
+		if u.presence != null and u.presence.user_id != local_user_id:
+			opponent_user_id = u.presence.user_id
+			opponent_username = u.presence.username if u.presence.username != "" else "Opponent"
+			break
+	# Fallback: check joined presences for opponent info
+	if opponent_user_id == "":
+		for p in joined.presences:
+			if p.user_id != local_user_id:
+				opponent_user_id = p.user_id
+				opponent_username = p.username if p.username != "" else "Opponent"
+				break
 
 	net_state = NetState.IN_LOBBY
 	_opponent_ready = false
 	_local_ready = false
 	EventBus.match_found.emit(match_id)
+	EventBus.connection_status_changed.emit("Match found! Starting...")
 
 	# Send our faction selection
 	_send_match_message(OpCode.FACTION_SELECT, { "faction": str(local_faction) })
@@ -214,10 +312,14 @@ func set_ready() -> void:
 func _try_start_match() -> void:
 	if not _local_ready or not _opponent_ready or opponent_faction == &"":
 		return
-	# Player 0 sends match config
+	# Player 0 sends match config — includes ALL simulation parameters so both
+	# clients initialize identically. Previously only seed+players were sent;
+	# mode_config was built locally from each client's selected_game_mode,
+	# causing desync when they differed (BUG-DESYNC1).
 	if local_player_id == 0:
 		var config := {
 			"seed": randi(),
+			"game_mode": GameManager.selected_game_mode,
 			"players": [
 				{ "id": 0, "team": 0, "faction": str(local_faction) },
 				{ "id": 1, "team": 1, "faction": str(opponent_faction) },
@@ -241,7 +343,15 @@ func _begin_match(config: Dictionary) -> void:
 			"faction": StringName(str(p.faction)),
 		})
 
+	# Use game_mode from match config — NOT from local selected_game_mode.
+	# Both clients must use the same mode for deterministic sync (BUG-DESYNC1).
+	var game_mode: int = int(config.get("game_mode", 0))  # 0 = STANDARD
+	GameManager.selected_game_mode = game_mode as GameManager.GameMode
 	GameManager.start_online_match(int(config.seed), player_data, local_player_id)
+	# Transition to the game arena scene. The simulation is already initialized
+	# and ticking; game_arena._ready() will re-emit match_started so children
+	# (card_hand, building_menu) can initialize from the running simulation.
+	SceneTransition.change_scene("res://scenes/game/game_arena.tscn")
 
 
 # --- Relay ---
@@ -261,11 +371,24 @@ func _on_match_state(match_state) -> void:
 
 	match op_code:
 		OpCode.COMMANDS:
-			var tick: int = int(data.tick)
-			var commands: Array = _deserialize_commands(data.get("commands", []))
-			_remote_commands_received[tick] = true
-			for cmd in commands:
-				GameManager.command_buffer.add_command(tick, cmd)
+			# Each payload contains multiple ticks (current + redundant previous).
+			# REPLACE (not skip) commands for each tick — later messages may have
+			# commands that earlier (empty) messages didn't, because the sender
+			# accumulates commands while stalling.
+			var ticks_array: Array = data.get("ticks", [])
+			if ticks_array.is_empty():
+				# Legacy single-tick format fallback
+				var tick: int = int(data.tick)
+				var commands: Array = _deserialize_commands(data.get("commands", []))
+				_remote_commands_received[tick] = true
+				GameManager.command_buffer.replace_commands(tick, commands)
+			else:
+				for tick_data in ticks_array:
+					var t: int = int(tick_data.tick)
+					var commands: Array = _deserialize_commands(tick_data.get("commands", []))
+					_remote_commands_received[t] = true
+					# Replace — later payload for same tick may have more commands
+					GameManager.command_buffer.replace_commands(t, commands)
 
 		OpCode.CHECKSUM:
 			var remote_tick: int = int(data.tick)
@@ -280,6 +403,8 @@ func _on_lobby_message(op_code: int, data: Dictionary) -> void:
 	match op_code:
 		OpCode.FACTION_SELECT:
 			opponent_faction = StringName(str(data.get("faction", "")))
+			# READY may have arrived before FACTION_SELECT; retry start check
+			_try_start_match()
 		OpCode.READY:
 			_opponent_ready = true
 			_try_start_match()
@@ -292,8 +417,32 @@ func _send_match_message(op_code: int, data: Dictionary) -> void:
 		_socket.send_match_state_async(match_id, op_code, JSON.stringify(data))
 
 
+## Handle socket disconnection. Reset all network state so the game can
+## reconnect cleanly from the main menu.
 func _on_socket_closed() -> void:
+	_reset_to_offline()
 	EventBus.disconnected_from_server.emit()
+	EventBus.connection_status_changed.emit("Connection lost")
+
+
+## Reset all network state to clean offline mode.
+func _reset_to_offline() -> void:
+	net_state = NetState.OFFLINE
+	offline_mode = true
+	match_id = ""
+	local_player_id = -1
+	opponent_user_id = ""
+	opponent_username = ""
+	opponent_faction = &""
+	_opponent_ready = false
+	_local_ready = false
+	_matchmaker_ticket = ""
+	_local_commands_sent.clear()
+	_remote_commands_received.clear()
+	_local_commands_for_tick.clear()
+	_client = null
+	_session = null
+	_socket = null
 
 
 # --- Serialization ---
@@ -313,6 +462,8 @@ func _serialize_commands(commands: Array) -> Array:
 				s["ability_id"] = str(cmd.ability_id)
 				s["target_x"] = cmd.target_x
 				s["target_y"] = cmd.target_y
+			Command.Type.ACTIVATE_BUILDING:
+				s["building_id"] = cmd.building_id
 		result.append(s)
 	return result
 
@@ -332,5 +483,7 @@ func _deserialize_commands(data: Array) -> Array:
 				cmd["ability_id"] = StringName(str(item.ability_id))
 				cmd["target_x"] = int(item.target_x)
 				cmd["target_y"] = int(item.target_y)
+			Command.Type.ACTIVATE_BUILDING:
+				cmd["building_id"] = int(item.building_id)
 		result.append(cmd)
 	return result

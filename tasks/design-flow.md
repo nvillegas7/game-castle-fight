@@ -78,7 +78,8 @@ the gap was never the assets — it was the workflow:
 ## Status
 
 - [x] Arena target composed (3 rounds, ~0.14s each) — matches mockup-v2 family
-- [ ] User approval of `design/arena_target.png`
-- [ ] Port to `game_arena.gd` from LAYOUT (castle/tower scale, walls, water platform, foam)
-- [ ] Perceptual-diff gate in `tests/`
-- [ ] Menu screens: same treatment (compose vs CR reference → approve → port)
+- [x] User approved `design/arena_target.png` (2026-07-08)
+- [x] Ported to `game_arena.gd`/`castle_visual.gd` from LAYOUT (commit 8b565f6)
+- [x] Parity gate: 4 arena detectors in `tests/test_screen_layout.gd`,
+      RED on old build → GREEN after port (15/15)
+- [ ] Menu screens: same treatment (compose vs CR reference → approve → port) — NEXT

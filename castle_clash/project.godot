@@ -49,6 +49,10 @@ window/size/window_width_override=504
 window/size/window_height_override=896
 window/stretch/mode="canvas_items"
 
+[gui]
+
+theme/custom="res://assets/theme/game_theme.tres"
+
 [input]
 
 click={

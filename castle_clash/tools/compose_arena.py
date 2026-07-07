@@ -1,27 +1,32 @@
 #!/usr/bin/env python3
 """compose_arena.py — design-space compositor for the battle arena screen.
 
-WHY THIS EXISTS (tasks/design-flow.md):
-  The mockups the user commissioned (Desktop v1/v2/v3) were composed in IMAGE
-  SPACE from the real game assets — seconds per iteration, full visual feedback
-  on every placement. Our old flow composed art blind in GDScript coordinates
-  with a ~90s boot-and-capture feedback loop, and it never converged.
+THE FLOW (tasks/design-flow.md): iterate the look HERE (~0.1s/render, real
+assets, real 720x1280 geometry) → user approves → design/arena_target.png is
+the pixel spec → the game PORTS the LAYOUT tables below verbatim → parity
+detectors in tests/test_screen_layout.gd pin it.
 
-  New flow:
-    1. Iterate the look HERE   (python3 tools/compose_arena.py → ~1s render)
-    2. User approves the output → design/arena_target.png IS the pixel spec
-    3. The LAYOUT table below is the single source of truth; the game-side
-       implementation mirrors it mechanically (same asset, same xy, same scale)
-    4. Gate: capture vs target perceptual diff (tests), not vibes
+INVARIANTS (user feedback 2026-07-08):
+  * SYMMETRY BY CONSTRUCTION — decorations are authored for the LEFT side of
+    the ENEMY (top) half only. Right side = x-mirror (720-x, same y). Player
+    half = y-mirror about FLIP_PIVOT (1040-y). Multiplayer perspective flip
+    (sim_to_screen Y-reflection) therefore shows both players an identical
+    arena. Never hand-place an unmirrored decoration.
+  * Y-SORTED RENDERING — decorations paint back-to-front by ground-y exactly
+    like the game's y-sorted DecorationLayer, so layering bugs (sheep floating
+    on trees) are visible HERE before approval, not after the port.
+  * CALIBRATED SCALE — landmark sizes come from MEASURED reference fractions
+    (forensics wf_772ab315): castle = 0.296 of playfield width → 0.68 native.
+    Never eyeball a scale when a measured number exists.
+  * Castles sit ON their sim anchors (360,120)/(360,920); at 0.68 the castle
+    overhangs the island rim by ~23px — "seated at the cliff" like mockup v2.
 
-Renders at native 720x1280. Sim geometry mirrored from game_arena.gd —
-gameplay occupies x=[206,514] (11 cols x 28px); castles at (360,120)/(360,920);
-build grids y=[55,335] (enemy) and y=[695,975] (player). Everything outside
-x=[206,514] is decoration-only space.
+Sim geometry (game_arena.gd): gameplay column x=[206,514]; build grids
+y=[55,335]/[695,975]; FLIP_PIVOT_Y=520. Outside the column = decoration space.
 
 Usage:
-  python3 tools/compose_arena.py            # render design/arena_target.png
-  python3 tools/compose_arena.py --grid     # + overlay sim geometry (debug)
+  python3 tools/compose_arena.py            # → design/arena_target.png
+  python3 tools/compose_arena.py --grid     # + sim geometry overlay
 """
 
 import sys
@@ -34,7 +39,8 @@ TER = A / "terrain"
 OUT = ROOT / "design" / "arena_target.png"
 
 W, H = 720, 1280
-TS = 64  # terrain tile size
+TS = 64
+PIVOT = 520.0  # FLIP_PIVOT_Y
 
 # ---------------------------------------------------------------- asset io --
 
@@ -53,17 +59,12 @@ def tile_of(sheet: Path, col: int, row: int) -> Image.Image:
 
 
 def frame_of(sheet: Path, idx: int = 0) -> Image.Image:
-    """Square frame idx from a horizontal strip (frame size = sheet height)."""
     im = load(sheet)
     fh = im.size[1]
     return im.crop((idx * fh, 0, (idx + 1) * fh, fh))
 
 
-def blit(dst: Image.Image, src: Image.Image, cx: float, cy: float,
-         scale: float = 1.0, flip_h: bool = False, flip_v: bool = False,
-         anchor: str = "bottom") -> None:
-    """Paste src centered-x at cx; anchor='bottom' puts the sprite's content
-    bottom at cy (how things 'stand' on the ground), 'center' centers it."""
+def blit(dst, src, cx, cy, scale=1.0, flip_h=False, flip_v=False, anchor="bottom"):
     if flip_h:
         src = src.transpose(Image.FLIP_LEFT_RIGHT)
     if flip_v:
@@ -76,170 +77,151 @@ def blit(dst: Image.Image, src: Image.Image, cx: float, cy: float,
         return
     cw, chh = bbox[2] - bbox[0], bbox[3] - bbox[1]
     x = round(cx - bbox[0] - cw / 2)
-    if anchor == "bottom":
-        y = round(cy - bbox[3])
-    else:
-        y = round(cy - bbox[1] - chh / 2)
+    y = round(cy - bbox[3]) if anchor == "bottom" else round(cy - bbox[1] - chh / 2)
     dst.alpha_composite(src, (x, y))
 
 
 # ------------------------------------------------------------------ layout --
-# The single source of truth. The game-side port reads THESE values.
-# All placements are (cx, ground_y) unless noted. Symmetry: the player half is
-# the enemy half mirrored about y=PIVOT (blue variants instead of red).
+# PORT THESE VERBATIM. Author left-side/enemy-half only — mirrors generated.
 
-PIVOT = 520.0  # play-area midline, = FLIP_PIVOT_Y in game_arena.gd
-
-GRASS = TER / "Tilemap_color1.png"   # sunny green flat tiles (3x3 at cols 0-2)
-ELEV = TER / "Tilemap_color1.png"    # elevated/stone tiles (cols 5-8)
-WATER = TER / "Water Background color.png"
+GRASS = TER / "Tilemap_color1.png"
+WATER_RGB = (71, 171, 169)          # native water texel — NEVER tint
 FOAM = TER / "Water Foam.png"
 
-# Grass platform (the island). Water fills everything else.
-# 64px-grid-aligned: x tiles 1..10 → x=[64,704]... chosen: x=[72,648] can't
-# grid-align; use tile grid offset 8 so platform = 9 tiles [72..648].
-PLAT_X0, PLAT_X1 = 72, 648     # land span (9 tiles wide, offset 8)
-PLAT_Y0, PLAT_Y1 = 56, 984     # land span vertically
-CORNER_CUT = 1                  # corner tiles rounded
+# Island platform: symmetric about PIVOT (72+968 = 2*520 ✓), 9x14 tiles.
+PLAT_X0, PLAT_X1 = 72, 648
+PLAT_Y0, PLAT_Y1 = 72, 968
 
-BUILDINGS = {
-    "castle": {"asset": "Castle.png", "scale": 0.90},   # 312px content → ~281px
-    "tower": {"asset": "Tower.png", "scale": 0.72},     # 120px content → ~86px
-    "house1": {"asset": "House1.png", "scale": 0.62},
-    "house2": {"asset": "House2.png", "scale": 0.62},
-}
+CASTLE_SCALE = 0.68                  # 0.296 * 720 / 312px content (measured)
+CASTLE_ANCHOR = (360, 120)           # sim anchor (enemy); player = y-mirror
 
-# Enemy (red, top) half placements; player half auto-mirrored.
-ENEMY_HALF = {
-    # Castle anchored at its CENTER on the sim castle position (360,120) — the
-    # game's visual must track the sim anchor (VFX/attacks target it), so the
-    # spec uses the same anchor. Mirror = (360,920), exactly the sim's player castle.
-    "castle": (360, 120),
-    "towers": [(140, 268), (580, 268)],
-    "houses": [("house1", 122, 150), ("house2", 598, 146)],
-    # stone wall (solid stone face row) castle base → towers, like mockup v2
-    "wall_y": 150,                  # top-left y of wall tile row
-    "wall_x": (140, 580),
-}
+# Fortress dressing (enemy half; x already centered/paired where needed)
+WALL_Y = 126                         # wall row bottom (190) = castle base ✓
+WALL_X = (140, 580)
+TOWER_SCALE, TOWER_GY = 0.72, 268    # flanking towers at x=140 / 720-140
+HOUSE = ("House1.png", 122, 148, 0.62)   # corner house; mirrored 4x
 
-TREE_CLUSTERS = [                   # (cx, ground_y, n) — outer bands, ON LAND
-    (136, 428, 3), (584, 438, 3),
-    (128, 580, 2), (592, 590, 2),
-]
-SHEEP = [(178, 392, False), (542, 392, True), (160, 668, False), (560, 660, True)]
-GOLD = [(178, 508, 3), (542, 508, 3)]      # (cx, cy, n nuggets)
-BUSHES = [(168, 322, 0), (552, 318, 1), (168, 740, 2), (552, 734, 3)]
-ROCKS = [(340, 508, 0), (388, 540, 1)]     # tiny midfield accents
-WATER_ROCKS = [(40, 300, 0), (684, 360, 1), (34, 700, 2), (688, 760, 3)]
+# Decorations — LEFT side of ENEMY half only. (cx, ground_y, extra)
+TREES_L = [(110, 428, 3), (110, 580, 2)]     # (cx, gy, count)
+SHEEP_L = [(190, 350), (190, 620)]           # graze spots, inboard of trees
+GOLD_L = [(188, 505)]                        # nugget cluster
+BUSH_L = [(170, 250, 1)]                     # (cx, gy, sprite idx)
+WROCK_L = [(40, 300, 1), (34, 470, 3)]       # in-water rocks
+ROCK_MID = (340, 508, 1)                     # midfield accent; point-mirrored
+
+TREE_SCALE, SHEEP_SCALE, GOLD_SCALE = 0.52, 0.55, 0.55
+BUSH_SCALE, ROCK_SCALE, WROCK_SCALE = 0.5, 0.4, 0.5
+
+
+def mirror_x(x: float) -> float:
+    return 720.0 - x
+
+
+def mirror_y(y: float) -> float:
+    return 2.0 * PIVOT - y
 
 
 # ------------------------------------------------------------------ render --
 
 def render(show_grid: bool = False) -> Image.Image:
-    img = Image.new("RGBA", (W, H), (0, 0, 0, 255))
+    img = Image.new("RGBA", (W, H), WATER_RGB + (255,))
 
-    # 1. Water base — everywhere, organic life comes from foam + rocks
-    wtile = load(WATER)
-    for y in range(0, H, TS):
-        for x in range(0, W, TS):
-            img.alpha_composite(wtile, (x, y))
-
-    # 2. Foam dashes hugging the coastline (drawn before land so it peeks out
-    #    from under the edge tiles — small, staggered, like the mockup's dashes)
+    # Foam dashes hugging all four coasts (before land, peeking out)
     foam = frame_of(FOAM, 0)
-    fs = 0.32
     for i, x in enumerate(range(PLAT_X0, PLAT_X1 - 24, 60)):
-        jig = 8 if i % 2 else -5
-        blit(img, foam, x + 30 + jig, PLAT_Y0 + 14, fs, anchor="center")
-        blit(img, foam, x + 30 - jig, PLAT_Y1 + 4, fs, anchor="center", flip_v=True)
+        jig = 8 if i % 2 == 0 else -5
+        blit(img, foam, x + 30 + jig, PLAT_Y0 + 14, 0.32, anchor="center")
+        blit(img, foam, x + 30 - jig, PLAT_Y1 + 4, 0.32, anchor="center", flip_v=True)
     for i, y in enumerate(range(PLAT_Y0, PLAT_Y1 - 24, 60)):
-        jig = 9 if i % 2 else -6
-        blit(img, foam, PLAT_X0 - 2, y + 30 + jig, fs, anchor="center")
-        blit(img, foam, PLAT_X1 + 2, y + 30 - jig, fs, anchor="center", flip_h=True)
+        jig = 9 if i % 2 == 0 else -6
+        blit(img, foam, PLAT_X0 - 2, y + 30 + jig, 0.32, anchor="center")
+        blit(img, foam, PLAT_X1 + 2, y + 30 - jig, 0.32, anchor="center", flip_h=True)
 
-    # 3. Grass platform with proper 3x3 edge tiles + rounded corners
+    # Island platform, 3x3 edge tiles + rounded corners (mirror of the game's
+    # _build_tiled_zone call)
     cols = (PLAT_X1 - PLAT_X0) // TS
     rows = (PLAT_Y1 - PLAT_Y0) // TS
     for r in range(rows):
         for c in range(cols):
-            is_t, is_b = r == 0, r == rows - 1
-            is_l, is_r = c == 0, c == cols - 1
-            # rounded corners: skip the extreme corner tile, use corner art next to it
-            if (is_t or is_b) and (is_l or is_r):
-                gx, gy = (0 if is_l else 2), (0 if is_t else 2)
-            elif is_t:
-                gx, gy = 1, 0
-            elif is_b:
-                gx, gy = 1, 2
-            elif is_l:
-                gx, gy = 0, 1
-            elif is_r:
-                gx, gy = 2, 1
-            else:
-                gx, gy = 1, 1
+            gx = 0 if c == 0 else (2 if c == cols - 1 else 1)
+            gy = 0 if r == 0 else (2 if r == rows - 1 else 1)
             img.alpha_composite(tile_of(GRASS, gx, gy),
                                 (PLAT_X0 + c * TS, PLAT_Y0 + r * TS))
 
-    # 4+5. Per-half fortress composition (enemy red top, player blue mirrored)
-    for team, faction in (("red", False), ("blue", True)):
+    # Per-half fortress: stone wall row, then castle/towers/houses.
+    stone = tile_of(GRASS, 6, 4)
+    for team, flip in (("red", False), ("blue", True)):
         bdir = A / "buildings" / team
-
-        def my(y: float) -> float:  # mirror ground-y for the player half
-            return y if not faction else 2 * PIVOT - y
-
-        # stone wall row first (behind buildings) — solid stone face like v2
-        wy = ENEMY_HALF["wall_y"]
-        wy = wy if not faction else 2 * PIVOT - wy - TS
-        wall_tile = tile_of(ELEV, 6, 4)
-        if faction:
-            wall_tile = wall_tile.transpose(Image.FLIP_TOP_BOTTOM)
-        x0, x1 = ENEMY_HALF["wall_x"]
-        x = x0
-        while x < x1:
-            img.alpha_composite(wall_tile, (x, round(wy)))
+        wy = WALL_Y if not flip else mirror_y(WALL_Y) - TS
+        wt = stone.transpose(Image.FLIP_TOP_BOTTOM) if flip else stone
+        x = WALL_X[0]
+        while x < WALL_X[1]:
+            img.alpha_composite(wt, (x, round(wy)))
             x += TS
+        cy = CASTLE_ANCHOR[1] if not flip else mirror_y(CASTLE_ANCHOR[1])
+        blit(img, load(bdir / "Castle.png"), CASTLE_ANCHOR[0], cy,
+             CASTLE_SCALE, anchor="center")
+        for tx in (140, mirror_x(140)):
+            gy2 = TOWER_GY if not flip else mirror_y(TOWER_GY)
+            blit(img, load(bdir / "Tower.png"), tx, gy2, TOWER_SCALE)
+        hname, hx, hy, hs = HOUSE
+        for hx2 in (hx, mirror_x(hx)):
+            gy3 = hy if not flip else mirror_y(hy)
+            blit(img, load(bdir / hname), hx2, gy3, hs)
 
-        cx, cy = ENEMY_HALF["castle"]
-        blit(img, load(bdir / "Castle.png"), cx, my(cy), BUILDINGS["castle"]["scale"],
-             anchor="center")
-        for tx, ty in ENEMY_HALF["towers"]:
-            blit(img, load(bdir / "Tower.png"), tx, my(ty), BUILDINGS["tower"]["scale"])
-        for hname, hx, hy in ENEMY_HALF["houses"]:
-            blit(img, load(bdir / BUILDINGS[hname]["asset"]), hx, my(hy),
-                 BUILDINGS[hname]["scale"])
+    # Decorations — expand mirrors, then paint back-to-front by ground-y
+    # (exactly like the game's y-sorted DecorationLayer).
+    jobs = []  # (ground_y, callable)
 
-    # 6. Decorations — FULL OPACITY, native palette, clustered like the mockups
-    for cx, gy, n in TREE_CLUSTERS:
+    def all4(cx, gy):
+        """4-way symmetric expansion: L/R x-mirror x top/bottom y-mirror."""
+        return [(cx, gy), (mirror_x(cx), gy), (cx, mirror_y(gy)),
+                (mirror_x(cx), mirror_y(gy))]
+
+    for cx, gy, n in TREES_L:
         for k in range(n):
             t = frame_of(TER / "Resources" / f"Tree{(k % 4) + 1}.png", 0)
-            dx = (k - n / 2) * 40 + 20
-            blit(img, t, cx + dx, gy + (k % 2) * 26, 0.52)
-            blit(img, t, cx + dx, 2 * PIVOT - gy + (k % 2) * 26, 0.52)  # mirror half
+            dx = (k - n / 2) * 32 + 16
+            dy = (k % 2) * 26
+            for px, py in all4(cx + dx, gy + dy):
+                jobs.append((py, lambda p=(px, py), s=t: blit(img, s, p[0], p[1], TREE_SCALE)))
 
-    for bx, by, i in BUSHES:
-        b = frame_of(TER / "Decorations" / f"Bushe{i + 1}.png", 0)
-        blit(img, b, bx, by, 0.5)
-    for rx, ry, i in ROCKS:
-        blit(img, load(TER / "Decorations" / f"Rock{i + 1}.png"), rx, ry, 0.4)
-    for wx, wy2, i in WATER_ROCKS:
-        blit(img, frame_of(TER / "Decorations" / f"Water Rocks_{i + 1:02d}.png", 0),
-             wx, wy2, 0.5)
+    sheep = frame_of(TER / "Resources" / "Sheep_Idle.png", 0)
+    for cx, gy in SHEEP_L:
+        for i, (px, py) in enumerate(all4(cx, gy)):
+            flip_h = px > 360  # face inward
+            jobs.append((py, lambda p=(px, py), f=flip_h: blit(img, sheep, p[0], p[1], SHEEP_SCALE, flip_h=f)))
 
-    sheep_img = frame_of(TER / "Resources" / "Sheep_Idle.png", 0)
-    for sx, sy, flip in SHEEP:
-        blit(img, sheep_img, sx, sy, 0.55, flip_h=flip)
-        blit(img, sheep_img, sx, 2 * PIVOT - sy, 0.55, flip_h=not flip)
-
-    for gx2, gy2, n in GOLD:
-        for k in range(n):
+    for cx, gy in GOLD_L:
+        for k in range(3):
             g = load(TER / "Resources" / f"Gold Stone {(k % 6) + 1}.png")
-            blit(img, g, gx2 + (k - n / 2) * 34 + 17, gy2 + (k % 2) * 16, 0.55)
+            dx, dy = (k - 1) * 30, (k % 2) * 14
+            for px, py in all4(cx + dx, gy + dy):
+                jobs.append((py, lambda p=(px, py), s=g: blit(img, s, p[0], p[1], GOLD_SCALE)))
 
-    # 7. HUD occlusion zones (honest preview of what the player actually sees)
+    for cx, gy, idx in BUSH_L:
+        b = frame_of(TER / "Decorations" / f"Bushe{idx}.png", 0)
+        for px, py in all4(cx, gy):
+            jobs.append((py, lambda p=(px, py), s=b: blit(img, s, p[0], p[1], BUSH_SCALE)))
+
+    for cx, gy, idx in WROCK_L:
+        wr = frame_of(TER / "Decorations" / f"Water Rocks_{idx:02d}.png", 0)
+        for px, py in all4(cx, gy):
+            jobs.append((py, lambda p=(px, py), s=wr: blit(img, s, p[0], p[1], WROCK_SCALE)))
+
+    rx, ry, ridx = ROCK_MID
+    r_img = load(TER / "Decorations" / f"Rock{ridx}.png")
+    for px, py in [(rx, ry), (mirror_x(rx), mirror_y(ry))]:  # point symmetry
+        jobs.append((py, lambda p=(px, py): blit(img, r_img, p[0], p[1], ROCK_SCALE)))
+
+    for _, job in sorted(jobs, key=lambda j: j[0]):
+        job()
+
+    # HUD occlusion (honest view)
     ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(ov)
-    d.rectangle([0, 0, W, 40], fill=(20, 10, 8, 210))          # top HUD ribbon
-    d.rectangle([0, 985, W, H], fill=(20, 10, 8, 210))         # gold bar + cards
+    d.rectangle([0, 0, W, 40], fill=(20, 10, 8, 210))
+    d.rectangle([0, 985, W, H], fill=(20, 10, 8, 210))
     d.text((W // 2 - 30, 14), "HUD", fill=(200, 180, 160, 255))
     d.text((W // 2 - 60, 1100), "CARD HAND", fill=(200, 180, 160, 255))
     img = Image.alpha_composite(img, ov)
@@ -257,6 +239,7 @@ def render(show_grid: bool = False) -> Image.Image:
 
 
 if __name__ == "__main__":
+    assert (PLAT_Y0 + PLAT_Y1) == 2 * PIVOT, "platform must mirror about the pivot"
     OUT.parent.mkdir(exist_ok=True)
     im = render(show_grid="--grid" in sys.argv)
     im.save(OUT)

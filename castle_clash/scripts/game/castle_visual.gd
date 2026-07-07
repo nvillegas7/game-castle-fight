@@ -29,13 +29,15 @@ func _ready() -> void:
 		_sprite.texture = tex
 		_sprite.centered = true
 		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		# Design-flow port (design/arena_target.png): castle renders at 0.9x
-		# NATIVE scale — the mockup-scale landmark (was 160px→112px effective,
-		# 1.7x too small vs the spec; forensics wf_772ab315). The parent
-		# CastleVisual node carries scale 0.7 in the scene, so compensate here
-		# to land at 0.9 effective. Sim footprint/hitbox unchanged.
+		# Design-flow port (design/arena_target.png): castle renders at 0.68x
+		# NATIVE scale = the MEASURED mockup proportion (0.296 of playfield
+		# width, forensics wf_772ab315 — the earlier 0.9 was an eyeballed
+		# overshoot the user flagged as "too big"). At 0.68 on the sim anchor
+		# the castle overhangs the island rim by ~23px — "seated at the cliff"
+		# like mockup v2. The parent CastleVisual node carries scale 0.7 in the
+		# scene, so compensate here. Sim footprint/hitbox unchanged.
 		var parent_s: float = scale.x if scale.x > 0.0 else 1.0
-		var s: float = 0.9 / parent_s
+		var s: float = 0.68 / parent_s
 		_sprite.scale = Vector2(s, s)
 		_half_h = tex.get_height() * s * 0.5
 		_half_w = tex.get_width() * s * 0.5

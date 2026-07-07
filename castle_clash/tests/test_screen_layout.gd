@@ -779,11 +779,15 @@ func _check_arena_castle_scale() -> void:
 				gap += 1
 			run = maxi(run, cur)
 		best_run = maxi(best_run, run)
-	if best_run >= 160:
-		_assert_pass("enemy castle red-roof run %dpx ≥ 160px (mockup scale)" % best_run)
+	# Calibrated band (recalibrated 2026-07-08 after user "too big" feedback):
+	# spec = 0.68 native = 212px design = ~148px capture. Lower bound catches the
+	# old tiny castle (94px); UPPER bound catches the 0.9 eyeball-overshoot (192px)
+	# so an uncalibrated scale can never silently return in either direction.
+	if best_run >= 130 and best_run <= 172:
+		_assert_pass("enemy castle red-roof run %dpx in calibrated band 130..172 (0.68 native)" % best_run)
 	else:
-		_assert_fail("enemy castle too small — widest contiguous red-roof run %dpx < 160px" % best_run,
-			"target castle content ≈197px at capture res (scale 0.9 native)")
+		_assert_fail("enemy castle off calibrated scale — red-roof run %dpx outside 130..172" % best_run,
+			"spec 0.296 of playfield width = ~148px capture (design/arena_target.png)")
 
 
 ## Decorative fortress towers must flank the castle at design (140,268)/(580,268)

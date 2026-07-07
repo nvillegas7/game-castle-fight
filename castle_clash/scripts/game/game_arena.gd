@@ -1434,38 +1434,34 @@ func _build_terrain_textures() -> void:
 
 	var ts: float = 64.0
 
-	# Grass ISLAND PLATFORM on native-teal water: x=[72,648] y=[56,952] (9x14
-	# tiles) with proper 3x3 edge/corner tiles — this resurrects _build_tiled_zone,
-	# which had the exact coastline logic and sat as dead code while the field
-	# shipped as a full-bleed rectangle. Uniform center tile (per-tile hue mixing
+	# Grass ISLAND PLATFORM on native-teal water: x=[72,648] y=[72,968] (9x14
+	# tiles) with proper 3x3 edge/corner tiles. The y-span mirrors EXACTLY about
+	# FLIP_PIVOT_Y=520 (72+968=1040) so the multiplayer perspective flip shows
+	# both players an identical island. Uniform center tile (per-tile hue mixing
 	# betrays the 64px grid — lessons.md 2026-07-07); variation = decoration.
-	_build_tiled_zone(terrain_layer, tm1, Rect2(72, 56, 576, 896), 1.0, ts, Color.WHITE)
+	_build_tiled_zone(terrain_layer, tm1, Rect2(72, 72, 576, 896), 1.0, ts, Color.WHITE)
 
 	_add_fortress_dressing(terrain_layer, tm1, ts)
 
 	_add_water_foam()
 
 
-## Fortress dressing per half (design/arena_target.png): a solid stone wall row
-## (elevated stone-face tile, col6 row4) running castle base → flanking Tower.png
-## sprites, plus decorative houses at the outer corners — mockup v2's composition
-## anchors. Towers/houses sit at x<206 / x>514, OUTSIDE the gameplay column, so
-## they can't be confused with placeable buildings. Enemy half as-authored; the
-## player half is the exact mirror about y=520 with blue variants.
+## Fortress WALL rows per half (design/arena_target.png): a solid stone wall row
+## (elevated stone-face tile, col6 row4) whose bottom edge (y=190) aligns with
+## the castle base at 0.68 scale — "the edges align" (user feedback 2026-07-08).
+## Towers/houses live in the y-sorted DecorationLayer (see
+## _setup_terrain_decorations) so sheep/trees layer correctly against them.
+## Enemy half as-authored; player half = exact mirror about FLIP_PIVOT_Y.
 func _add_fortress_dressing(parent: Node2D, tm: Texture2D, ts: float) -> void:
 	if tm == null:
 		return
 	var stone := AtlasTexture.new()
 	stone.atlas = tm
 	stone.region = Rect2(6 * 64, 4 * 64, 64, 64)  # solid stone face
-	# LAYOUT (compositor ENEMY_HALF): wall_y=150, wall_x=(140,580),
-	# towers ground (140,268)/(580,268) scale 0.72, houses (122,150)/(598,146) scale 0.62
-	for spec in [[false, "red"], [true, "blue"]]:
+	# LAYOUT: WALL_Y=126 (row 126..190; castle base = 120+141/2 = 190), WALL_X=(140,580)
+	for spec in [[false], [true]]:
 		var flip: bool = spec[0]
-		var team_dir: String = spec[1]
-		# Stone wall row (behind the castle body; terrain_layer z=0 keeps
-		# castle/buildings/units in front)
-		var wy: float = 150.0 if not flip else 2.0 * FLIP_PIVOT_Y - 150.0 - ts
+		var wy: float = 126.0 if not flip else 2.0 * FLIP_PIVOT_Y - 126.0 - ts
 		var x: float = 140.0
 		while x < 580.0:
 			var spr := Sprite2D.new()
@@ -1476,25 +1472,6 @@ func _add_fortress_dressing(parent: Node2D, tm: Texture2D, ts: float) -> void:
 			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			parent.add_child(spr)
 			x += ts
-		# Flanking towers + corner houses (bottom-anchored sprites on ground y)
-		var dressing := [
-			["Tower.png", 140.0, 268.0, 0.72],
-			["Tower.png", 580.0, 268.0, 0.72],
-			["House1.png", 122.0, 150.0, 0.62],
-			["House2.png", 598.0, 146.0, 0.62],
-		]
-		for d in dressing:
-			var tex: Texture2D = load("res://assets/sprites/buildings/%s/%s" % [team_dir, d[0]])
-			if tex == null:
-				continue
-			var gy: float = d[2] if not flip else 2.0 * FLIP_PIVOT_Y - d[2]
-			var spr := Sprite2D.new()
-			spr.texture = tex
-			spr.position = Vector2(d[1], gy)
-			spr.offset = Vector2(0, -tex.get_height() * 0.5)  # bottom-anchored
-			spr.scale = Vector2(d[3], d[3])
-			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			parent.add_child(spr)
 
 
 ## Build a tiled zone using flat ground tiles (cols 0-3) with proper edges
@@ -1573,11 +1550,11 @@ func _add_water_foam() -> void:
 	var idx: int = 0
 	for x_pos in range(72, 600, 60):  # top + bottom coasts
 		var jig: float = 8.0 if idx % 2 == 0 else -5.0
-		dash_specs.append([Vector2(x_pos + 30 + jig, 70), false, false])
-		dash_specs.append([Vector2(x_pos + 30 - jig, 956), false, true])
+		dash_specs.append([Vector2(x_pos + 30 + jig, 86), false, false])
+		dash_specs.append([Vector2(x_pos + 30 - jig, 972), false, true])
 		idx += 1
 	idx = 0
-	for y_pos in range(56, 904, 60):  # left + right coasts
+	for y_pos in range(72, 920, 60):  # left + right coasts
 		var jig: float = 9.0 if idx % 2 == 0 else -6.0
 		dash_specs.append([Vector2(70, y_pos + 30 + jig), false, false])
 		dash_specs.append([Vector2(650, y_pos + 30 - jig), true, false])
@@ -1600,54 +1577,77 @@ func _add_water_foam() -> void:
 
 
 func _setup_terrain_decorations() -> void:
-	# Design-flow port of design/arena_target.png — placements mirror the
-	# compositor's LAYOUT tables VERBATIM (tools/compose_arena.py). Change the
-	# look there first (0.1s/render), re-approve, then port the numbers here.
+	# Design-flow port of design/arena_target.png — mirrors the compositor's
+	# LAYOUT tables VERBATIM (tools/compose_arena.py). Change the look there
+	# first (0.1s/render), re-approve, then port the numbers here.
 	#
-	# Rules (tasks/design-flow.md): FULL opacity, native palette, no random
-	# rotation of pixel art, no procedural vector shapes. Readability comes from
-	# placement — everything decorative lives OUTSIDE the gameplay column
-	# x=[206,514] except two small midfield rock accents. Player half mirrors the
-	# enemy half about y=520. Animations (sway/graze/bob) stay — they're the
-	# game's advantage over a static mockup.
+	# SYMMETRY BY CONSTRUCTION (user feedback 2026-07-08): decorations are
+	# authored for the LEFT side of the ENEMY half only; right side = x-mirror
+	# (720-x, same y), player half = y-mirror about FLIP_PIVOT_Y. The multiplayer
+	# perspective flip therefore shows both players an identical arena.
+	#
+	# Y-SORTED: every decoration is ground-anchored (position = ground point,
+	# sprite offset lifts the art) and the layer y-sorts, so sheep never float
+	# on tree canopies and units interleave correctly.
 	var deco_base := "res://assets/sprites/terrain/"
 
 	var deco_layer := Node2D.new()
 	deco_layer.z_index = 0
+	deco_layer.y_sort_enabled = true
 	deco_layer.name = "DecorationLayer"
 	add_child(deco_layer)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42  # Deterministic phase staggering for animations
 
-	# --- Trees: 4 clusters per side (LAYOUT tree_clusters), mirrored halves ---
+	# 4-way symmetric expansion helper: [L, R, L-mirrored, R-mirrored]
+	var all4 := func(cx: float, gy: float) -> Array:
+		return [Vector2(cx, gy), Vector2(720.0 - cx, gy),
+			Vector2(cx, 2.0 * FLIP_PIVOT_Y - gy), Vector2(720.0 - cx, 2.0 * FLIP_PIVOT_Y - gy)]
+
+	# --- Fortress towers + corner houses (y-sorted vs sheep/trees) ---
+	# Enemy half red, player half blue; LAYOUT: Tower @(140,268) s=0.72,
+	# House1 @(122,148) s=0.62 (all four corners via mirroring).
+	for spec in [[false, "red"], [true, "blue"]]:
+		var flip: bool = spec[0]
+		var team_dir: String = spec[1]
+		for d in [["Tower.png", 140.0, 268.0, 0.72], ["Tower.png", 580.0, 268.0, 0.72],
+				["House1.png", 122.0, 148.0, 0.62], ["House1.png", 598.0, 148.0, 0.62]]:
+			var tex: Texture2D = load("res://assets/sprites/buildings/%s/%s" % [team_dir, d[0]])
+			if tex == null:
+				continue
+			var gy: float = d[2] if not flip else 2.0 * FLIP_PIVOT_Y - d[2]
+			var spr := Sprite2D.new()
+			spr.texture = tex
+			spr.position = Vector2(d[1], gy)
+			spr.offset = Vector2(0, -tex.get_height() * 0.5)  # bottom-anchored
+			spr.scale = Vector2(d[3], d[3])
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			deco_layer.add_child(spr)
+
+	# --- Trees: LAYOUT TREES_L = [(110,428,3),(110,580,2)], 4-way mirrored ---
 	var tree_sheets: Array[Texture2D] = []
 	for i in range(1, 5):
 		var path: String = deco_base + "Resources/Tree%d.png" % i
 		if ResourceLoader.exists(path):
 			tree_sheets.append(load(path))
 	if not tree_sheets.is_empty():
-		# (cx, ground_y, count) — enemy half; player half mirrored below
-		var tree_clusters := [
-			[136.0, 428.0, 3], [584.0, 438.0, 3],
-			[128.0, 580.0, 2], [592.0, 590.0, 2],
-		]
-		for cl in tree_clusters:
+		for cl in [[110.0, 428.0, 3], [110.0, 580.0, 2]]:
 			for k in int(cl[2]):
 				var sheet: Texture2D = tree_sheets[k % tree_sheets.size()]
 				var fh: int = int(sheet.get_height())
 				var at := AtlasTexture.new()
 				at.atlas = sheet
 				at.region = Rect2(0, 0, fh, fh)
-				var dx: float = (k - cl[2] / 2.0) * 40.0 + 20.0
+				var dx: float = (k - cl[2] / 2.0) * 32.0 + 16.0
 				var dy: float = (k % 2) * 26.0
-				for gy in [cl[1] + dy, 2.0 * FLIP_PIVOT_Y - cl[1] + dy]:
+				for pos in all4.call(cl[0] + dx, cl[1] + dy):
 					var spr := Sprite2D.new()
 					spr.texture = at
 					spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 					spr.scale = Vector2(0.52, 0.52)
-					spr.position = Vector2(cl[0] + dx, gy)
-					spr.offset = Vector2(0, -fh * 0.5)  # bottom-anchored (sways from base)
+					spr.position = pos
+					spr.offset = Vector2(0, -fh * 0.5)  # ground-anchored, sways from base
 					deco_layer.add_child(spr)
 					var sway := spr.create_tween().set_loops()
 					var sdur: float = rng.randf_range(2.6, 3.8)
@@ -1656,77 +1656,73 @@ func _setup_terrain_decorations() -> void:
 					sway.tween_property(spr, "rotation", samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 					sway.tween_property(spr, "rotation", -samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-	# --- Bushes: 4 fixed spots (LAYOUT bushes), already symmetric pairs ---
-	var bush_layout := [[168.0, 322.0, 1], [552.0, 318.0, 2], [168.0, 740.0, 3], [552.0, 734.0, 4]]
-	for b in bush_layout:
-		var path: String = deco_base + "Decorations/Bushe%d.png" % b[2]
-		if not ResourceLoader.exists(path):
-			continue
-		var sheet: Texture2D = load(path)
-		var spr := Sprite2D.new()
-		spr.texture = _extract_sprite_frame(sheet, 0)
-		spr.position = Vector2(b[0], b[1])
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		spr.scale = Vector2(0.5, 0.5)
-		var tex_size: Vector2 = spr.texture.get_size() if spr.texture else Vector2(32, 32)
-		spr.offset = Vector2(0, -tex_size.y * 0.5)  # sway from the base
-		deco_layer.add_child(spr)
-		var sway_tw := spr.create_tween().set_loops()
-		var sway_dur: float = rng.randf_range(1.8, 2.8)
-		var sway_amp: float = deg_to_rad(rng.randf_range(3.0, 5.0))
-		sway_tw.tween_interval(rng.randf_range(0.0, sway_dur))
-		sway_tw.tween_property(spr, "rotation", sway_amp, sway_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		sway_tw.tween_property(spr, "rotation", -sway_amp, sway_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	# --- Bushes: LAYOUT BUSH_L = [(170,250)], 4-way ---
+	var bush_path: String = deco_base + "Decorations/Bushe1.png"
+	if ResourceLoader.exists(bush_path):
+		var bsheet: Texture2D = load(bush_path)
+		for pos in all4.call(170.0, 250.0):
+			var spr := Sprite2D.new()
+			spr.texture = _extract_sprite_frame(bsheet, 0)
+			spr.position = pos
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			spr.scale = Vector2(0.5, 0.5)
+			var tex_size: Vector2 = spr.texture.get_size() if spr.texture else Vector2(32, 32)
+			spr.offset = Vector2(0, -tex_size.y * 0.5)
+			deco_layer.add_child(spr)
+			var sway_tw := spr.create_tween().set_loops()
+			var sway_dur: float = rng.randf_range(1.8, 2.8)
+			var sway_amp: float = deg_to_rad(rng.randf_range(3.0, 5.0))
+			sway_tw.tween_interval(rng.randf_range(0.0, sway_dur))
+			sway_tw.tween_property(spr, "rotation", sway_amp, sway_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+			sway_tw.tween_property(spr, "rotation", -sway_amp, sway_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-	# --- Midfield rock accents: 2 fixed (LAYOUT rocks) — no rotation ---
-	var rock_layout := [[340.0, 508.0, 1], [388.0, 540.0, 2]]
-	for r in rock_layout:
-		var path: String = deco_base + "Decorations/Rock%d.png" % r[2]
-		if not ResourceLoader.exists(path):
-			continue
-		var spr := Sprite2D.new()
-		spr.texture = load(path)
-		spr.position = Vector2(r[0], r[1])
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		spr.scale = Vector2(0.4, 0.4)
-		deco_layer.add_child(spr)
+	# --- Midfield rock accents: POINT-mirrored pair (340,508)/(380,532) ---
+	var rock_path: String = deco_base + "Decorations/Rock1.png"
+	if ResourceLoader.exists(rock_path):
+		for pos in [Vector2(340, 508), Vector2(380, 532)]:
+			var spr := Sprite2D.new()
+			spr.texture = load(rock_path)
+			spr.position = pos
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			spr.scale = Vector2(0.4, 0.4)
+			deco_layer.add_child(spr)
 
-	# --- Water rocks IN the water (LAYOUT water_rocks), gentle bob ---
-	var wrock_layout := [[40.0, 300.0, 1], [684.0, 360.0, 2], [34.0, 700.0, 3], [688.0, 760.0, 4]]
-	for wr in wrock_layout:
-		var path: String = deco_base + "Decorations/Water Rocks_%02d.png" % wr[2]
+	# --- Water rocks: LAYOUT WROCK_L = [(40,300,1),(34,470,3)], 4-way, bob ---
+	for wr in [[40.0, 300.0, 1], [34.0, 470.0, 3]]:
+		var path: String = deco_base + "Decorations/Water Rocks_%02d.png" % int(wr[2])
 		if not ResourceLoader.exists(path):
 			continue
 		var sheet: Texture2D = load(path)
 		var frame_count: int = maxi(1, sheet.get_width() / sheet.get_height())
-		var spr := Sprite2D.new()
-		spr.texture = _extract_sprite_frame(sheet, int(wr[2]) % frame_count)
-		spr.position = Vector2(wr[0], wr[1])
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		spr.scale = Vector2(0.5, 0.5)
-		deco_layer.add_child(spr)
-		var bob_dur: float = rng.randf_range(3.0, 5.0)
-		var bob_amp: float = rng.randf_range(2.0, 3.0)
-		var bob_tw := spr.create_tween().set_loops()
-		bob_tw.tween_interval(rng.randf_range(0.0, bob_dur))
-		bob_tw.tween_property(spr, "position:y", wr[1] + bob_amp, bob_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		bob_tw.tween_property(spr, "position:y", wr[1] - bob_amp, bob_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-
-	# --- Gold nugget clusters (LAYOUT gold): 3 nuggets per spot, both halves ---
-	var gold_layout := [[178.0, 508.0], [542.0, 508.0]]
-	for g in gold_layout:
-		for k in 3:
-			var path: String = deco_base + "Resources/Gold Stone %d.png" % ((k % 6) + 1)
-			if not ResourceLoader.exists(path):
-				continue
+		for pos in all4.call(wr[0], wr[1]):
 			var spr := Sprite2D.new()
-			spr.texture = load(path)
-			spr.position = Vector2(g[0] + (k - 1.5) * 34.0 + 17.0, g[1] + (k % 2) * 16.0)
+			spr.texture = _extract_sprite_frame(sheet, int(wr[2]) % frame_count)
+			spr.position = pos
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			spr.scale = Vector2(0.5, 0.5)
+			deco_layer.add_child(spr)
+			var bob_dur: float = rng.randf_range(3.0, 5.0)
+			var bob_amp: float = rng.randf_range(2.0, 3.0)
+			var bob_tw := spr.create_tween().set_loops()
+			bob_tw.tween_interval(rng.randf_range(0.0, bob_dur))
+			bob_tw.tween_property(spr, "position:y", pos.y + bob_amp, bob_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+			bob_tw.tween_property(spr, "position:y", pos.y - bob_amp, bob_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+
+	# --- Gold: LAYOUT GOLD_L = [(188,505)], 3 nuggets, 4-way ---
+	for k in 3:
+		var gold_path: String = deco_base + "Resources/Gold Stone %d.png" % ((k % 6) + 1)
+		if not ResourceLoader.exists(gold_path):
+			continue
+		var gtex: Texture2D = load(gold_path)
+		for pos in all4.call(188.0 + (k - 1) * 30.0, 505.0 + (k % 2) * 14.0):
+			var spr := Sprite2D.new()
+			spr.texture = gtex
+			spr.position = pos
 			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			spr.scale = Vector2(0.55, 0.55)
 			deco_layer.add_child(spr)
 
-	# --- Sheep grazing (LAYOUT sheep): animated, both halves mirrored ---
+	# --- Sheep: LAYOUT SHEEP_L = [(190,350),(190,620)], 4-way, ground-anchored ---
 	var sheep_tex = load(deco_base + "Resources/Sheep_Grass.png")
 	if sheep_tex:
 		var sheep_sf := SpriteFrames.new()
@@ -1742,30 +1738,27 @@ func _setup_terrain_decorations() -> void:
 			atlas.atlas = sheep_tex
 			atlas.region = Rect2(si * sh_fh, 0, sh_fh, sh_fh)
 			sheep_sf.add_frame(&"graze", atlas)
-		# (cx, cy, flip_h) — enemy half; mirrored below with flipped facing
-		var sheep_layout := [
-			[178.0, 392.0, false], [542.0, 392.0, true],
-			[160.0, 668.0, false], [560.0, 660.0, true],
-		]
-		for sl in sheep_layout:
-			for half in 2:
-				var sy: float = sl[1] if half == 0 else 2.0 * FLIP_PIVOT_Y - sl[1]
+		for sl in [[190.0, 350.0], [190.0, 620.0]]:
+			for pos in all4.call(sl[0], sl[1]):
 				var sheep := AnimatedSprite2D.new()
 				sheep.sprite_frames = sheep_sf
-				sheep.position = Vector2(sl[0], sy)
+				sheep.position = pos
+				# Ground-anchor: sheep art sits ~75% down its frame; lift so the
+				# wool base lands on position.y (correct y-sort vs trees/towers).
+				sheep.offset = Vector2(0, -sh_fh * 0.25)
 				sheep.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 				sheep.scale = Vector2(0.55, 0.55)
-				sheep.flip_h = sl[2] if half == 0 else not sl[2]
+				sheep.flip_h = pos.x > 360.0  # face inward
 				sheep.play(&"graze")
 				sheep.frame = rng.randi() % sh_fc
 				deco_layer.add_child(sheep)
 				var sb := sheep.create_tween().set_loops()
 				var sbd: float = rng.randf_range(2.2, 3.4)
 				sb.tween_interval(rng.randf_range(0.0, sbd))
-				sb.tween_property(sheep, "position:y", sy + 2.0, sbd * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-				sb.tween_property(sheep, "position:y", sy - 2.0, sbd * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+				sb.tween_property(sheep, "position:y", pos.y + 2.0, sbd * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+				sb.tween_property(sheep, "position:y", pos.y - 2.0, sbd * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-	# --- Rubber duck easter egg (kept, now fully opaque) ---
+	# --- Rubber duck easter egg (kept; drifts in the left channel) ---
 	var duck_tex = load(deco_base + "Decorations/Rubber duck.png")
 	if duck_tex:
 		var duck_sf := SpriteFrames.new()
@@ -1794,11 +1787,6 @@ func _setup_terrain_decorations() -> void:
 		var drift_tw := duck.create_tween().set_loops()
 		drift_tw.tween_property(duck, "position:x", duck.position.x + 8, 6.0)
 		drift_tw.tween_property(duck, "position:x", duck.position.x - 2, 6.0)
-
-	# Removed vs the old builder (design-flow parity with the mockups):
-	# random scatter placement, alpha-faded everything, rotated rocks, stumps,
-	# 0.18-alpha clouds, procedural vector banners/flowers/scorch/debris
-	# (_add_faction_decorations). The mockups contain none of these.
 
 
 # --- Smart AI Opponent ---

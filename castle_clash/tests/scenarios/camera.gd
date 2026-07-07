@@ -1,6 +1,6 @@
 ## SCENARIO: camera zoom + pan limits.
 ## Drives the camera exclusively through the inputs it listens to (mouse wheel
-## zoom, middle-click-drag pan) and asserts zoom clamps to [0.5, 2.0] and pan
+## zoom, middle-click-drag pan) and asserts zoom clamps to [1.0, 2.0] and pan
 ## clamps to the arena bounds. Captures at every extreme.
 ## Run: godot --path castle_clash -- --scenario camera
 extends ScenarioBase
@@ -22,10 +22,10 @@ func run() -> void:
 		"zoom=%f" % cam.zoom.x)
 	await capture("zoom_max")
 
-	# Zoom OUT well past the limit — must clamp at ZOOM_MIN (0.5) and recenter
-	# (visible area exceeds the arena, camera snaps to CAMERA_HOME)
+	# Zoom OUT well past the limit — must clamp at ZOOM_MIN (1.0, arena exactly
+	# fills the viewport; below that would reveal void) and recenter to home.
 	await wheel(-40)
-	check("zoom-out clamps at 0.5 (sent 40 notches)", is_equal_approx(cam.zoom.x, 0.5),
+	check("zoom-out clamps at 1.0 (sent 40 notches)", is_equal_approx(cam.zoom.x, 1.0),
 		"zoom=%f" % cam.zoom.x)
 	check("camera recenters to home when fully zoomed out",
 		cam.position.is_equal_approx(Vector2(360, 640)), "pos=%s" % cam.position)

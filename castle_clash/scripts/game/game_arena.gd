@@ -35,7 +35,9 @@ const GRID_MARGIN_X: int = 206      # (720 - 308) / 2
 @onready var gold_bar_label: Label = $UILayer/GoldBarBg/GoldBarLabel
 @onready var camera: Camera2D = $Camera2D
 
-const ZOOM_MIN: float = 0.5
+# 1.0 = arena exactly fills the 720x1280 viewport. Below 1.0 would reveal void
+# beyond the arena, so zoom only goes IN from the default.
+const ZOOM_MIN: float = 1.0
 const ZOOM_MAX: float = 2.0
 const ZOOM_SPEED: float = 0.1
 const PAN_SPEED_KEYS: float = 600.0  # Pixels per second when panning with keys
@@ -171,14 +173,16 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	# Mouse wheel zoom
+	# Mouse wheel zoom. Guard on event.pressed: a wheel notch emits BOTH a
+	# pressed and a released event, so without this the step applied twice
+	# (effective 2x ZOOM_SPEED).
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
 			_zoom_level = clampf(_zoom_level + ZOOM_SPEED, ZOOM_MIN, ZOOM_MAX)
 			if camera:
 				camera.zoom = Vector2(_zoom_level, _zoom_level)
 				_clamp_camera_position()
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
 			_zoom_level = clampf(_zoom_level - ZOOM_SPEED, ZOOM_MIN, ZOOM_MAX)
 			if camera:
 				camera.zoom = Vector2(_zoom_level, _zoom_level)

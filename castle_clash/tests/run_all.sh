@@ -39,6 +39,7 @@ run_headless "Simulation (395 asserts)"        tests/test_simulation.gd
 run_headless "Determinism lint (banned APIs)"  tests/test_banned_api.gd
 run_headless "Replay determinism + golden"     tests/test_replay_determinism.gd
 run_headless "Behavior audit (movement)"       tests/test_behavior_audit.gd
+run_headless "Combat feel (walk cadence)"      tests/test_combat_feel.gd
 run_headless "Targeting diagnostics"           tests/test_targeting_diag.gd
 run_headless "Unit behavior scenarios"         tests/test_unit_behavior.gd
 run_headless "Multiplayer (checksum/config)"   tests/test_multiplayer.gd

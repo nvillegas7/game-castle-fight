@@ -119,6 +119,9 @@ func _ready() -> void:
 	EventBus.connected_to_server.connect(_on_connected)
 	EventBus.disconnected_from_server.connect(_on_disconnected)
 	EventBus.match_found.connect(_on_match_found)
+	# 1B-2: without this, an in-lobby abort (build/version mismatch, config
+	# timeout/conflict) left the menu stuck on "vs Opponent - Starting..." forever.
+	NetworkManager.match_error.connect(_on_match_error)
 
 	_select_tab(2)
 	_update_faction_selection()
@@ -1597,6 +1600,24 @@ func _on_connected() -> void:
 
 func _on_disconnected() -> void:
 	_restore_online_buttons()
+
+
+## 1B-2: surface an in-lobby abort so the player sees why matchmaking stopped
+## and can retry, instead of an infinite "Starting..." spinner.
+func _on_match_error(kind: String, message: String) -> void:
+	if status_label:
+		status_label.modulate.a = 1.0  # stop any pulse tween
+		status_label.visible = true
+		var msg: String = message if message != "" else "Match error (%s)" % kind
+		if kind == "version_mismatch":
+			msg = "Update available — refresh your browser to play online."
+		status_label.text = msg
+	_show_cancel_search_btn(false)
+	# Re-enable the online/play buttons after a short beat so the message reads.
+	var t := get_tree().create_timer(2.5)
+	t.timeout.connect(func():
+		online_btn.get_node("TouchArea").disabled = false
+		play_btn.get_node("TouchArea").disabled = false)
 
 func _on_match_found(_match_id: String) -> void:
 	if status_label:

@@ -18,12 +18,12 @@ before the fix, or the passing criterion.
 | 1A-3 | Hand-rolled two-finger pinch-zoom + pan from ScreenTouch/ScreenDrag; enable Android pan-and-scale | A2 | 1A | `pinch_zoom_pan` scenario asserts camera transform |
 | 1A-4 | Radial menu at true cell center; scale hit radius by zoom; kill double-fire path | A2 | 1A | `radial_menu_under_zoom` scenario (see BUG-34) |
 | 1A-5 | ⏳ PARTIAL (6ea781f: wheel event.pressed guard + ZOOM_MIN 1.0 done). TODO: reparent Blocked!/info popup to UILayer; zoom-to-cursor; fix middle-drag pan (consumed by STOP ColorRect) | A2 | 1A | popup renders in screen space regardless of pan/zoom |
-| 1B-1 | Commit lockstep rework; build.sh → hashed deploy; verify served artifacts | A1 | 1B | live build no longer runs pre-fix current_tick+1 race |
-| 1B-2 | Surface lobby aborts (version_mismatch/config_timeout) in main_menu instead of hanging on "Starting…" | A2 | 1B | abort reason shown, no infinite spinner |
+| 1B-1 | ⚠️ NEEDS USER: sync fix is committed (bdb34e6); deploy it — `cd castle_clash && ./build.sh` (needs brotli+wrangler+Cloudflare auth). Live build predates the fix. | A1 | 1B | served index.<hash>.pck newer than Apr 19 |
+| ~~1B-2~~ | ✅ DONE Surface lobby aborts in main_menu (NetworkManager.match_error → message + retry, version_mismatch → "refresh browser") | A2 | 1B | — |
 | 1B-3 | Total command ordering: per-player seq number; sort (player_id, seq) | A1 | 1B | test_multiplayer.gd asserts deterministic apply order |
-| 1B-4 | Freeze match on desync (stop simulating divergent games behind overlay) | A1 | 1B | on checksum mismatch sim halts |
-| 1B-5 | Stronger checksum (gold + next_entity_id, order-sensitive rolling hash; dense first 200 ticks) | A1/A5 | 1B | replaces order-insensitive XOR at simulation.gd:431-446 |
-| 1B-6 | Integration test send→flush→stall→commit across frame boundaries; two-client Nakama + 2-tab | A1 | 1B | BUG-DESYNC1 stall-boundary scenario red on pre-fix, green on fixed |
+| ~~1B-4~~ | ✅ DONE Freeze match on desync (GameManager._on_desync_detected → MATCH_OVER + set_process(false)) | A1 | 1B | — |
+| ~~1B-5~~ | ✅ DONE (453725a) order-sensitive checksum covering all mutable state + subchecksums + state dump. TODO(minor): dense checksum send in first 200 ticks | A1/A5 | 1B | — |
+| 1B-6 | ⏳ DEFERRED (dedicated task): extract LockstepPeer (RefCounted, injected transport+clock) → two-peer headless harness with FakeRelay + BUG-DESYNC1 stall-boundary scenario. Note: test_multiplayer `_test_two_sim_json_wire_lockstep` already covers 520-tick determinism + dup/out-of-order delivery; this adds staging/stall-timing coverage. Risky refactor of live net code — do carefully. | A1 | 1B | BUG-DESYNC1 scenario red on +1 staging, green on +2 |
 | 1C-1 | Walk-cadence divisor bug (game_arena.gd:729 px/sec vs px/tick) — units foot-skate at ~10% cadence | A2 | 1C | see BUG-40; per-cycle displacement ≈ 1 body width |
 | 1C-2 | Make hit-stop real (pause sprite + skip position sync during stop) or delete the claim | A2 | 1C | no position drift during hit-stop |
 | 1C-3 | Impact timing: delay damage number/flash to strike frame (melee) / projectile arrival (ranged); arrow impact puff | A2 | 1C | damage number fires on impact frame |

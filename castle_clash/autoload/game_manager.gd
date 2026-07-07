@@ -47,6 +47,17 @@ func _ready() -> void:
 	set_process(false)
 	_load_faction_data()
 	EventBus.disconnected_from_server.connect(_on_disconnected)
+	EventBus.desync_detected.connect(_on_desync_detected)
+
+
+## 1B-4: once checksums diverge the two clients are simulating different games.
+## Halt the sim immediately (mirroring the disconnect path) so we stop advancing
+## a divergent match behind the error overlay instead of running two realities.
+func _on_desync_detected(_tick: int) -> void:
+	if state == State.PLAYING or state == State.COUNTDOWN:
+		state = State.MATCH_OVER
+		set_process(false)
+		Engine.time_scale = 1.0
 
 
 func _load_faction_data() -> void:

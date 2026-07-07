@@ -85,12 +85,13 @@ brotli -q 11 -f "$EXPORT_DIR/index.${HASH}.pck" -o "$EXPORT_DIR/index.${HASH}.pc
 mv "$EXPORT_DIR/index.${HASH}.pck.tmp" "$EXPORT_DIR/index.${HASH}.pck"
 PCK_AFTER=$(stat -f%z "$EXPORT_DIR/index.${HASH}.pck")
 
-printf "  index.%s.wasm: %s → %s (%.0f%% reduction)\n" "$HASH" \
-  "$(numfmt --to=iec "$WASM_BEFORE")" "$(numfmt --to=iec "$WASM_AFTER")" \
-  "$(echo "scale=0; (1 - $WASM_AFTER / $WASM_BEFORE) * 100" | bc -l)"
-printf "  index.%s.pck:  %s → %s (%.0f%% reduction)\n" "$HASH" \
-  "$(numfmt --to=iec "$PCK_BEFORE")" "$(numfmt --to=iec "$PCK_AFTER")" \
-  "$(echo "scale=0; (1 - $PCK_AFTER / $PCK_BEFORE) * 100" | bc -l)"
+# Portable size formatting (macOS has no numfmt/coreutils by default).
+hsize() { awk -v b="$1" 'BEGIN{split("B KB MB GB",u); i=1; while(b>=1024 && i<4){b/=1024; i++} printf "%.1f%s", b, u[i]}'; }
+pct() { awk -v a="$1" -v b="$2" 'BEGIN{printf "%d", (b>0)?(1-a/b)*100:0}'; }
+printf "  index.%s.wasm: %s → %s (%s%% smaller)\n" "$HASH" \
+  "$(hsize "$WASM_BEFORE")" "$(hsize "$WASM_AFTER")" "$(pct "$WASM_AFTER" "$WASM_BEFORE")"
+printf "  index.%s.pck:  %s → %s (%s%% smaller)\n" "$HASH" \
+  "$(hsize "$PCK_BEFORE")" "$(hsize "$PCK_AFTER")" "$(pct "$PCK_AFTER" "$PCK_BEFORE")"
 
 # Check Cloudflare Pages 25 MiB per-file limit
 MAX_BYTES=$((25 * 1024 * 1024))

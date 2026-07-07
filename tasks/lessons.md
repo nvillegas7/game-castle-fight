@@ -160,3 +160,33 @@ tiled. Verified by capture: uniform color1 + decoration matched mockup, hue-mix 
 **Corollary — "flat" was never about uniform grass.** The original arena looked muddy
 because of the reddish enemy TINT + brown combat-lane tint, not because grass was uniform.
 Fixing the tint (→ one lush green) solved "flat"; adding hue-blocks made it worse.
+
+---
+
+## Lesson (2026-07-08) — Why visual iterations never converge: compose in image space, not in code
+
+**Context**: User escalated: "Claude Design made v1/v2/v3 from the SAME assets and they look
+great; our game doesn't after several iterations — something is fundamentally wrong with the
+flow." Forensic audit (wf_772ab315) confirmed it.
+
+**Root cause chain** (full numbers in tasks/design-flow.md):
+1. Art composed blind in GDScript coordinates; feedback = 3-5 min per placement decision
+   (boot + capture + inspect) vs ~0.1s in image space. 50-100x latency gap.
+2. The reference mockups were never IN the repo/loop — no resolution-matched target, no diff.
+3. Acceptance = element checklists ("sheep ✓ trees ✓"), shipped at 2.3x sparser composition.
+4. Scale never art-directed: castle 1.7x too small vs mockup; sim cell size dictated visuals.
+5. Global alpha/tint nerfs (T-039 et al) made reference parity mathematically unreachable.
+
+**Rules now enforced (tasks/design-flow.md + PROCESS.md §2):**
+- **Rule — visual tasks start in the compositor.** `tools/compose_<screen>.py` renders the
+  screen from real assets at real resolution (~0.1s). All art decisions happen there. The
+  approved PNG is committed to `design/` as the pixel spec; code PORTS it mechanically.
+- **Rule — the reference lives in the repo**, resolution-matched (design/references/), or it
+  is not a spec.
+- **Rule — full opacity, native palette.** Never modulate-tint or alpha-fade pack art for
+  "readability" — solve readability with PLACEMENT. Never rotate pixel art by random radians.
+- **Rule — composition parity is numeric.** Density/scale/coverage stats vs the target, not
+  "looks close". (Perceptual-diff gate: pending implementation.)
+- **Meta-rule — lessons must compile into tooling/gates.** "Reference image is the spec" was
+  already written 2026-04-19 and violated again in 3.3b because it stayed prose. A lesson
+  that matters becomes a tool, a gate, or a checked-in artifact — not a paragraph.

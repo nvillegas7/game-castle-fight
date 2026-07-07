@@ -37,6 +37,13 @@ persist, do not poll, and do not talk to each other.
 
 Every task walks this line. One task = one branch = one evidence-citing commit.
 
+> **VISUAL/ART tasks** (screen look, terrain, menu styling) follow
+> `tasks/design-flow.md` FIRST: compose the target in image space
+> (`tools/compose_*.py`, ~0.1s/iteration) → user approves the target PNG →
+> mechanical port to code → perceptual gate. Never art-direct by editing GDScript
+> against a 90-second capture loop — that flow demonstrably never converges
+> (see design-flow.md §failure).
+
 1. **TRIAGE** — orchestrator picks the next `tasks/backlog.md` row, confirms it still
    reproduces, decides the domain scope and whether it can run in parallel.
 2. **RED** — write the failing test / pixel detector FIRST and commit it (or stage it) so

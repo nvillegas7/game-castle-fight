@@ -1403,13 +1403,17 @@ func _polish_arena_visuals() -> void:
 # --- T-060: Kingdom Rush 3-Layer Terrain ---
 
 func _build_terrain_textures() -> void:
-	# Tiny Swords tilemap: fill zones with center tile (tiled), add edge tiles only at borders.
-	# Tilemap grid: cols 0-3 = flat, cols 5-8 = elevated. (1,1) = center fill.
-	var tm_flat = load("res://assets/sprites/terrain/Tilemap_color1.png")
-	var tm_elev = load("res://assets/sprites/terrain/Tilemap_color4.png")
-	var tm_enemy = load("res://assets/sprites/terrain/Tilemap_color2.png")
-	var shadow_tex = load("res://assets/sprites/terrain/Shadow.png")
-	if tm_flat == null:
+	# Lush symmetric meadow — matches the Claude Design v1/v2/v3 mockups: ONE green field
+	# across the whole arena (enemy zone + combat lane + player zone), no brown dirt band,
+	# no reddish enemy tint. The old 3-tinted-band look read as "muddy"; the mockups are a
+	# single lush meadow whose zones are implied by buildings, not ground colour.
+	#
+	# Grass is a UNIFORM sunny green (color1). Per-tile hue mixing was tried and rejected —
+	# adjacent tiles of different hue betray the 64px grid as visible rectangular patches
+	# (the mockups have none). Like the mockups, all organic variation comes from the
+	# decoration layer (trees, sheep, bushes, flowers, gold), not from the base tile.
+	var tm1 = load("res://assets/sprites/terrain/Tilemap_color1.png")  # bright sunny 152,181,82
+	if tm1 == null:
 		return
 
 	var terrain_layer := Node2D.new()
@@ -1424,53 +1428,13 @@ func _build_terrain_textures() -> void:
 	# Use 1:1 scale (64px tiles at game size) for fewer visible seams
 	var ts: float = 64.0
 
-	# Extract center fill tile for each tilemap
 	var grass_center := AtlasTexture.new()
-	grass_center.atlas = tm_flat
+	grass_center.atlas = tm1
 	grass_center.region = Rect2(64, 64, 64, 64)  # (1,1) = center fill
 
-	var enemy_center := AtlasTexture.new()
-	if tm_enemy:
-		enemy_center.atlas = tm_enemy
-		enemy_center.region = Rect2(64, 64, 64, 64)
-
-	var dirt_center := AtlasTexture.new()
-	if tm_elev:
-		dirt_center.atlas = tm_elev
-		dirt_center.region = Rect2(5 * 64 + 64, 64, 64, 64)  # Elevated (6,1) = center
-
-	# === COMBAT lane FIRST (y=345-695) — warm brown dirt ===
-	# Drawn first so grass zones render on top of any tile overflow at boundaries
-	if tm_elev:
-		_fill_zone_with_tile(terrain_layer, dirt_center, Rect2(40, 345, 640, 350), ts, Color(1.1, 1.0, 0.9))
-
-	# === ENEMY zone grass (y=0-345) — darker, reddish tint ===
-	var e_tile: AtlasTexture = enemy_center if tm_enemy else grass_center
-	_fill_zone_with_tile(terrain_layer, e_tile, Rect2(40, 0, 640, 345), ts, Color(0.95, 0.85, 0.85))
-
-	# === PLAYER zone grass LAST (y=695-1010) — bright, friendly green ===
-	# Drawn after combat lane so grass covers any dirt tile overflow at y=695
-	_fill_zone_with_tile(terrain_layer, grass_center, Rect2(40, 695, 640, 315), ts, Color(1.1, 1.15, 1.0))
-
-	# === Edge tiles at zone transitions (top/bottom of each zone) ===
-	_add_edge_row(terrain_layer, tm_flat, Rect2(40, 695, 640, 0), ts, true)   # Top of player zone
-	_add_edge_row(terrain_layer, tm_flat, Rect2(40, 1010, 640, 0), ts, false) # Bottom of player zone
-	if tm_enemy:
-		_add_edge_row(terrain_layer, tm_enemy, Rect2(40, 0, 640, 0), ts, true)    # Top of enemy zone
-		_add_edge_row(terrain_layer, tm_enemy, Rect2(40, 345, 640, 0), ts, false)  # Bottom of enemy zone
-
-	# === Shadow at zone transitions (thin strip right at boundary) ===
-	if shadow_tex:
-		for sx in range(40, 680, 96):
-			for sy in [343, 693]:
-				var sh := Sprite2D.new()
-				sh.texture = shadow_tex
-				sh.centered = false
-				sh.position = Vector2(sx, sy)
-				sh.scale = Vector2(0.5, 0.06)  # Thin shadow, minimal overflow into adjacent zone
-				sh.modulate = Color(1, 1, 1, 0.2)
-				sh.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-				terrain_layer.add_child(sh)
+	# One seamless green field spanning all three zones (y=0..1010). No mid-field edge
+	# rows or boundary shadows — those only made sense to delineate the old distinct bands.
+	_fill_zone_with_tile(terrain_layer, grass_center, Rect2(40, 0, 640, 1010), ts)
 
 	_add_water_foam()
 
@@ -1690,17 +1654,9 @@ func _add_water_foam() -> void:
 		foam.set_meta("breath_phase", randf() * TAU)
 		_ambient_foams.append(foam)
 
-	# Shadow.png along terrain transitions for depth
-	var shadow_tex = load("res://assets/sprites/terrain/Shadow.png")
-	if shadow_tex:
-		for shadow_y in [343, 693]:
-			var shadow := Sprite2D.new()
-			shadow.texture = shadow_tex
-			shadow.position = Vector2(360, shadow_y)
-			shadow.scale = Vector2(3.5, 0.08)
-			shadow.modulate = Color(0, 0, 0, 0.15)
-			shadow.z_index = -1
-			add_child(shadow)
+	# (Removed) mid-field boundary shadows at y=343/693 — they drew horizontal seams that
+	# only read correctly when the arena had 3 distinct colour bands. The meadow is now one
+	# uniform green field, so those strips would look like unexplained shadow lines.
 
 
 func _setup_terrain_decorations() -> void:
@@ -1815,12 +1771,16 @@ func _setup_terrain_decorations() -> void:
 	# (y clamped so the full canopy fits). z=0 keeps them behind units; groves sit at
 	# the left/right margins so central lanes stay clean.
 	if not tree_sheets.is_empty():
-		var groves := [
-			Vector2(86, 235), Vector2(76, 560), Vector2(96, 855),
-			Vector2(636, 205), Vector2(646, 520), Vector2(624, 845),
-		]
+		# Symmetric tree-line framing BOTH margins (mirrored about x=360, matching mockup v2).
+		# Build columns occupy x=[206,514]; trees hug x<180 / x>540 so they frame the arena
+		# without covering placement. Left cluster centres are defined once then mirrored right.
+		var left_centers := [Vector2(80, 172), Vector2(80, 388), Vector2(80, 604), Vector2(80, 838)]
+		var groves: Array[Vector2] = []
+		for c in left_centers:
+			groves.append(c)
+			groves.append(Vector2(720.0 - c.x, c.y))  # mirror to right margin
 		for grove in groves:
-			for _k in rng.randi_range(2, 3):
+			for _k in rng.randi_range(3, 4):
 				var sheet: Texture2D = tree_sheets[rng.randi() % tree_sheets.size()]
 				var fh: int = int(sheet.get_height())
 				var at := AtlasTexture.new()
@@ -1829,11 +1789,11 @@ func _setup_terrain_decorations() -> void:
 				var spr := Sprite2D.new()
 				spr.texture = at
 				spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-				var s: float = rng.randf_range(0.34, 0.5)
+				var s: float = rng.randf_range(0.44, 0.62)
 				spr.scale = Vector2(s, s)
 				spr.position = Vector2(
-					clampf(grove.x + rng.randf_range(-24, 24), 62, 658),
-					clampf(grove.y + rng.randf_range(-22, 22), 155, 895))
+					clampf(grove.x + rng.randf_range(-26, 26), 52, 668),
+					clampf(grove.y + rng.randf_range(-26, 26), 158, 872))
 				spr.offset = Vector2(0, -fh * 0.5)
 				spr.modulate.a = rng.randf_range(0.9, 1.0)
 				deco_layer.add_child(spr)
@@ -1891,20 +1851,73 @@ func _setup_terrain_decorations() -> void:
 		spr.modulate.a = 0.55  # T-039: reduced from 0.75
 		deco_layer.add_child(spr)
 
-	# Gold stones near build zones (unused Tiny Swords resource sprites)
-	for i in range(1, 5):
-		var gold_path: String = deco_base + "Resources/Gold Stone %d.png" % i
-		if ResourceLoader.exists(gold_path):
-			var gold_tex: Texture2D = load(gold_path)
-			var gx: float = rng.randf_range(90, 180) if rng.randf() < 0.5 else rng.randf_range(540, 630)
-			var gy: float = rng.randf_range(700, 950)
-			var spr := Sprite2D.new()
-			spr.texture = gold_tex
-			spr.position = Vector2(gx, gy)
-			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			spr.scale = Vector2(0.2, 0.2)
-			spr.modulate.a = 0.5
-			deco_layer.add_child(spr)
+	# Gold nugget clusters — symmetric flanking "resource piles" (mockups show a bright gold
+	# pile). Brighter + bigger than the old faint stones; mirrored L/R about x=360, kept in the
+	# flanking grass (off the combat centre) so they read as scenery, not a unit.
+	var gold_texs: Array[Texture2D] = []
+	for i in range(1, 7):
+		var gp: String = deco_base + "Resources/Gold Stone %d.png" % i
+		if ResourceLoader.exists(gp):
+			gold_texs.append(load(gp))
+	if not gold_texs.is_empty():
+		var gold_left := [Vector2(150, 470), Vector2(135, 720)]
+		var gold_spots: Array[Vector2] = []
+		for c in gold_left:
+			gold_spots.append(c)
+			gold_spots.append(Vector2(720.0 - c.x, c.y))  # mirror to right flank
+		for spot in gold_spots:
+			for _g in rng.randi_range(2, 3):
+				var spr := Sprite2D.new()
+				spr.texture = gold_texs[rng.randi() % gold_texs.size()]
+				spr.position = spot + Vector2(rng.randf_range(-16, 16), rng.randf_range(-12, 12))
+				spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				var gs: float = rng.randf_range(0.24, 0.34)
+				spr.scale = Vector2(gs, gs)
+				spr.modulate.a = 0.9
+				deco_layer.add_child(spr)
+
+	# Sheep grazing in the meadow — a charming Tiny-Swords touch present in every mockup.
+	# Symmetric pairs (mirrored about x=360) in the flanking grass, clear of the combat centre
+	# so they never tangle with fighting units. Animated (grazing) + a gentle idle bob.
+	var sheep_tex = load(deco_base + "Resources/Sheep_Grass.png")
+	if sheep_tex:
+		var sheep_sf := SpriteFrames.new()
+		if sheep_sf.has_animation(&"default"):
+			sheep_sf.remove_animation(&"default")
+		sheep_sf.add_animation(&"graze")
+		sheep_sf.set_animation_speed(&"graze", 6)
+		sheep_sf.set_animation_loop(&"graze", true)
+		var sh_fh: int = sheep_tex.get_height()         # 128
+		var sh_fc: int = sheep_tex.get_width() / sh_fh   # 12 grazing frames
+		for si in sh_fc:
+			var atlas := AtlasTexture.new()
+			atlas.atlas = sheep_tex
+			atlas.region = Rect2(si * sh_fh, 0, sh_fh, sh_fh)
+			sheep_sf.add_frame(&"graze", atlas)
+		var sheep_left := [Vector2(150, 340), Vector2(120, 500), Vector2(160, 650)]
+		var sheep_spots: Array[Vector2] = []
+		for c in sheep_left:
+			sheep_spots.append(c)
+			sheep_spots.append(Vector2(720.0 - c.x, c.y))  # mirror to right flank
+		for idx in sheep_spots.size():
+			var spos: Vector2 = sheep_spots[idx]
+			var sheep := AnimatedSprite2D.new()
+			sheep.sprite_frames = sheep_sf
+			sheep.position = spos
+			sheep.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			var ss: float = rng.randf_range(0.22, 0.27)
+			sheep.scale = Vector2(ss, ss)
+			sheep.flip_h = (idx % 2 == 1)  # right-side sheep face inward toward the arena
+			sheep.modulate.a = 0.95
+			sheep.z_index = 0
+			sheep.play(&"graze")
+			sheep.frame = rng.randi() % sh_fc
+			deco_layer.add_child(sheep)
+			var sb := sheep.create_tween().set_loops()
+			var sbd: float = rng.randf_range(2.2, 3.4)
+			sb.tween_interval(rng.randf_range(0.0, sbd))
+			sb.tween_property(sheep, "position:y", spos.y + 2.0, sbd * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+			sb.tween_property(sheep, "position:y", spos.y - 2.0, sbd * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
 	# Rubber duck easter egg in water — animated 3-frame sprite sheet (96x32 = 3 frames of 32x32)
 	var duck_tex = load(deco_base + "Decorations/Rubber duck.png")
@@ -1973,9 +1986,9 @@ func _setup_terrain_decorations() -> void:
 
 
 func _add_faction_decorations(deco_layer: Node2D, rng: RandomNumberGenerator) -> void:
-	# Player side (Kingdom): blue banners, flowers, neat fences
-	var player_y_range := Vector2(720, 950)  # Player build zone area
-	var enemy_y_range := Vector2(80, 310)    # Enemy build zone area
+	# Subtle faction markers + a symmetric wildflower dapple. Scorch marks and combat-lane
+	# debris were removed — the mockups are a clean lush meadow, and those dark smudges
+	# muddied the grass and worked against the peaceful Tiny-Swords look.
 
 	# Blue banners on player side (drawn as flag poles)
 	for pos in [Vector2(180, 760), Vector2(530, 800), Vector2(160, 900), Vector2(555, 870)]:
@@ -1985,18 +1998,7 @@ func _add_faction_decorations(deco_layer: Node2D, rng: RandomNumberGenerator) ->
 		banner.draw.connect(_draw_banner.bind(banner, Color(0.25, 0.45, 0.85, 0.5), rng.randf()))
 		deco_layer.add_child(banner)
 
-	# Flowers on player side (small colored dots)
-	for _f in 8:
-		var fx: float = rng.randf_range(100, 620)
-		var fy: float = rng.randf_range(player_y_range.x, player_y_range.y)
-		var flower := Node2D.new()
-		flower.position = Vector2(fx, fy)
-		flower.z_index = 0
-		var fc: Color = [Color(0.9, 0.3, 0.4, 0.5), Color(0.4, 0.3, 0.9, 0.5), Color(0.9, 0.8, 0.2, 0.5)][rng.randi() % 3]
-		flower.draw.connect(_draw_flower.bind(flower, fc))
-		deco_layer.add_child(flower)
-
-	# Red banners on enemy side (rough palisades)
+	# Red banners on enemy side (mirrors the blue banners for a symmetric faction marker)
 	for pos in [Vector2(180, 120), Vector2(530, 160), Vector2(160, 260), Vector2(555, 230)]:
 		var banner := Node2D.new()
 		banner.position = pos
@@ -2004,26 +2006,17 @@ func _add_faction_decorations(deco_layer: Node2D, rng: RandomNumberGenerator) ->
 		banner.draw.connect(_draw_banner.bind(banner, Color(0.82, 0.22, 0.12, 0.5), rng.randf()))
 		deco_layer.add_child(banner)
 
-	# Scorched marks on enemy side
-	for _s in 5:
-		var sx: float = rng.randf_range(120, 600)
-		var sy: float = rng.randf_range(enemy_y_range.x, enemy_y_range.y)
-		var scorch := Node2D.new()
-		scorch.position = Vector2(sx, sy)
-		scorch.z_index = 0
-		var sr: float = rng.randf_range(6, 14)
-		scorch.draw.connect(_draw_scorch.bind(scorch, sr))
-		deco_layer.add_child(scorch)
-
-	# Combat lane center: debris
-	for _d in 6:
-		var dx: float = rng.randf_range(220, 500)
-		var dy: float = rng.randf_range(420, 620)
-		var debris := Node2D.new()
-		debris.position = Vector2(dx, dy)
-		debris.z_index = 0
-		debris.draw.connect(_draw_debris.bind(debris, rng.randf()))
-		deco_layer.add_child(debris)
+	# Wildflowers scattered across the WHOLE meadow (both halves) — small colourful dots
+	# that give the grass organic life, like the mockup, without any tiled patchiness.
+	for _f in 14:
+		var fx: float = rng.randf_range(90, 630)
+		var fy: float = rng.randf_range(150, 960)
+		var flower := Node2D.new()
+		flower.position = Vector2(fx, fy)
+		flower.z_index = 0
+		var fc: Color = [Color(0.9, 0.3, 0.4, 0.5), Color(0.4, 0.3, 0.9, 0.5), Color(0.9, 0.8, 0.2, 0.5)][rng.randi() % 3]
+		flower.draw.connect(_draw_flower.bind(flower, fc))
+		deco_layer.add_child(flower)
 
 
 func _draw_banner(node: Node2D, color: Color, phase: float) -> void:
@@ -2043,18 +2036,6 @@ func _draw_flower(node: Node2D, color: Color) -> void:
 		var a: float = i * TAU / 4.0
 		node.draw_circle(Vector2(cos(a) * 2, sin(a) * 2), 1.5, color)
 	node.draw_circle(Vector2.ZERO, 1.2, Color(0.9, 0.85, 0.3, 0.5))
-
-
-func _draw_scorch(node: Node2D, radius: float) -> void:
-	node.draw_circle(Vector2.ZERO, radius, Color(0.12, 0.08, 0.05, 0.25))
-	node.draw_circle(Vector2.ZERO, radius * 0.6, Color(0.08, 0.05, 0.03, 0.2))
-
-
-func _draw_debris(node: Node2D, seed_val: float) -> void:
-	var sz: float = 2.0 + seed_val * 3.0
-	node.draw_rect(Rect2(-sz, -1, sz * 2, 2), Color(0.4, 0.35, 0.25, 0.3))
-	node.draw_line(Vector2(-sz, 0), Vector2(sz, 0), Color(0.5, 0.4, 0.3, 0.2), 1.5)
-
 
 
 ## T-064: Render tree wall in combat zone + worn paths at gaps

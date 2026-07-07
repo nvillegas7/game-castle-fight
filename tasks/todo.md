@@ -260,3 +260,21 @@
 - [ ] Paid user acquisition
 - [ ] New seasons with content
 - [ ] Tournaments + esports support
+
+---
+
+## 2026-07-07 — 3.3b terrain: match Claude Design mockups (v1/v2/v3)
+**Spec = the 3 Desktop mockups.** User: "implement any of that so long as the design is symmetrical."
+v2 = most symmetric → north star. **Diagnosis:** current arena is muddy — reddish-pink enemy tint +
+brown "combat" band (color4 olive tinted brown). All 3 mockups are ONE lush green field. Kill the mud.
+- [x] 1. Lush symmetric meadow — one uniform green field (killed brown lane + pink tint).
+      NOTE: per-tile hue mixing REJECTED — adjacent hues betray the 64px grid as visible
+      rectangular patches; mockups are uniform. Variation now comes from decoration only.
+- [x] 2. Removed band seams (mid-field edge-rows + boundary shadow strips)
+- [x] 3. Symmetric tree-line framing — 4 clusters/side mirrored about x=360, fuller pines
+- [x] 4. Sheep — animated grazing (Sheep_Grass 12f), 3 symmetric pairs in flanking grass
+- [x] 5. Gold nugget clusters — brighter (a0.9), symmetric L/R pairs at 2 y-levels
+- [x] 5b. Removed scorch marks + combat debris (muddied clean grass); flowers now full-field symmetric
+- [x] 6. Verified: capture game_008 vs v2 (matches); L0 395/0 green; determinism golden 6/0 byte-identical
+- [ ] 7. DEPLOY (awaiting user OK): `cd castle_clash && ./build.sh` → live castlefight.pages.dev
+- [ ] 8. (Optional follow-up) stone perimeter walls castle→towers (mockup framing; building-layer, higher risk)

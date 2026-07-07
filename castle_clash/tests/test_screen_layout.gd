@@ -68,6 +68,20 @@ func _record(severity: String, src: String, line: int, msg: String) -> void:
 	_findings.append({"severity": severity, "src": src, "line": line, "msg": msg})
 
 
+# Captures now live under the project (test_output/, gitignored) instead of /tmp,
+# which macOS purges every ~3 days. Writer: tests/auto_screenshot.gd.
+const CAPTURE_DIR: String = "res://test_output/autotest"
+
+
+func _cap(name: String) -> String:
+	return ProjectSettings.globalize_path("%s/%s" % [CAPTURE_DIR, name])
+
+
+# True once a capture run has written its manifest (tests/capture.sh / --autotest).
+func _capture_manifest_present() -> bool:
+	return FileAccess.file_exists(_cap("manifest.json"))
+
+
 func _assert_pass(name: String) -> void:
 	_pass += 1
 	print("  PASS: %s" % name)
@@ -310,13 +324,8 @@ func _check_progress_bar_construction() -> void:
 ## bar Y-band y≈624-688, centerline ~y=648, bar interior x≈90..414.
 func _check_progress_bar_pixel_continuity() -> void:
 	print("[Progress bar pixel continuity (BUG-43 pixel-level)]")
-	var img_path: String = "/tmp/castle_clash_test/loading_000.png"
-	if not FileAccess.file_exists(img_path):
-		_assert_pass("no autotest capture present at %s — run `godot --path castle_clash -- --autotest` first" % img_path)
-		return
-	var img := Image.load_from_file(img_path)
+	var img := _load_capture("loading_000.png")
 	if img == null:
-		_assert_fail("could not load %s" % img_path, "Image.load_from_file returned null")
 		return
 	# Bar centerline ~y=648 in 504×896 capture.
 	var y_sample: int = 648
@@ -350,7 +359,7 @@ func _check_progress_bar_pixel_continuity() -> void:
 		_assert_fail("loading bar has %d detached wood segments at y=%d (should be 1)" % [merged.size(), y_sample],
 			"BUG-43 RE-OPEN — middle plank floats between end caps")
 		for i in merged.size():
-			_record("HIGH", img_path, y_sample, "wood run #%d: x=%d..%d (width %d)" % [i + 1, merged[i].start, merged[i].end, merged[i].end - merged[i].start])
+			_record("HIGH", "loading_000.png", y_sample, "wood run #%d: x=%d..%d (width %d)" % [i + 1, merged[i].start, merged[i].end, merged[i].end - merged[i].start])
 
 
 ## Detects tip strip / NinePatch edge artifacts (BUG-44).
@@ -396,7 +405,7 @@ func _check_tip_strip_construction() -> void:
 # Calibrated against menu_battle_000.png (504×896) on the buggy build 2026-04-18.
 # Per QA gate: a bug cannot be moved to DONE until its detector flips PASS.
 
-const MENU_CAPTURE: String = "/tmp/castle_clash_test/menu_battle_000.png"
+const MENU_CAPTURE: String = "menu_battle_000.png"
 
 
 ## BUG-46: Chimney smoke renders as horizontal LINE of small light puffs at the
@@ -585,7 +594,7 @@ func _check_ribbon_edge_clipping() -> void:
 ## when it's not the active tab.
 func _check_battle_tab_always_lifted() -> void:
 	print("[Battle tab always lifted/gold (BUG-51 pixel)]")
-	var img := _load_capture("/tmp/castle_clash_test/menu_army_000.png")
+	var img := _load_capture("menu_army_000.png")
 	if img == null:
 		return
 	var w: int = img.get_width()
@@ -615,7 +624,7 @@ func _check_battle_tab_always_lifted() -> void:
 	if battle_gold > 80 and battle_gold > max_non_battle + 60:
 		_assert_fail("BUG-51 — Battle tab has %d gold px vs max non-Battle %d on army_tab capture" % [battle_gold, max_non_battle],
 			"Battle tab styled as always-active; `_apply_center_tab_emphasis` at main_menu.gd:982 needs conditional application")
-		_record("HIGH", "/tmp/castle_clash_test/menu_army_000.png", y0,
+		_record("HIGH", "menu_army_000.png", y0,
 			"BUG-51 — gold_px per tab: Shop=%d Army=%d Battle=%d Social=%d Settings=%d" %
 			[tab_slices[0].gold, tab_slices[1].gold, tab_slices[2].gold, tab_slices[3].gold, tab_slices[4].gold])
 	else:
@@ -634,7 +643,7 @@ func _check_battle_tab_always_lifted() -> void:
 ## indicates scenic bleed-through.
 func _check_non_battle_tab_scenic_bleed() -> void:
 	print("[Non-Battle tab scenic bleed-through (BUG-52 pixel)]")
-	var img := _load_capture("/tmp/castle_clash_test/menu_army_000.png")
+	var img := _load_capture("menu_army_000.png")
 	if img == null:
 		return
 	var w: int = img.get_width()
@@ -655,7 +664,7 @@ func _check_non_battle_tab_scenic_bleed() -> void:
 		_assert_fail("BUG-52 — scenic palette pixels leak into army tab edges: left=%d right=%d (threshold %d)" %
 			[left_scenic, right_scenic, threshold],
 			"`_build_scenic_background` at main_menu.gd:636 stays visible under all tabs; non-Battle tabs need opaque backgrounds OR hide scenic when not on Battle")
-		_record("HIGH", "/tmp/castle_clash_test/menu_army_000.png", y0,
+		_record("HIGH", "menu_army_000.png", y0,
 			"BUG-52 — grass+stone bleed: L=%d R=%d y=%d-%d band=30px" % [left_scenic, right_scenic, y0, y1])
 	else:
 		_assert_pass("non-Battle tab edges have clean UI background (L=%d R=%d)" % [left_scenic, right_scenic])
@@ -673,9 +682,18 @@ func _is_scenic_palette(c: Color) -> bool:
 
 # --- Pixel-detector helpers ---
 
-func _load_capture(path: String) -> Image:
+## Loads a capture PNG by bare filename. A MISSING capture is a FAIL, not a pass —
+## this closes the "silent green" hole where every pixel detector passed with zero
+## pixels examined whenever /tmp had been purged (lessons.md 2026-04-18).
+func _load_capture(name: String) -> Image:
+	var path := _cap(name)
 	if not FileAccess.file_exists(path):
-		_assert_pass("no autotest capture at %s — run `godot --path castle_clash -- --autotest` first" % path)
+		if _capture_manifest_present():
+			_assert_fail("capture %s missing from the last run" % name,
+				"pipeline ran but did not produce this PNG — check auto_screenshot manifest")
+		else:
+			_assert_fail("no capture manifest — run `tests/capture.sh` before the pixel gate",
+				"pixel detectors cannot pass without a fresh capture run")
 		return null
 	var img := Image.load_from_file(path)
 	if img == null:

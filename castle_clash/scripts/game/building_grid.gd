@@ -268,8 +268,18 @@ func _input(event: InputEvent) -> void:
 		queue_redraw()
 
 
+## Screen (window/viewport) position → this grid node's local space. MUST invert
+## the camera (canvas) transform: under any zoom≠1 or pan, screen and world space
+## diverge, so the old `screen_pos - global_position` mapped taps to the wrong
+## cell (verified: at zoom 2x a tap on cell (2,4) derived cell (-1,-11)). Mirrors
+## the world→screen conversion already used correctly for the radial hit-test.
+func _screen_to_local(screen_pos: Vector2) -> Vector2:
+	var world_pos: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * screen_pos
+	return world_pos - global_position
+
+
 func _update_ghost_position(screen_pos: Vector2) -> void:
-	var local_pos: Vector2 = screen_pos - global_position
+	var local_pos: Vector2 = _screen_to_local(screen_pos)
 	var gx: int = int(local_pos.x) / CELL_SIZE
 	var gy: int = int(local_pos.y) / CELL_SIZE
 
@@ -349,7 +359,7 @@ var _radial_building_id: int = -1
 func _try_sell_building(screen_pos: Vector2) -> void:
 	if GameManager.simulation == null:
 		return
-	var local_pos: Vector2 = screen_pos - global_position
+	var local_pos: Vector2 = _screen_to_local(screen_pos)
 	if local_pos.x < 0 or local_pos.x > GRID_COLS * CELL_SIZE \
 	   or local_pos.y < 0 or local_pos.y > GRID_ROWS * CELL_SIZE:
 		return
@@ -371,7 +381,7 @@ func _try_sell_building(screen_pos: Vector2) -> void:
 func _try_show_radial(screen_pos: Vector2) -> bool:
 	if GameManager.simulation == null:
 		return false
-	var local_pos: Vector2 = screen_pos - global_position
+	var local_pos: Vector2 = _screen_to_local(screen_pos)
 	if local_pos.x < 0 or local_pos.x > GRID_COLS * CELL_SIZE \
 	   or local_pos.y < 0 or local_pos.y > GRID_ROWS * CELL_SIZE:
 		_dismiss_radial()

@@ -86,10 +86,14 @@ var SCENARIOS: Dictionary = {
 
 	# === Category 5: Siege units ===
 	"siege_vs_castle": {
-		"desc": "2 catapults march to castle — siege damage test",
-		"p0": [["siege_workshop", 5, 3]],
+		# siege_workshop has requires_building=&"barracks" (tier-2 gate). Placing it
+		# without a barracks first makes Simulation._handle_place_building silently reject
+		# the command, so no catapult ever spawns. Place the barracks prerequisite first
+		# (same pattern as flying_3v3 placing archer_range before gryphon_roost).
+		"desc": "barracks (prereq) + siege_workshop — footmen & catapults siege undefended castle",
+		"p0": [["barracks", 8, 3], ["siege_workshop", 5, 3]],
 		"p1": [],
-		"cap": 2,
+		"cap": 4,
 		"checks": ["castle_attack", "siege_damage"],
 	},
 

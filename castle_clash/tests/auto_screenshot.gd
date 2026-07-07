@@ -8,11 +8,16 @@ extends Node
 var _active: bool = false
 var _timer: float = 0.0
 var _frame_count: int = 0
-var _out_dir: String = "/tmp/castle_clash_test"
+# Captures live under the project (survives macOS /tmp purges) and are gitignored.
+const CAPTURE_SUBDIR: String = "res://test_output/autotest"
+var _out_dir: String = ""
 var _match_started: bool = false
 var _build_timer: float = 0.0
 var _builds_done: int = 0
 var _end_screen_captured: bool = false
+# Artifact integrity tracking — a 0-capture or save-failed run must exit non-zero.
+var _captured: Array[String] = []
+var _capture_failures: Array[String] = []
 const INTERVAL: float = 5.0   # Capture every 5 seconds (less overhead)
 const MAX_FRAMES: int = 12   # 60 seconds of gameplay
 const BUILD_INTERVAL: float = 3.0  # Place a building every 3 seconds
@@ -30,18 +35,20 @@ func _ready() -> void:
 			loading_only = true
 	if not _active:
 		return
+	_out_dir = ProjectSettings.globalize_path(CAPTURE_SUBDIR)
+	_clean_out_dir()
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 	print("[AutoTest] Active. AI-vs-AI mode. Saving to %s/" % _out_dir)
 	# 1) Loading screen
 	await get_tree().create_timer(0.5).timeout
-	await _capture_frame("loading")
+	await _capture_frame("loading", 0)
 	if loading_only:
 		print("[AutoTest] --autotest-loading: captured loading, quitting.")
-		get_tree().quit()
+		_finish()
 		return
 	# 2) Wait for main menu to render
 	await get_tree().create_timer(4.0).timeout
-	await _capture_frame("menu")
+	await _capture_frame("menu", 0)
 	# 3) Capture each main-menu tab (Battle is the default landing tab so already
 	# captured above as menu_000.png — we still recapture as menu_battle to keep
 	# naming uniform across all tabs).
@@ -69,7 +76,7 @@ func _capture_all_menu_tabs() -> void:
 		# another frame_post_draw internally. Without the await, the loop
 		# iterates to the next `_select_tab` before the viewport is read, so the
 		# saved PNG reflects the *next* tab's state (found via BUG-52 debug).
-		await _capture_frame("menu_%s" % TAB_NAMES[i])
+		await _capture_frame("menu_%s" % TAB_NAMES[i], 0)
 	# Leave on Battle tab so the existing change_scene flow proceeds normally.
 	if menu.has_method("_select_tab"):
 		menu._select_tab(2)
@@ -95,7 +102,10 @@ func _process(delta: float) -> void:
 	_timer += delta
 	if _timer >= INTERVAL:
 		_timer = 0.0
-		_capture_frame("game")
+		# Pass the index explicitly: _capture_frame awaits a frame internally, so
+		# reading _frame_count after the await (post-increment) captured the wrong
+		# index and skipped game_000. Binding it at call time fixes the race.
+		_capture_frame("game", _frame_count)
 		_frame_count += 1
 		if _frame_count >= MAX_FRAMES and not _end_screen_captured:
 			_end_screen_captured = true  # set BEFORE await so _process can't re-enter
@@ -160,27 +170,67 @@ func _auto_build() -> void:
 func _force_victory_and_capture_end_screen() -> void:
 	if GameManager.simulation == null:
 		print("[AutoTest] WARN: simulation null at end-screen step — quitting")
-		get_tree().quit()
+		_finish()
 		return
 	# Force enemy castle to 0 HP. Sim's tick check will emit match_over.
 	GameManager.simulation.castles[1].hp = 0
 	# Wait long enough for the next sim tick + end_screen scene transition.
 	await get_tree().create_timer(2.5).timeout
 	await RenderingServer.frame_post_draw
-	_capture_frame("end_victory")
+	await _capture_frame("end_victory", 0)
 	# Also capture defeat-state end screen by overriding (can't replay the match
 	# easily within one autotest run, so skip — file follow-up if needed).
 	await get_tree().create_timer(0.5).timeout
 	print("[AutoTest] End screen captured. Quitting.")
-	get_tree().quit()
+	_finish()
 
 
-func _capture_frame(prefix: String) -> void:
+func _capture_frame(prefix: String, index: int) -> void:
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
-	var path := "%s/%s_%03d.png" % [_out_dir, prefix, _frame_count]
-	img.save_png(path)
-	print("[AutoTest] Saved %s" % path)
+	var fname := "%s_%03d.png" % [prefix, index]
+	var path := "%s/%s" % [_out_dir, fname]
+	var err := img.save_png(path)
+	if err != OK or not FileAccess.file_exists(path):
+		_capture_failures.append(fname)
+		push_error("[AutoTest] FAILED to save %s (err %d)" % [path, err])
+	else:
+		_captured.append(fname)
+		print("[AutoTest] Saved %s" % path)
+
+
+## Remove stale captures so a reader can never mistake a previous run's PNGs for
+## this run's output (the "stale-build verdict" hole).
+func _clean_out_dir() -> void:
+	var dir := DirAccess.open(_out_dir)
+	if dir == null:
+		return
+	for f in dir.get_files():
+		if f.ends_with(".png") or f == "manifest.json" or f == "game_state.json":
+			dir.remove(f)
+
+
+## Write the run manifest and quit with a non-zero code on any capture failure or
+## a zero-capture run. Closes the "0 captures, exit 0" hole: readers key off this.
+func _finish() -> void:
+	var ok: bool = _capture_failures.is_empty() and not _captured.is_empty()
+	var manifest := {
+		"ok": ok,
+		"count": _captured.size(),
+		"captured": _captured,
+		"failures": _capture_failures,
+		"unix_time": Time.get_unix_time_from_system(),
+	}
+	var f := FileAccess.open(_out_dir + "/manifest.json", FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(manifest, "  "))
+		f.close()
+	if ok:
+		print("[AutoTest] Capture run OK: %d captures. Manifest written." % _captured.size())
+	else:
+		push_error("[AutoTest] Capture run FAILED: %d saved, %d failures" % [
+			_captured.size(), _capture_failures.size()])
+	get_tree().quit(0 if ok else 1)
 
 
 func _dump_game_state() -> void:

@@ -190,3 +190,22 @@ flow." Forensic audit (wf_772ab315) confirmed it.
 - **Meta-rule — lessons must compile into tooling/gates.** "Reference image is the spec" was
   already written 2026-04-19 and violated again in 3.3b because it stayed prose. A lesson
   that matters becomes a tool, a gate, or a checked-in artifact — not a paragraph.
+
+---
+
+## Lesson (2026-07-08b) — Three compositor-flow refinements from the first feedback round
+
+1. **Calibrate from measured fractions, never eyeball.** Ported the castle at 0.9x native
+   from a rough eyeball while the forensics report had the measured answer (0.296 of
+   playfield width → 0.68x). User immediately flagged "too big". When a measurement exists,
+   the LAYOUT must cite it. Detector now pins a TWO-SIDED band (130..172px) so scale can't
+   silently drift in either direction.
+2. **The design tool must share the game's rendering semantics.** The compositor drew in
+   table order while the game y-sorts — so "sheep floating on tree canopies" was invisible
+   in the approved target and appeared only in-game. The compositor now paints back-to-front
+   by ground-y. Generalization: any semantic the runtime applies (y-sort, z-layers,
+   modulate) must exist in the design tool, or the spec lies.
+3. **Symmetry by construction.** Hand-placed "roughly mirrored" decorations drifted ±4-10px.
+   Author one quadrant; generate mirrors; assert the invariant (platform spans mirror about
+   FLIP_PIVOT_Y). Matters doubly here: the multiplayer perspective flip means asymmetry =
+   different-looking arenas for the two players.

@@ -65,6 +65,16 @@ the gap was never the assets — it was the workflow:
   bands + water margins are free composition space — that's where framing lives.
 - **HUD honesty.** The compositor blocks out real HUD zones (top bar, card hand) so
   the design is judged on what players actually see.
+- **Calibrate scale from measured reference fractions — never eyeball.** The 0.9x
+  castle overshoot shipped while the measured number (0.296 of playfield width)
+  sat in the forensics report. If a measurement exists, the LAYOUT cites it.
+- **The compositor renders y-sorted, like the game.** Table-order rendering hid a
+  sheep-floating-on-trees layering bug until after the port. Painter's algorithm
+  by ground-y in the tool = layering bugs visible before approval.
+- **Symmetry by construction, not by intention.** Author ONE quadrant
+  (left side of the enemy half); the tool generates x/y mirrors and asserts the
+  platform mirrors about the flip pivot. Multiplayer perspective flip then
+  guarantees identical views for both players — hand-mirroring drifts.
 
 ## Tooling
 

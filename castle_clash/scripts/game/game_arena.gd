@@ -1436,7 +1436,45 @@ func _build_terrain_textures() -> void:
 	# rows or boundary shadows — those only made sense to delineate the old distinct bands.
 	_fill_zone_with_tile(terrain_layer, grass_center, Rect2(40, 0, 640, 1010), ts)
 
+	_add_castle_ramparts(terrain_layer, tm1, ts)
+
 	_add_water_foam()
+
+
+## Stone ramparts framing each castle (mockup v2): a low cliff-edge wall hugging each castle's
+## base, so the castle sits ON the wall line with the wings extending out toward the flanking
+## towers — a fortress line, exactly the mockup composition. Uses the tilemap's grass-topped
+## cliff-edge tile (elevated bottom-edge centre, col 6 row 3) repeated straight across (corner
+## tiles hook down, so we use only the straight edge). Enemy (top) wall as-is (stone face
+## points down toward combat); player (bottom) wall vertically flipped (stone face points up).
+## Rendered in terrain_layer (z=0) so castle/towers/buildings/units (z>=1) sit in front.
+## Symmetric about the play-area midline (y=520): centres 157 and 883.
+func _add_castle_ramparts(parent: Node2D, tm: Texture2D, ts: float) -> void:
+	if tm == null:
+		return
+	# A single grass-topped cliff-edge row (col6 row3) as a low stone terrace hugging each
+	# castle base — a subtle fortress line, not a dominant wall (the 2-row solid-stone version
+	# read as a clashing teal band detached from the castle). Enemy row faces down toward
+	# combat; the player row is vertically flipped to face up.
+	var edge := AtlasTexture.new()
+	edge.atlas = tm
+	edge.region = Rect2(6 * 64, 3 * 64, 64, 64)  # grass-topped cliff edge
+	var wall_x0: float = 150.0
+	var wall_x1: float = 570.0
+	# top-left y per faction, tucked right under each castle. Symmetric about y=520.
+	for spec in [[100.0, false], [876.0, true]]:
+		var wy: float = spec[0]
+		var flip: bool = spec[1]
+		var x: float = wall_x0
+		while x < wall_x1:
+			var spr := Sprite2D.new()
+			spr.texture = edge
+			spr.centered = false
+			spr.position = Vector2(x, wy)
+			spr.flip_v = flip
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			parent.add_child(spr)
+			x += ts
 
 
 ## Fill a zone rect with a single tiled center texture (no edge variety)

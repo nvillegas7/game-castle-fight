@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="FactionData" load_steps=9 format=3]
+[gd_resource type="Resource" script_class="FactionData" load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://data_scripts/faction_data.gd" id="1"]
 [ext_resource type="Resource" path="res://data/buildings/barracks.tres" id="2"]
@@ -8,12 +8,19 @@
 [ext_resource type="Resource" path="res://data/buildings/guard_tower.tres" id="6"]
 [ext_resource type="Resource" path="res://data/buildings/knight_hall.tres" id="7"]
 [ext_resource type="Resource" path="res://data/buildings/siege_workshop.tres" id="8"]
+[ext_resource type="Resource" path="res://data/buildings/wall.tres" id="9"]
+[ext_resource type="Resource" path="res://data/buildings/armory.tres" id="10"]
+[ext_resource type="Resource" path="res://data/buildings/war_horn.tres" id="11"]
+[ext_resource type="Resource" path="res://data/buildings/mage_tower.tres" id="12"]
+[ext_resource type="Resource" path="res://data/buildings/gryphon_roost.tres" id="13"]
+[ext_resource type="Resource" path="res://data/buildings/ballista_workshop.tres" id="14"]
+[ext_resource type="Resource" path="res://data/buildings/royal_stable.tres" id="15"]
 
 [resource]
 script = ExtResource("1")
 id = &"kingdom"
 display_name = "The Kingdom"
 description = "Balanced faction with strong healing and armor."
-buildings = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8")]
+buildings = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("9"), ExtResource("10"), ExtResource("11"), ExtResource("12"), ExtResource("13"), ExtResource("14"), ExtResource("15")]
 primary_color = Color(0.2, 0.4, 0.8, 1.0)
 secondary_color = Color(0.8, 0.75, 0.3, 1.0)

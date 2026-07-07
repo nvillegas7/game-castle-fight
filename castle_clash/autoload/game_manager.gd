@@ -88,9 +88,8 @@ func start_test_match() -> void:
 	tutorial_mode = false
 	tutorial_step = 4  # mark as completed
 
-	var start_gold: int = 0
 	var player_data := [
-		{ "id": 0, "team": 0, "faction": selected_faction, "perk": selected_perk, "start_gold": start_gold },
+		{ "id": 0, "team": 0, "faction": selected_faction, "perk": selected_perk },
 		{ "id": 1, "team": 1, "faction": ai_faction, "perk": &"" },
 	]
 	local_player_id = 0
@@ -139,18 +138,6 @@ func _init_simulation(seed_value: int, player_data: Array) -> void:
 	simulation.initialize(seed_value, player_data, mode_config)
 	command_buffer = CommandBuffer.new()
 
-	# DESYNC DEBUG: compare initial state BEFORE any ticks
-	var init_cs := simulation.compute_checksum()
-	var rng_s := simulation.rng.get_state()
-	var bldg_count := simulation.building_registry.size()
-	var bldg_keys := simulation.building_registry.keys()
-	bldg_keys.sort()
-	print("[DESYNC-INIT] seed=%d checksum=%d rng=[%d,%d,%d,%d] buildings=%d entities=%d mode_inc=%d mode_spn=%d keys=%s" % [
-		seed_value, init_cs, rng_s[0], rng_s[1], rng_s[2], rng_s[3],
-		bldg_count, simulation.entities.size(),
-		mode_config.get("income_mult", -1), mode_config.get("spawn_mult", -1),
-		str(bldg_keys).substr(0, 200)])
-
 	state = State.PLAYING
 	current_tick = 0
 	_tick_accumulator_msec = 0
@@ -187,6 +174,10 @@ func get_checksum_for_tick(tick: int) -> int:
 
 ## Reset all match state. Called after match ends or on disconnect.
 func reset_match() -> void:
+	# Leave the relay match FIRST — otherwise trailing opponent payloads keep
+	# arriving for the command_buffer nulled below (null-deref on COMMANDS).
+	if is_online_match and not NetworkManager.offline_mode:
+		NetworkManager.leave_current_match()
 	state = State.MENU
 	is_online_match = false
 	current_tick = 0
@@ -231,6 +222,10 @@ func _process(delta: float) -> void:
 					state = State.MATCH_OVER
 					set_process(false)
 					EventBus.match_aborted.emit("Opponent disconnected")
+				# T-101: update interp during stalls so visual layer keeps lerping
+				# smoothly toward end-of-tick instead of freezing (brick walk).
+				# Pure visual float — no lockstep effect, cannot cause desync.
+				tick_interpolation = clampf(float(_tick_accumulator_msec) / float(TICK_DURATION_MSEC), 0.0, 1.0)
 				return  # Don't consume accumulator -- retry next frame
 
 		_stall_msec = 0
@@ -248,21 +243,11 @@ func _process(delta: float) -> void:
 func _advance_simulation_tick() -> void:
 	current_tick += 1
 	var commands := command_buffer.get_commands(current_tick)
-	# DESYNC DEBUG: log key state at tick 1 and every checksum tick
-	if current_tick == 1:
-		print("[DESYNC-DBG] tick=1 seed=", simulation.match_seed, " rng_state=", simulation.rng.get_state(), " entities=", simulation.entities.size(), " player_id=", local_player_id)
-	if current_tick % 50 == 0:
-		simulation.compute_checksum_debug()
-		print("[DESYNC-DBG] tick=", current_tick, " entities=", simulation.entities.size(), " castle0_hp=", simulation.castles[0].hp, " castle1_hp=", simulation.castles[1].hp, " cmds=", commands.size())
 	var result := simulation.step(commands)
 	command_buffer.clear_through(current_tick)
 
 	# Track checksums for desync detection
 	var checksum: int = simulation.compute_checksum()
-	# Post-step debug for tick 150 (prep phase boundary) and first desync
-	if current_tick == 150 or current_tick == 151:
-		simulation.compute_checksum_debug()
-		print("[POST-STEP] tick=", current_tick, " cmds_processed=", commands.size(), " events=", result.events.size(), " ent_count=", simulation.entities.size())
 	_checksum_history[current_tick] = checksum
 	if current_tick > 100:
 		_checksum_history.erase(current_tick - 100)
@@ -282,29 +267,44 @@ func _advance_simulation_tick() -> void:
 			"income":
 				EventBus.gold_changed.emit(event.player_id, FP.to_int(event.new_gold))
 			"building_destroyed":
-				EventBus.building_destroyed.emit(event.entity_id)
+				# Sim-emitted only for sells; combat kills arrive as entity_died.
+				EventBus.building_destroyed.emit(event.entity_id, event.get("reason", "sold"))
 			"wave_spawned":
 				EventBus.wave_started.emit(event.wave_number)
 			"unit_spawned":
 				EventBus.unit_spawned.emit(event.entity_id, event.unit_type)
 			"unit_attacked":
-				var target = simulation._find_entity_by_id(event.target_id)
-				if target:
-					EventBus.unit_attacked.emit(
-						event.attacker_id, event.target_id,
-						FP.to_int(event.damage),
-						FP.to_float(target.x), FP.to_float(target.y)
-					)
+				# Read the position from the event payload — NEVER re-look-up the
+				# target: _cleanup_dead removes hp<=0 entities within the same step,
+				# so every killing blow used to be silently swallowed here (no swing,
+				# no projectile, no damage number on lethal hits).
+				EventBus.unit_attacked.emit(
+					event.attacker_id, event.target_id,
+					FP.to_int(event.damage),
+					FP.to_float(event.get("target_x", 0)), FP.to_float(event.get("target_y", 0))
+				)
 			"unit_healed":
-				var healed = simulation._find_entity_by_id(event.target_id)
-				if healed:
-					EventBus.unit_healed.emit(
-						event.healer_id, event.target_id,
-						FP.to_int(event.amount),
-						FP.to_float(healed.x), FP.to_float(healed.y)
-					)
+				EventBus.unit_healed.emit(
+					event.healer_id, event.target_id,
+					FP.to_int(event.amount),
+					FP.to_float(event.get("target_x", 0)), FP.to_float(event.get("target_y", 0))
+				)
 			"castle_damaged":
 				EventBus.castle_damaged.emit(event.team, FP.to_int(event.damage), FP.to_int(event.remaining_hp), event.get("attacker_id", -1))
+			"castle_wrath_ready":
+				EventBus.castle_wrath_ready.emit(event.team, event.castle_id)
+			"castle_wrath_activated":
+				EventBus.castle_wrath_activated.emit(
+					event.team,
+					event.target_ids,
+					FP.to_float(event.center_x),
+					FP.to_float(event.center_y),
+					float(event.range_px)
+				)
+			"castle_wrath_refused":
+				EventBus.castle_wrath_refused.emit(event.team, event.reason)
+			"prep_phase_ended":
+				EventBus.prep_phase_ended.emit()
 			"skill_proc":
 				EventBus.skill_activated.emit(event.unit_id, StringName(event.skill))
 			"match_over":
@@ -313,9 +313,15 @@ func _advance_simulation_tick() -> void:
 				_dramatic_match_end(event.winner)
 			"entity_died":
 				if event.get("entity_type", "unit") == "building":
-					EventBus.building_destroyed.emit(event.id)
+					EventBus.building_destroyed.emit(event.id, event.get("reason", "killed"))
 				else:
-					EventBus.unit_died.emit(event.id, -1)
+					# Bounty + position come from the payload — the entity is
+					# already removed from the sim when this dispatches.
+					EventBus.unit_died.emit(
+						event.id, -1,
+						event.get("bounty", 0),
+						FP.to_float(event.get("x", 0)), FP.to_float(event.get("y", 0))
+					)
 
 
 func _dramatic_match_end(winner: int) -> void:

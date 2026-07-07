@@ -15,10 +15,59 @@ var horde_wins: int = 0
 var last_win_timestamp: int = 0  # Unix timestamp
 var first_win_bonus_available: bool = false
 
+# Audio volume settings (0.0 = mute, 1.0 = full)
+var music_volume: float = 0.8
+var sfx_volume: float = 1.0
+var ui_volume: float = 1.0
+
 
 func _ready() -> void:
 	_load()
 	_check_first_win_bonus()
+	_apply_audio_volumes()
+
+
+func set_music_volume(vol: float) -> void:
+	music_volume = clampf(vol, 0.0, 1.0)
+	_apply_bus_volume("Music", music_volume)
+	_save()
+
+func set_sfx_volume(vol: float) -> void:
+	sfx_volume = clampf(vol, 0.0, 1.0)
+	_apply_bus_volume("SFX", sfx_volume)
+	_save()
+
+func set_ui_volume(vol: float) -> void:
+	ui_volume = clampf(vol, 0.0, 1.0)
+	_apply_bus_volume("UI", ui_volume)
+	_save()
+
+func _apply_bus_volume(bus_name: String, vol: float) -> void:
+	var idx: int = AudioServer.get_bus_index(bus_name)
+	if idx >= 0:
+		AudioServer.set_bus_volume_db(idx, linear_to_db(vol))
+		AudioServer.set_bus_mute(idx, vol <= 0.0)
+
+func _apply_audio_volumes() -> void:
+	_apply_bus_volume("Music", music_volume)
+	_apply_bus_volume("SFX", sfx_volume)
+	_apply_bus_volume("UI", ui_volume)
+
+
+## Generic key-value getter for persistent data (used by tutorial, perks, etc.)
+func get_value(key: String, default_value = null):
+	var config := ConfigFile.new()
+	if config.load(SAVE_PATH) == OK:
+		return config.get_value("data", key, default_value)
+	return default_value
+
+
+## Generic key-value setter for persistent data.
+func set_value(key: String, value) -> void:
+	var config := ConfigFile.new()
+	config.load(SAVE_PATH)  # Load existing, ignore error if new
+	config.set_value("data", key, value)
+	config.save(SAVE_PATH)
 
 
 func record_match_result(won: bool, faction: StringName, waves: int, buildings: int) -> void:
@@ -91,6 +140,9 @@ func _save() -> void:
 	config.set_value("stats", "kingdom_wins", kingdom_wins)
 	config.set_value("stats", "horde_wins", horde_wins)
 	config.set_value("stats", "last_win_timestamp", last_win_timestamp)
+	config.set_value("audio", "music_volume", music_volume)
+	config.set_value("audio", "sfx_volume", sfx_volume)
+	config.set_value("audio", "ui_volume", ui_volume)
 	config.save(SAVE_PATH)
 
 
@@ -106,3 +158,6 @@ func _load() -> void:
 	kingdom_wins = config.get_value("stats", "kingdom_wins", 0)
 	horde_wins = config.get_value("stats", "horde_wins", 0)
 	last_win_timestamp = config.get_value("stats", "last_win_timestamp", 0)
+	music_volume = config.get_value("audio", "music_volume", 0.8)
+	sfx_volume = config.get_value("audio", "sfx_volume", 1.0)
+	ui_volume = config.get_value("audio", "ui_volume", 1.0)

@@ -1,114 +1,94 @@
-## Animated chibi castle with banner wave, window glow, damage states.
+## Castle visual using Tiny Swords Castle.png sprite with damage states.
 extends Node2D
 
 @export var team: int = 0
 var hp_ratio: float = 1.0
 
-var _time: float = 0.0
+var _sprite: Sprite2D = null
+var _prev_hp: float = 1.0
+var _fire_nodes: Array[Node2D] = []
+var _glow_color: Color = Color.TRANSPARENT
 
-const K_WALL := Color(0.5, 0.55, 0.7)
-const K_ROOF := Color(0.2, 0.35, 0.65)
-const K_ACC := Color(0.85, 0.75, 0.3)
-
-const H_WALL := Color(0.55, 0.45, 0.35)
-const H_ROOF := Color(0.65, 0.15, 0.1)
-const H_ACC := Color(0.85, 0.55, 0.2)
-
-const OL := Color(0.05, 0.04, 0.08, 0.6)
+# T-008: HP bars handled by game_arena.gd (.tscn ColorRects + BigBar overlay)
+# castle_visual.gd only handles sprite, damage tint, fire, and glow
 
 
-func _process(delta: float) -> void:
-	_time += delta
+func _ready() -> void:
+	# Team-colored glow base behind castle
+	var glow_color: Color = Color(0.2, 0.4, 0.8, 0.15) if team == 0 else Color(0.8, 0.2, 0.1, 0.15)
 	queue_redraw()
+	_glow_color = glow_color
+
+	var tex: Texture2D = SpriteRegistry.get_castle_sprite(team)
+	if tex:
+		_sprite = Sprite2D.new()
+		_sprite.texture = tex
+		_sprite.centered = true
+		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var s: float = 160.0 / tex.get_height()
+		_sprite.scale = Vector2(s, s)
+		add_child(_sprite)
+
+
+func _process(_delta: float) -> void:
+	if abs(hp_ratio - _prev_hp) < 0.001:
+		return
+	_prev_hp = hp_ratio
+	queue_redraw()
+
+	# Damage tint on sprite
+	if _sprite:
+		if hp_ratio < 0.5:
+			var dmg: float = (0.5 - hp_ratio) * 1.0
+			_sprite.modulate = Color(1.0, 1.0 - dmg, 1.0 - dmg)
+		else:
+			_sprite.modulate = Color.WHITE
+
+	# Sprite-based fire at low HP
+	if hp_ratio < 0.5 and _fire_nodes.is_empty():
+		# Add fire sprites
+		var fire1 := Effects.create_fire(Vector2(-20, -5), 0.45)
+		var fire2 := Effects.create_fire(Vector2(18, -8), 0.4)
+		add_child(fire1)
+		add_child(fire2)
+		_fire_nodes.append(fire1)
+		_fire_nodes.append(fire2)
+		# Add third fire at very low HP
+		if hp_ratio < 0.25:
+			var fire3 := Effects.create_fire(Vector2(0, 0), 0.55)
+			add_child(fire3)
+			_fire_nodes.append(fire3)
+	elif hp_ratio < 0.25 and _fire_nodes.size() < 3:
+		var fire3 := Effects.create_fire(Vector2(0, 0), 0.55)
+		add_child(fire3)
+		_fire_nodes.append(fire3)
+	elif hp_ratio >= 0.5 and not _fire_nodes.is_empty():
+		# Remove fire when healed above threshold
+		for f in _fire_nodes:
+			f.queue_free()
+		_fire_nodes.clear()
 
 
 func _draw() -> void:
-	var wall: Color; var roof: Color; var acc: Color
-	if team == 0:
-		wall = K_WALL; roof = K_ROOF; acc = K_ACC
+	if _glow_color.a > 0:
+		# Soft radial glow behind castle
+		for i in range(3, 0, -1):
+			var r: float = 50.0 + i * 20.0
+			var c := Color(_glow_color.r, _glow_color.g, _glow_color.b, _glow_color.a * (0.4 / i))
+			draw_circle(Vector2.ZERO, r, c)
+
+	# HP bar at castle top — same style as building_visual (no gaps)
+	var bar_w: float = 120.0
+	var bar_h: float = 6.0
+	var bar_x: float = -bar_w * 0.5
+	var bar_y: float = -56.0 - 4.0  # sprite half-height (56) + 4px gap, same as buildings
+	draw_rect(Rect2(bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2), Color(0, 0, 0, 0.55))
+	draw_rect(Rect2(bar_x, bar_y, bar_w, bar_h), Color(0.15, 0.1, 0.05, 0.7))
+	var fill_col: Color
+	if hp_ratio > 0.6:
+		fill_col = Color(0.2, 0.8, 0.25) if team == 0 else Color(0.9, 0.2, 0.1)
+	elif hp_ratio > 0.3:
+		fill_col = Color(0.9, 0.8, 0.15)
 	else:
-		wall = H_WALL; roof = H_ROOF; acc = H_ACC
-
-	# Damage darkening
-	if hp_ratio < 0.5:
-		var dmg: float = (0.5 - hp_ratio) * 0.5
-		wall = wall.darkened(dmg)
-		roof = roof.darkened(dmg * 0.7)
-
-	var w: float = 70.0
-	var h: float = 140.0
-
-	# Main keep
-	draw_rect(Rect2(-w * 0.35, -h * 0.2, w * 0.7, h * 0.5), wall)
-	draw_rect(Rect2(-w * 0.35, -h * 0.2, w * 0.7, h * 0.5), OL, false, 1.0)
-
-	# Left tower
-	draw_rect(Rect2(-w * 0.5, -h * 0.28, w * 0.22, h * 0.58), wall.lightened(0.08))
-	draw_rect(Rect2(-w * 0.5, -h * 0.28, w * 0.22, h * 0.58), OL, false, 0.8)
-	var lt := PackedVector2Array([
-		Vector2(-w * 0.52, -h * 0.28),
-		Vector2(-w * 0.39, -h * 0.4),
-		Vector2(-w * 0.26, -h * 0.28),
-	])
-	draw_colored_polygon(lt, roof)
-	draw_polyline(PackedVector2Array([lt[0], lt[1], lt[2]]), OL, 1.0)
-
-	# Right tower
-	draw_rect(Rect2(w * 0.28, -h * 0.28, w * 0.22, h * 0.58), wall.lightened(0.08))
-	draw_rect(Rect2(w * 0.28, -h * 0.28, w * 0.22, h * 0.58), OL, false, 0.8)
-	var rt := PackedVector2Array([
-		Vector2(w * 0.26, -h * 0.28),
-		Vector2(w * 0.39, -h * 0.4),
-		Vector2(w * 0.52, -h * 0.28),
-	])
-	draw_colored_polygon(rt, roof)
-	draw_polyline(PackedVector2Array([rt[0], rt[1], rt[2]]), OL, 1.0)
-
-	# Battlements
-	for i in 3:
-		var bx: float = -9 + i * 9
-		draw_rect(Rect2(bx, -h * 0.22, 6, 7), wall)
-
-	# Gate
-	draw_rect(Rect2(-7, h * 0.12, 14, 18), Color(0.18, 0.12, 0.08))
-	# Gate arch (polygon semicircle)
-	var gate_pts := PackedVector2Array()
-	for i in 9:
-		var a: float = PI + float(i) / 8.0 * PI
-		gate_pts.append(Vector2(cos(a) * 7, h * 0.12 + sin(a) * 7))
-	draw_colored_polygon(gate_pts, Color(0.22, 0.15, 0.1))
-
-	# Windows with animated glow
-	var glow: float = 0.4 + sin(_time * 2.0) * 0.15
-	var win_col := Color(0.95, 0.85, 0.45, glow)
-	for row_i in 3:
-		var wy: float = -h * 0.12 + row_i * h * 0.1
-		draw_rect(Rect2(-5, wy, 4, 5), win_col)
-		draw_rect(Rect2(1, wy, 4, 5), win_col)
-
-	# Tower windows
-	for row_i in 2:
-		var twy: float = -h * 0.1 + row_i * h * 0.12
-		draw_rect(Rect2(-w * 0.45, twy, 3, 4), Color(0.9, 0.8, 0.45, glow * 0.8))
-		draw_rect(Rect2(w * 0.35, twy, 3, 4), Color(0.9, 0.8, 0.45, glow * 0.8))
-
-	# Animated banner
-	var wind: float = sin(_time * 3.0) * 2.5
-	var flag := PackedVector2Array([
-		Vector2(0, -h * 0.38),
-		Vector2(11 + wind, -h * 0.35),
-		Vector2(wind * 0.4, -h * 0.32),
-	])
-	draw_colored_polygon(flag, acc)
-	draw_rect(Rect2(-1, -h * 0.42, 2, h * 0.1), Color(0.35, 0.25, 0.15))
-
-	# Fire at low HP
-	if hp_ratio < 0.3:
-		var fh: float = 8.0 + sin(_time * 7.0) * 3.0
-		draw_circle(Vector2(-9, h * 0.05), fh * 0.35, Color(1.0, 0.6, 0.1, 0.55))
-		draw_circle(Vector2(-9, h * 0.05), fh * 0.2, Color(1.0, 0.9, 0.3, 0.4))
-		draw_circle(Vector2(10, -h * 0.05), fh * 0.3, Color(1.0, 0.5, 0.05, 0.45))
-		# Smoke
-		var sy: float = -h * 0.15 + sin(_time * 3.0) * 5.0
-		draw_circle(Vector2(-8, sy), 4, Color(0.3, 0.3, 0.3, 0.25))
-		draw_circle(Vector2(9, sy - 3), 3, Color(0.3, 0.3, 0.3, 0.2))
+		fill_col = Color(0.9, 0.2, 0.1)
+	draw_rect(Rect2(bar_x, bar_y, bar_w * hp_ratio, bar_h), fill_col)

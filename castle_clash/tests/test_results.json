@@ -1,0 +1,1586 @@
+{
+  "fail": 0,
+  "pass": 395,
+  "results": [
+    {
+      "status": "PASS",
+      "test": "compiles: game_arena.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: building_grid.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: effects.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: castle_visual.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: sprite_unit_visual.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: unit_visual.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: sprite_building_visual.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: building_visual.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: card_hand.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: hud.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: end_screen.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: main_menu.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: game_manager.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: sfx.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: sprite_registry.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: event_bus.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: player_data.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: network_manager.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: simulation.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: command.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: command_buffer.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: fixed_point.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: deterministic_rng.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: tutorial.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "compiles: loading_screen.gd"
+    },
+    {
+      "status": "PASS",
+      "test": "FP.from_int(1) == 65536"
+    },
+    {
+      "status": "PASS",
+      "test": "FP round-trip integer"
+    },
+    {
+      "status": "PASS",
+      "test": "FP.mul 3*4=12"
+    },
+    {
+      "status": "PASS",
+      "test": "FP.div 10/2=5"
+    },
+    {
+      "status": "PASS",
+      "test": "melee range_sq = 784 (28^2)"
+    },
+    {
+      "status": "PASS",
+      "test": "2-cell dist_sq = 3136 (56^2)"
+    },
+    {
+      "status": "PASS",
+      "test": "melee can't attack at 2 cells"
+    },
+    {
+      "status": "PASS",
+      "test": "melee can attack at 1 cell"
+    },
+    {
+      "status": "PASS",
+      "test": "SpriteRegistry autoload exists"
+    },
+    {
+      "status": "PASS",
+      "test": "unit sprites loaded (20 types)"
+    },
+    {
+      "status": "PASS",
+      "test": "building textures loaded (18)"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for footman"
+    },
+    {
+      "status": "PASS",
+      "test": "footman has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "footman has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for archer"
+    },
+    {
+      "status": "PASS",
+      "test": "archer has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "archer has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for priest"
+    },
+    {
+      "status": "PASS",
+      "test": "priest has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "priest has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for knight"
+    },
+    {
+      "status": "PASS",
+      "test": "knight has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "knight has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for catapult"
+    },
+    {
+      "status": "PASS",
+      "test": "catapult has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "catapult has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for grunt"
+    },
+    {
+      "status": "PASS",
+      "test": "grunt has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "grunt has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for axe_thrower"
+    },
+    {
+      "status": "PASS",
+      "test": "axe_thrower has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "axe_thrower has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for wardrummer"
+    },
+    {
+      "status": "PASS",
+      "test": "wardrummer has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "wardrummer has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for berserker"
+    },
+    {
+      "status": "PASS",
+      "test": "berserker has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "berserker has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for demolisher"
+    },
+    {
+      "status": "PASS",
+      "test": "demolisher has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "demolisher has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for champion"
+    },
+    {
+      "status": "PASS",
+      "test": "champion has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "champion has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for warlord"
+    },
+    {
+      "status": "PASS",
+      "test": "warlord has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "warlord has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for gryphon_rider"
+    },
+    {
+      "status": "PASS",
+      "test": "gryphon_rider has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "gryphon_rider has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for wyvern_rider"
+    },
+    {
+      "status": "PASS",
+      "test": "wyvern_rider has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "wyvern_rider has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for ballista_unit"
+    },
+    {
+      "status": "PASS",
+      "test": "ballista_unit has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "ballista_unit has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for scorpion"
+    },
+    {
+      "status": "PASS",
+      "test": "scorpion has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "scorpion has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for mage"
+    },
+    {
+      "status": "PASS",
+      "test": "mage has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "mage has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for red_mage"
+    },
+    {
+      "status": "PASS",
+      "test": "red_mage has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "red_mage has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for royal_knight"
+    },
+    {
+      "status": "PASS",
+      "test": "royal_knight has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "royal_knight has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "sprites exist for war_rider"
+    },
+    {
+      "status": "PASS",
+      "test": "war_rider has idle anim"
+    },
+    {
+      "status": "PASS",
+      "test": "war_rider has walk anim"
+    },
+    {
+      "status": "PASS",
+      "test": "blue barracks sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red barracks sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue war_camp sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red war_camp sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue archer_range sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red archer_range sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue axe_range sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red axe_range sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue priest_temple sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red priest_temple sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue war_drums sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red war_drums sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue knight_hall sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red knight_hall sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue berserker_pit sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red berserker_pit sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue siege_workshop sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red siege_workshop sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue demolisher_works sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red demolisher_works sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue gold_mine sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red gold_mine sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue plunder_camp sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red plunder_camp sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue guard_tower sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red guard_tower sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue flame_tower sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red flame_tower sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue wall sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red wall sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue palisade sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red palisade sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue armory sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red armory sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue blood_altar sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red blood_altar sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue war_horn sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red war_horn sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue blood_totem sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red blood_totem sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue champions_hall sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red champions_hall sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue warlords_den sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red warlords_den sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue gryphon_roost sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red gryphon_roost sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue wyvern_nest sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red wyvern_nest sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue ballista_workshop sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red ballista_workshop sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue scorpion_foundry sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red scorpion_foundry sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue royal_stable sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red royal_stable sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue beast_pen sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red beast_pen sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue mage_tower sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red mage_tower sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "blue castle sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "red castle sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "2 players initialized"
+    },
+    {
+      "status": "PASS",
+      "test": "2 castles initialized"
+    },
+    {
+      "status": "PASS",
+      "test": "castle 0 has HP"
+    },
+    {
+      "status": "PASS",
+      "test": "castle 1 has HP"
+    },
+    {
+      "status": "PASS",
+      "test": "starts at tick 0"
+    },
+    {
+      "status": "PASS",
+      "test": "building placed successfully"
+    },
+    {
+      "status": "PASS",
+      "test": "building is barracks"
+    },
+    {
+      "status": "PASS",
+      "test": "building belongs to team 0"
+    },
+    {
+      "status": "PASS",
+      "test": "income tick adds gold (before=500 after=520)"
+    },
+    {
+      "status": "PASS",
+      "test": "units spawned from barracks (1 found)"
+    },
+    {
+      "status": "PASS",
+      "test": "damage table has 4 attack types"
+    },
+    {
+      "status": "PASS",
+      "test": "damage row has 4 armor types"
+    },
+    {
+      "status": "PASS",
+      "test": "damage row has 4 armor types"
+    },
+    {
+      "status": "PASS",
+      "test": "damage row has 4 armor types"
+    },
+    {
+      "status": "PASS",
+      "test": "damage row has 4 armor types"
+    },
+    {
+      "status": "PASS",
+      "test": "Physical vs Medium = 100%%"
+    },
+    {
+      "status": "PASS",
+      "test": "Pierce vs Light > 100%%"
+    },
+    {
+      "status": "PASS",
+      "test": "Siege vs Fortified > 100%%"
+    },
+    {
+      "status": "PASS",
+      "test": "20px is within melee range"
+    },
+    {
+      "status": "PASS",
+      "test": "100px is outside melee range"
+    },
+    {
+      "status": "PASS",
+      "test": "gold mine was placed"
+    },
+    {
+      "status": "PASS",
+      "test": "got gold refund from selling mine (466 -> 506)"
+    },
+    {
+      "status": "PASS",
+      "test": "gold mine removed from entities after sell"
+    },
+    {
+      "status": "PASS",
+      "test": "castle starts with HP (5000)"
+    },
+    {
+      "status": "PASS",
+      "test": "can't build on castle cells (row 8 col 3, center)"
+    },
+    {
+      "status": "PASS",
+      "test": "CAN build on flanking col 0 row 8 (T-096 defensive slot)"
+    },
+    {
+      "status": "PASS",
+      "test": "CAN build on row 7 (T-096 no longer castle zone)"
+    },
+    {
+      "status": "PASS",
+      "test": "can build on row 5 (safe zone)"
+    },
+    {
+      "status": "PASS",
+      "test": "team 1 barracks entity placed"
+    },
+    {
+      "status": "PASS",
+      "test": "team 1 barracks grid_x == 3 (commanded)"
+    },
+    {
+      "status": "PASS",
+      "test": "team 1 barracks grid_y == 5 (commanded)"
+    },
+    {
+      "status": "PASS",
+      "test": "grid_cells[1][5][3] == entity_id"
+    },
+    {
+      "status": "PASS",
+      "test": "grid_cells[1][5][4] == entity_id"
+    },
+    {
+      "status": "PASS",
+      "test": "grid_cells[1][6][3] == entity_id"
+    },
+    {
+      "status": "PASS",
+      "test": "grid_cells[1][6][4] == entity_id"
+    },
+    {
+      "status": "PASS",
+      "test": "team 1 barracks pixel y == 233 (got 233)"
+    },
+    {
+      "status": "PASS",
+      "test": "units have targets (4)"
+    },
+    {
+      "status": "PASS",
+      "test": "units targeting troops or castle (4 troops, 4 total)"
+    },
+    {
+      "status": "PASS",
+      "test": "game_arena.tscn exists"
+    },
+    {
+      "status": "PASS",
+      "test": "main_menu.tscn exists"
+    },
+    {
+      "status": "PASS",
+      "test": "WoodTable.png exists"
+    },
+    {
+      "status": "PASS",
+      "test": "Banner.png exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SpecialPaper.png exists"
+    },
+    {
+      "status": "PASS",
+      "test": "Swords.png exists"
+    },
+    {
+      "status": "PASS",
+      "test": "war_economy income = 25 (not 20)"
+    },
+    {
+      "status": "PASS",
+      "test": "non-perk income = 20"
+    },
+    {
+      "status": "PASS",
+      "test": "iron_discipline footman HP >= 100 (got 198)"
+    },
+    {
+      "status": "PASS",
+      "test": "swift_march: unit has move speed > 0 (5)"
+    },
+    {
+      "status": "PASS",
+      "test": "savage_rush income = 17 (not 20)"
+    },
+    {
+      "status": "PASS",
+      "test": "blitz income_mult = 200"
+    },
+    {
+      "status": "PASS",
+      "test": "blitz spawn_mult = 50"
+    },
+    {
+      "status": "PASS",
+      "test": "blitz first tick gold >= 35 (got 40)"
+    },
+    {
+      "status": "PASS",
+      "test": "mirror: team 0 placed barracks"
+    },
+    {
+      "status": "PASS",
+      "test": "mirror: team 1 placed barracks"
+    },
+    {
+      "status": "PASS",
+      "test": "armory placed (count=1)"
+    },
+    {
+      "status": "PASS",
+      "test": "armory grants armor bonus (got FP 65536)"
+    },
+    {
+      "status": "PASS",
+      "test": "2 armories placed (count=2)"
+    },
+    {
+      "status": "PASS",
+      "test": "2 armories grant +2 armor (got FP 131072)"
+    },
+    {
+      "status": "PASS",
+      "test": "compound income earned > 20g over 60 ticks (got 23)"
+    },
+    {
+      "status": "PASS",
+      "test": "war_horn placed"
+    },
+    {
+      "status": "PASS",
+      "test": "war_horn has mana capacity (600)"
+    },
+    {
+      "status": "PASS",
+      "test": "war_horn activated (ticks=99)"
+    },
+    {
+      "status": "PASS",
+      "test": "units have diverse skills (6 found: [&\"charge\", &\"lance_pierce\", &\"shield_wall\", &\"devotion_aura\", &\"volley\", &\"piercing_shot\"])"
+    },
+    {
+      "status": "PASS",
+      "test": "kingdom/horde primary skills present"
+    },
+    {
+      "status": "PASS",
+      "test": "barracks placed for sell test"
+    },
+    {
+      "status": "PASS",
+      "test": "sell refund ~25g (got 25)"
+    },
+    {
+      "status": "PASS",
+      "test": "deterministic replay: checksums match (242522699180 == 242522699180)"
+    },
+    {
+      "status": "PASS",
+      "test": "different seed: checksums differ (242522699180 != 19745219679)"
+    },
+    {
+      "status": "PASS",
+      "test": "reached tick 501 without crash"
+    },
+    {
+      "status": "PASS",
+      "test": "entities exist after 500 ticks (11)"
+    },
+    {
+      "status": "PASS",
+      "test": "castle 0 HP >= 0"
+    },
+    {
+      "status": "PASS",
+      "test": "castle 1 HP >= 0"
+    },
+    {
+      "status": "PASS",
+      "test": "GameManager autoload exists"
+    },
+    {
+      "status": "PASS",
+      "test": "PlayerData autoload exists"
+    },
+    {
+      "status": "PASS",
+      "test": "tutorial_mode should be true when flag is false"
+    },
+    {
+      "status": "PASS",
+      "test": "advance to step 1"
+    },
+    {
+      "status": "PASS",
+      "test": "advance to step 2"
+    },
+    {
+      "status": "PASS",
+      "test": "advance to step 3"
+    },
+    {
+      "status": "PASS",
+      "test": "advance to step 4 (complete)"
+    },
+    {
+      "status": "PASS",
+      "test": "tutorial_mode disabled at step 4"
+    },
+    {
+      "status": "PASS",
+      "test": "tutorial_complete flag set to true"
+    },
+    {
+      "status": "PASS",
+      "test": "4 tutorial_step_changed signals emitted (4)"
+    },
+    {
+      "status": "PASS",
+      "test": "signals in order [1,2,3,4] (got [1, 2, 3, 4])"
+    },
+    {
+      "status": "PASS",
+      "test": "tutorial_complete still true from prior test"
+    },
+    {
+      "status": "PASS",
+      "test": "tutorial should NOT trigger when already completed"
+    },
+    {
+      "status": "PASS",
+      "test": "tutorial triggers after replay reset"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX autoload exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX main pool >= 8 players (got 16)"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX UI pool >= 2 players (got 4)"
+    },
+    {
+      "status": "PASS",
+      "test": "music player A exists"
+    },
+    {
+      "status": "PASS",
+      "test": "music player B exists"
+    },
+    {
+      "status": "PASS",
+      "test": "ambient player exists"
+    },
+    {
+      "status": "PASS",
+      "test": "music tracks loaded >= 5 (got 9: [\"menu_theme\", \"battle_theme\", \"victory_fanfare\", \"defeat_fanfare\", \"loading_ambient\", \"bards_tale\", \"kings_feast\", \"market_day\", \"rejoicing\"])"
+    },
+    {
+      "status": "PASS",
+      "test": "music_playing true after play_music"
+    },
+    {
+      "status": "PASS",
+      "test": "current_track is battle_theme (got 'battle_theme')"
+    },
+    {
+      "status": "PASS",
+      "test": "current_track cleared after stop_music (got '')"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX variant categories >= 5 (got 16: [\"hit\", \"shoot\", \"death\", \"heal\", \"castle_hit\", \"place\", \"gold\", \"sell\", \"destroy\", \"wave\", \"skill\", \"hit_role_0\", \"shoot_role_1\", \"hit_role_2\", \"hit_role_3\", \"hit_role_4\"])"
+    },
+    {
+      "status": "PASS",
+      "test": "UI SFX files >= 3 (got 5: [\"button_click\", \"tab_switch\", \"card_select\", \"card_hover\", \"card_denied\"])"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX directory exists: res://assets/audio/sfx/combat/"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX directory exists: res://assets/audio/sfx/building/"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX directory exists: res://assets/audio/sfx/ui/"
+    },
+    {
+      "status": "PASS",
+      "test": "AudioServer has >= 2 buses (got 4)"
+    },
+    {
+      "status": "PASS",
+      "test": "Master bus exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX bus exists or multiple buses configured"
+    },
+    {
+      "status": "PASS",
+      "test": "music_volume in range [0,1] (got 0.80)"
+    },
+    {
+      "status": "PASS",
+      "test": "sfx_volume in range [0,1] (got 1.00)"
+    },
+    {
+      "status": "PASS",
+      "test": "EventBus autoload exists"
+    },
+    {
+      "status": "PASS",
+      "test": "EventBus has unit_attacked signal"
+    },
+    {
+      "status": "PASS",
+      "test": "EventBus has unit_died signal"
+    },
+    {
+      "status": "PASS",
+      "test": "EventBus has building_placed signal"
+    },
+    {
+      "status": "PASS",
+      "test": "EventBus has castle_damaged signal"
+    },
+    {
+      "status": "PASS",
+      "test": "EventBus has skill_activated signal"
+    },
+    {
+      "status": "PASS",
+      "test": "EventBus has wave_started signal"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX.play_hit() exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX.play_shoot() exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX.play_death() exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX.play_place() exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX.play_castle_hit() exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX.play_skill() exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX.play_wave() exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX.play_music() exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX.start_ambient() exists"
+    },
+    {
+      "status": "PASS",
+      "test": "SFX.stop_ambient() exists"
+    },
+    {
+      "status": "PASS",
+      "test": "gold mine income per cycle >= 22g (got 23)"
+    },
+    {
+      "status": "PASS",
+      "test": "gold mine income per cycle <= 25g (got 23)"
+    },
+    {
+      "status": "PASS",
+      "test": "ninepatch asset exists: specialpaper.png"
+    },
+    {
+      "status": "PASS",
+      "test": "ninepatch asset exists: regularpaper.png"
+    },
+    {
+      "status": "PASS",
+      "test": "ninepatch asset exists: ribbon_red.png"
+    },
+    {
+      "status": "PASS",
+      "test": "ninepatch asset exists: ribbon_yellow.png"
+    },
+    {
+      "status": "PASS",
+      "test": "ninepatch asset exists: woodtable.png"
+    },
+    {
+      "status": "PASS",
+      "test": "ninepatch asset exists: bigbar_base.png"
+    },
+    {
+      "status": "PASS",
+      "test": "ninepatch asset exists: banner.png"
+    },
+    {
+      "status": "PASS",
+      "test": "footman: team 0 and team 1 get DIFFERENT sprites"
+    },
+    {
+      "status": "PASS",
+      "test": "footman: team 1 gets red equivalent (grunt)"
+    },
+    {
+      "status": "PASS",
+      "test": "archer: team 0 and team 1 get DIFFERENT sprites"
+    },
+    {
+      "status": "PASS",
+      "test": "archer: team 1 gets red equivalent (axe_thrower)"
+    },
+    {
+      "status": "PASS",
+      "test": "priest: team 0 and team 1 get DIFFERENT sprites"
+    },
+    {
+      "status": "PASS",
+      "test": "priest: team 1 gets red equivalent (wardrummer)"
+    },
+    {
+      "status": "PASS",
+      "test": "knight: team 0 and team 1 get DIFFERENT sprites"
+    },
+    {
+      "status": "PASS",
+      "test": "knight: team 1 gets red equivalent (berserker)"
+    },
+    {
+      "status": "PASS",
+      "test": "catapult: team 0 and team 1 get DIFFERENT sprites"
+    },
+    {
+      "status": "PASS",
+      "test": "catapult: team 1 gets red equivalent (demolisher)"
+    },
+    {
+      "status": "PASS",
+      "test": "champion: team 0 and team 1 get DIFFERENT sprites"
+    },
+    {
+      "status": "PASS",
+      "test": "champion: team 1 gets red equivalent (warlord)"
+    },
+    {
+      "status": "PASS",
+      "test": "gryphon_rider: team 0 and team 1 get DIFFERENT sprites"
+    },
+    {
+      "status": "PASS",
+      "test": "gryphon_rider: team 1 gets red equivalent (wyvern_rider)"
+    },
+    {
+      "status": "PASS",
+      "test": "ballista_unit: team 0 and team 1 get DIFFERENT sprites"
+    },
+    {
+      "status": "PASS",
+      "test": "ballista_unit: team 1 gets red equivalent (scorpion)"
+    },
+    {
+      "status": "PASS",
+      "test": "royal_knight: team 0 and team 1 get DIFFERENT sprites"
+    },
+    {
+      "status": "PASS",
+      "test": "royal_knight: team 1 gets red equivalent (war_rider)"
+    },
+    {
+      "status": "PASS",
+      "test": "RED_EQUIVALENT has all 9 Kingdom→Red mappings (got 10)"
+    },
+    {
+      "status": "PASS",
+      "test": "roof icon asset exists: wing_icon"
+    },
+    {
+      "status": "PASS",
+      "test": "roof icon asset exists: bolt_icon"
+    },
+    {
+      "status": "PASS",
+      "test": "roof icon asset exists: horse_icon"
+    },
+    {
+      "status": "PASS",
+      "test": "archer_range and gryphon_roost share base sprite 'Archery'"
+    },
+    {
+      "status": "PASS",
+      "test": "archer_range uses 'Archery' sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "siege_workshop and ballista_workshop share base sprite 'House1'"
+    },
+    {
+      "status": "PASS",
+      "test": "siege_workshop uses 'House1' sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "barracks and royal_stable share base sprite 'Barracks'"
+    },
+    {
+      "status": "PASS",
+      "test": "barracks uses 'Barracks' sprite"
+    },
+    {
+      "status": "PASS",
+      "test": "sprite_building_visual.gd loads"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (blue): barracks"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (red): barracks"
+    },
+    {
+      "status": "PASS",
+      "test": "barracks: blue and red building sprites differ"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (blue): archer_range"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (red): archer_range"
+    },
+    {
+      "status": "PASS",
+      "test": "archer_range: blue and red building sprites differ"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (blue): siege_workshop"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (red): siege_workshop"
+    },
+    {
+      "status": "PASS",
+      "test": "siege_workshop: blue and red building sprites differ"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (blue): gryphon_roost"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (red): gryphon_roost"
+    },
+    {
+      "status": "PASS",
+      "test": "gryphon_roost: blue and red building sprites differ"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (blue): ballista_workshop"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (red): ballista_workshop"
+    },
+    {
+      "status": "PASS",
+      "test": "ballista_workshop: blue and red building sprites differ"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (blue): royal_stable"
+    },
+    {
+      "status": "PASS",
+      "test": "building sprite loads (red): royal_stable"
+    },
+    {
+      "status": "PASS",
+      "test": "royal_stable: blue and red building sprites differ"
+    },
+    {
+      "status": "PASS",
+      "test": "catapult spawned (5 found)"
+    },
+    {
+      "status": "PASS",
+      "test": "catapults have targets (3 bldg, 2 unit, 0 castle, 0 none)"
+    },
+    {
+      "status": "PASS",
+      "test": "melee footmen spawned (1 found)"
+    },
+    {
+      "status": "PASS",
+      "test": "flying gryphon riders spawned (1 found)"
+    },
+    {
+      "status": "PASS",
+      "test": "anti-air documented — 0 melee→flying, 1→other, 0→none, 1 flying alive (BUG-28)"
+    },
+    {
+      "status": "PASS",
+      "test": "mage/targets spawned"
+    },
+    {
+      "status": "PASS",
+      "test": "primary target damaged by fireball"
+    },
+    {
+      "status": "PASS",
+      "test": "splash hit nearby footman #2"
+    },
+    {
+      "status": "PASS",
+      "test": "splash hit nearby footman #3"
+    },
+    {
+      "status": "PASS",
+      "test": "guard: attacker magic type applied"
+    },
+    {
+      "status": "PASS",
+      "test": "distant enemy unaffected by splash (outside 42px range)"
+    },
+    {
+      "status": "PASS",
+      "test": "arcane_shield_hp initialized from skill_param_3"
+    },
+    {
+      "status": "PASS",
+      "test": "shield absorbed or broke under magic damage"
+    },
+    {
+      "status": "PASS",
+      "test": "castle_wrath_available true at match start"
+    },
+    {
+      "status": "PASS",
+      "test": "castle_wrath_ready_emitted starts false"
+    },
+    {
+      "status": "PASS",
+      "test": "no ready event at HP=2000 (above 30%%)"
+    },
+    {
+      "status": "PASS",
+      "test": "ready event fires once HP crosses below 30%%"
+    },
+    {
+      "status": "PASS",
+      "test": "ready event does not re-emit after first fire"
+    },
+    {
+      "status": "PASS",
+      "test": "castle 0 entity present"
+    },
+    {
+      "status": "PASS",
+      "test": "castle_wrath_activated event emitted on use"
+    },
+    {
+      "status": "PASS",
+      "test": "enemy inside 140px took damage"
+    },
+    {
+      "status": "PASS",
+      "test": "enemy outside 140px unaffected"
+    },
+    {
+      "status": "PASS",
+      "test": "castle_wrath_available consumed after use"
+    },
+    {
+      "status": "PASS",
+      "test": "second activation is a no-op (one-time per match)"
+    },
+    {
+      "status": "PASS",
+      "test": "no additional damage on second activation"
+    },
+    {
+      "status": "PASS",
+      "test": "castle 0 entity present (edge radius)"
+    },
+    {
+      "status": "PASS",
+      "test": "wrath activated (edge radius)"
+    },
+    {
+      "status": "PASS",
+      "test": "catapult at max siege range (edge dist 140px) takes wrath damage"
+    },
+    {
+      "status": "PASS",
+      "test": "unit beyond siege range (edge dist 250px) unaffected"
+    },
+    {
+      "status": "PASS",
+      "test": "wrath unit_attacked event carries target position payload"
+    },
+    {
+      "status": "PASS",
+      "test": "lethal unit_attacked event present in step events"
+    },
+    {
+      "status": "PASS",
+      "test": "victim removed from sim in the same step (payload is the only data source)"
+    },
+    {
+      "status": "PASS",
+      "test": "lethal unit_attacked carries target_x/target_y"
+    },
+    {
+      "status": "PASS",
+      "test": "payload position matches victim's final sim position"
+    },
+    {
+      "status": "PASS",
+      "test": "test unit has a nonzero bounty (5)"
+    },
+    {
+      "status": "PASS",
+      "test": "entity_died event emitted for dead unit"
+    },
+    {
+      "status": "PASS",
+      "test": "entity_died payload carries bounty=5"
+    },
+    {
+      "status": "PASS",
+      "test": "entity_died payload carries position"
+    },
+    {
+      "status": "PASS",
+      "test": "barracks placed (reason test)"
+    },
+    {
+      "status": "PASS",
+      "test": "building_destroyed event emitted on sell"
+    },
+    {
+      "status": "PASS",
+      "test": "sell path carries reason=sold"
+    },
+    {
+      "status": "PASS",
+      "test": "entity_died emitted for combat-killed building"
+    },
+    {
+      "status": "PASS",
+      "test": "entity_died marks entity_type=building"
+    },
+    {
+      "status": "PASS",
+      "test": "combat kill carries reason=killed"
+    },
+    {
+      "status": "PASS",
+      "test": "castle_wrath replay: checksums match (266322687315 == 266322687315)"
+    },
+    {
+      "status": "PASS",
+      "test": "unknown ability id does not produce castle_wrath events"
+    },
+    {
+      "status": "PASS",
+      "test": "castle_wrath refused while HP above 30%%"
+    },
+    {
+      "status": "PASS",
+      "test": "castle_wrath_refused event emitted with reason=hp_above_threshold"
+    },
+    {
+      "status": "PASS",
+      "test": "refused cast does not burn the wrath charge"
+    },
+    {
+      "status": "PASS",
+      "test": "captured enough snapshots (20)"
+    },
+    {
+      "status": "PASS",
+      "test": "sampled marching frames (120)"
+    },
+    {
+      "status": "PASS",
+      "test": "mean per-frame delta is nonzero (0.333 px)"
+    },
+    {
+      "status": "PASS",
+      "test": "max frame delta 0.333 px < 2.5x mean 0.333 (stutter check)"
+    },
+    {
+      "status": "PASS",
+      "test": "min frame delta 0.333 px > 0.3x mean 0.333 (no visible hitches)"
+    },
+    {
+      "status": "PASS",
+      "test": "coefficient of variation 0.000 < 0.5 (smooth, no stutter pattern)"
+    },
+    {
+      "status": "PASS",
+      "test": "real footman spawned from barracks (3)"
+    },
+    {
+      "status": "PASS",
+      "test": "captured enough real-spawn snapshots (25)"
+    },
+    {
+      "status": "PASS",
+      "test": "real-spawn mean delta > 0.1 (0.747)"
+    },
+    {
+      "status": "PASS",
+      "test": "real-spawn no teleport: max 0.747 < 2.5x mean 0.747"
+    },
+    {
+      "status": "PASS",
+      "test": "real-spawn smooth: CV 0.000 < 0.5"
+    }
+  ]
+}

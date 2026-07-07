@@ -19,4 +19,6 @@ tower_range = 5
 tower_attack_speed = 12
 tower_attack_type = 1
 requires_building = &""
+max_hp = 800
+armor = 5
 grid_size = Vector2i(2, 2)

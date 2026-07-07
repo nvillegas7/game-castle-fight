@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="UnitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/unit_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"mage"
+display_name = "Mage"
+faction = &"kingdom"
+max_hp = 120
+attack_damage = 20
+attack_speed_ticks = 16
+attack_range = 4
+aggro_range = 7
+move_speed = 2
+armor = 0
+magic_defense = 4
+bounty = 14
+skill_id = &"fireball"
+skill_param_1 = 400
+skill_param_2 = 42
+skill_id_2 = &"arcane_shield"
+skill_param_3 = 30
+skill_param_4 = 0
+attack_type = 2
+armor_type = 0
+role = 2

@@ -6,13 +6,15 @@
 [resource]
 script = ExtResource("1")
 id = &"knight_hall"
-display_name = "Knight Hall"
+display_name = "Lancer Barracks"
 faction = &"kingdom"
 gold_cost = 120
 sell_refund_percent = 50
 spawns_unit = ExtResource("2")
 units_per_wave = 1
-spawn_interval_ticks = 300
+spawn_interval_ticks = 110
 tier = 2
 requires_building = &"barracks"
+max_hp = 800
+armor = 4
 grid_size = Vector2i(2, 2)

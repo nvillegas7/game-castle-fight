@@ -1,6 +1,13 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/sprites/ui/logo.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/sprites/ui/Icon_03.png" id="icon_shop"]
+[ext_resource type="Texture2D" path="res://assets/sprites/ui/Icon_06.png" id="icon_army"]
+[ext_resource type="Texture2D" path="res://assets/sprites/ui/Icon_05.png" id="icon_battle"]
+[ext_resource type="Texture2D" path="res://assets/sprites/ui/Icon_11.png" id="icon_social"]
+[ext_resource type="Texture2D" path="res://assets/sprites/ui/Icon_10.png" id="icon_settings"]
+[ext_resource type="Texture2D" path="res://assets/sprites/ui/Avatars_01.png" id="avatar"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -18,9 +25,93 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.15, 0.2, 0.1, 1)
+color = Color(0.11, 0.085, 0.06, 1)
 
-[node name="VBox" type="VBoxContainer" parent="."]
+
+[node name="Header" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 90.0
+grow_horizontal = 2
+
+[node name="HeaderBg" type="ColorRect" parent="Header"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.12, 0.1, 0.08, 0.9)
+
+[node name="HeaderContent" type="HBoxContainer" parent="Header"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_right = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+alignment = 0
+
+[node name="Avatar" type="TextureRect" parent="Header/HeaderContent"]
+layout_mode = 2
+custom_minimum_size = Vector2(60, 60)
+texture = ExtResource("avatar")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PlayerName" type="Label" parent="Header/HeaderContent"]
+layout_mode = 2
+size_flags_vertical = 1
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
+theme_override_colors/font_outline_color = Color(0.15, 0.1, 0.05, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 20
+text = "Commander"
+
+[node name="Spacer" type="Control" parent="Header/HeaderContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="TrophyIcon" type="TextureRect" parent="Header/HeaderContent"]
+layout_mode = 2
+modulate = Color(1, 0.82, 0.28, 1)
+custom_minimum_size = Vector2(28, 28)
+texture = ExtResource("icon_army")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TrophyLabel" type="Label" parent="Header/HeaderContent"]
+layout_mode = 2
+size_flags_vertical = 1
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_colors/font_outline_color = Color(0.15, 0.1, 0.05, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 18
+text = "New Commander"
+
+
+[node name="ContentArea" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_top = 90.0
+offset_right = 720.0
+offset_bottom = 1160.0
+
+
+[node name="ShopPanel" type="Control" parent="ContentArea"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ShopBg" type="ColorRect" parent="ContentArea/ShopPanel"]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -28,70 +119,797 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -280.0
-offset_top = -400.0
+offset_top = -200.0
 offset_right = 280.0
-offset_bottom = 400.0
+offset_bottom = 200.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 20
-alignment = 1
+color = Color(0.18, 0.15, 0.12, 0.85)
 
-[node name="Title" type="Label" parent="VBox"]
-layout_mode = 2
-text = "CASTLE CLASH"
+[node name="ShopTitle" type="Label" parent="ContentArea/ShopPanel/ShopBg"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 20.0
+offset_right = 100.0
+offset_bottom = 60.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_colors/font_outline_color = Color(0.15, 0.1, 0.05, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 28
+text = "SHOP"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="VBox"]
-layout_mode = 2
+[node name="ComingSoon" type="Label" parent="ContentArea/ShopPanel/ShopBg"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -20.0
+offset_right = 150.0
+offset_bottom = 40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.7, 0.65, 0.5, 0.8)
+theme_override_font_sizes/font_size = 22
+text = "Coming Soon..."
+horizontal_alignment = 1
+
+
+[node name="ArmyPanel" type="Control" parent="ContentArea"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ArmyBg" type="ColorRect" parent="ContentArea/ArmyPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -200.0
+offset_right = 280.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.18, 0.15, 0.12, 0.85)
+
+[node name="ArmyTitle" type="Label" parent="ContentArea/ArmyPanel/ArmyBg"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 20.0
+offset_right = 100.0
+offset_bottom = 60.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_colors/font_outline_color = Color(0.15, 0.1, 0.05, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 28
+text = "ARMY"
+horizontal_alignment = 1
+
+[node name="ComingSoon" type="Label" parent="ContentArea/ArmyPanel/ArmyBg"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -20.0
+offset_right = 150.0
+offset_bottom = 40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.7, 0.65, 0.5, 0.8)
+theme_override_font_sizes/font_size = 22
+text = "Coming Soon..."
+horizontal_alignment = 1
+
+
+[node name="BattlePanel" type="Control" parent="ContentArea"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Logo" type="TextureRect" parent="ContentArea/BattlePanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -80.0
+offset_top = 20.0
+offset_right = 80.0
+offset_bottom = 240.0
+grow_horizontal = 2
+texture = ExtResource("3")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Title" type="Label" parent="ContentArea/BattlePanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 250.0
+offset_right = 200.0
+offset_bottom = 300.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0.2, 0.12, 0.05, 1)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 32
+text = "CASTLE FIGHT"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ChooseLabel" type="Label" parent="ContentArea/BattlePanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -150.0
+offset_top = 320.0
+offset_right = 150.0
+offset_bottom = 350.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.85, 0.8, 0.65, 0.9)
+theme_override_font_sizes/font_size = 18
 text = "Choose your faction"
 horizontal_alignment = 1
 
-[node name="Spacer1" type="Control" parent="VBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
-
-[node name="FactionRow" type="HBoxContainer" parent="VBox"]
-layout_mode = 2
-theme_override_constants/separation = 20
+[node name="FactionRow" type="HBoxContainer" parent="ContentArea/BattlePanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -280.0
+offset_top = 370.0
+offset_right = 280.0
+offset_bottom = 480.0
+grow_horizontal = 2
+theme_override_constants/separation = 30
 alignment = 1
 
-[node name="KingdomBtn" type="Button" parent="VBox/FactionRow"]
-unique_name_in_owner = true
+[node name="KingdomBtn" type="Control" parent="ContentArea/BattlePanel/FactionRow"]
 layout_mode = 2
-custom_minimum_size = Vector2(240, 80)
+custom_minimum_size = Vector2(240, 100)
+
+[node name="Bg" type="ColorRect" parent="ContentArea/BattlePanel/FactionRow/KingdomBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.2, 0.4, 0.7, 1)
+
+[node name="Label" type="Label" parent="ContentArea/BattlePanel/FactionRow/KingdomBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.1, 0.2, 0.4, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 22
 text = "The Kingdom"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="HordeBtn" type="Button" parent="VBox/FactionRow"]
-unique_name_in_owner = true
+[node name="TouchArea" type="Button" parent="ContentArea/BattlePanel/FactionRow/KingdomBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
+[node name="HordeBtn" type="Control" parent="ContentArea/BattlePanel/FactionRow"]
 layout_mode = 2
-custom_minimum_size = Vector2(240, 80)
+custom_minimum_size = Vector2(240, 100)
+
+[node name="Bg" type="ColorRect" parent="ContentArea/BattlePanel/FactionRow/HordeBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.3, 0.15, 0.12, 0.6)
+
+[node name="Label" type="Label" parent="ContentArea/BattlePanel/FactionRow/HordeBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.4, 0.1, 0.08, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 22
 text = "The Horde"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="FactionDesc" type="Label" parent="VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(500, 80)
-text = "The Kingdom - Balanced faction with healing priests and heavy knights."
+[node name="TouchArea" type="Button" parent="ContentArea/BattlePanel/FactionRow/HordeBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
+[node name="FactionDesc" type="Label" parent="ContentArea/BattlePanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -280.0
+offset_top = 560.0
+offset_right = 280.0
+offset_bottom = 610.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.85, 0.8, 0.65, 0.9)
+theme_override_colors/font_outline_color = Color(0.08, 0.05, 0.02, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 14
+text = "The Kingdom - Balanced faction with healing priests and heavy lancers."
+horizontal_alignment = 1
+autowrap_mode = 2
 horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="Spacer2" type="Control" parent="VBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 30)
+[node name="PlayBtn" type="Control" parent="ContentArea/BattlePanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -230.0
+offset_top = 620.0
+offset_right = 230.0
+offset_bottom = 710.0
+grow_horizontal = 2
 
-[node name="PlayBtn" type="Button" parent="VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(0, 80)
-text = "BATTLE (vs AI)"
+[node name="Bg" type="ColorRect" parent="ContentArea/BattlePanel/PlayBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.15, 0.55, 0.25, 1)
 
-[node name="OnlineBtn" type="Button" parent="VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(0, 64)
-text = "PLAY ONLINE (1v1)"
-
-[node name="StatusLabel" type="Label" parent="VBox"]
-unique_name_in_owner = true
-layout_mode = 2
+[node name="Label" type="Label" parent="ContentArea/BattlePanel/PlayBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.05, 0.2, 0.08, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 28
+text = "BATTLE"
 horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TouchArea" type="Button" parent="ContentArea/BattlePanel/PlayBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
+[node name="OnlineBtn" type="Control" parent="ContentArea/BattlePanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -160.0
+offset_top = 730.0
+offset_right = 160.0
+offset_bottom = 800.0
+grow_horizontal = 2
+
+[node name="Bg" type="ColorRect" parent="ContentArea/BattlePanel/OnlineBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.2, 0.35, 0.6, 0.85)
+
+[node name="Label" type="Label" parent="ContentArea/BattlePanel/OnlineBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.08, 0.15, 0.3, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 20
+text = "PLAY ONLINE (1v1)"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TouchArea" type="Button" parent="ContentArea/BattlePanel/OnlineBtn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
+[node name="StatusLabel" type="Label" parent="ContentArea/BattlePanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -280.0
+offset_top = 810.0
+offset_right = 280.0
+offset_bottom = 860.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.7, 0.65, 0.5, 0.7)
+theme_override_font_sizes/font_size = 14
+horizontal_alignment = 1
+autowrap_mode = 2
+
+
+[node name="SocialPanel" type="Control" parent="ContentArea"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="SocialBg" type="ColorRect" parent="ContentArea/SocialPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -200.0
+offset_right = 280.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.18, 0.15, 0.12, 0.85)
+
+[node name="SocialTitle" type="Label" parent="ContentArea/SocialPanel/SocialBg"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 20.0
+offset_right = 100.0
+offset_bottom = 60.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_colors/font_outline_color = Color(0.15, 0.1, 0.05, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 28
+text = "SOCIAL"
+horizontal_alignment = 1
+
+[node name="ComingSoon" type="Label" parent="ContentArea/SocialPanel/SocialBg"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -20.0
+offset_right = 150.0
+offset_bottom = 40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.7, 0.65, 0.5, 0.8)
+theme_override_font_sizes/font_size = 22
+text = "Coming Soon..."
+horizontal_alignment = 1
+
+
+[node name="SettingsPanel" type="Control" parent="ContentArea"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="SettingsBg" type="ColorRect" parent="ContentArea/SettingsPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -200.0
+offset_right = 280.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.18, 0.15, 0.12, 0.85)
+
+[node name="SettingsTitle" type="Label" parent="ContentArea/SettingsPanel/SettingsBg"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 20.0
+offset_right = 100.0
+offset_bottom = 60.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_colors/font_outline_color = Color(0.15, 0.1, 0.05, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 28
+text = "SETTINGS"
+horizontal_alignment = 1
+
+[node name="ComingSoon" type="Label" parent="ContentArea/SettingsPanel/SettingsBg"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -20.0
+offset_right = 150.0
+offset_bottom = 40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.7, 0.65, 0.5, 0.8)
+theme_override_font_sizes/font_size = 22
+text = "Coming Soon..."
+horizontal_alignment = 1
+
+
+[node name="TabBar" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -120.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="TabBarBg" type="ColorRect" parent="TabBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.14, 0.11, 0.08, 0.95)
+
+[node name="TabBarTopLine" type="ColorRect" parent="TabBar"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 2.0
+grow_horizontal = 2
+color = Color(0.5, 0.38, 0.2, 0.8)
+
+[node name="TabButtons" type="HBoxContainer" parent="TabBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 6.0
+offset_right = -10.0
+offset_bottom = -6.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="Tab0" type="Control" parent="TabBar/TabButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 100)
+
+[node name="Bg" type="ColorRect" parent="TabBar/TabButtons/Tab0"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.15, 0.12, 0.1, 0.8)
+
+[node name="Icon" type="TextureRect" parent="TabBar/TabButtons/Tab0"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -22.0
+offset_top = 10.0
+offset_right = 22.0
+offset_bottom = 54.0
+grow_horizontal = 2
+texture = ExtResource("icon_shop")
+expand_mode = 1
+stretch_mode = 5
+modulate = Color(1, 1, 1, 0.5)
+
+[node name="TabLabel" type="Label" parent="TabBar/TabButtons/Tab0"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.7, 0.65, 0.55, 0.7)
+theme_override_font_sizes/font_size = 13
+text = "Shop"
+horizontal_alignment = 1
+
+[node name="TouchArea" type="Button" parent="TabBar/TabButtons/Tab0"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
+[node name="Tab1" type="Control" parent="TabBar/TabButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 100)
+
+[node name="Bg" type="ColorRect" parent="TabBar/TabButtons/Tab1"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.15, 0.12, 0.1, 0.8)
+
+[node name="Icon" type="TextureRect" parent="TabBar/TabButtons/Tab1"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -22.0
+offset_top = 10.0
+offset_right = 22.0
+offset_bottom = 54.0
+grow_horizontal = 2
+texture = ExtResource("icon_army")
+expand_mode = 1
+stretch_mode = 5
+modulate = Color(1, 1, 1, 0.5)
+
+[node name="TabLabel" type="Label" parent="TabBar/TabButtons/Tab1"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.7, 0.65, 0.55, 0.7)
+theme_override_font_sizes/font_size = 13
+text = "Army"
+horizontal_alignment = 1
+
+[node name="TouchArea" type="Button" parent="TabBar/TabButtons/Tab1"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
+[node name="Tab2" type="Control" parent="TabBar/TabButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 100)
+
+[node name="Bg" type="ColorRect" parent="TabBar/TabButtons/Tab2"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.25, 0.45, 0.7, 0.95)
+
+[node name="Icon" type="TextureRect" parent="TabBar/TabButtons/Tab2"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -22.0
+offset_top = 10.0
+offset_right = 22.0
+offset_bottom = 54.0
+grow_horizontal = 2
+texture = ExtResource("icon_battle")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TabLabel" type="Label" parent="TabBar/TabButtons/Tab2"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 0.9, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "Battle"
+horizontal_alignment = 1
+
+[node name="TouchArea" type="Button" parent="TabBar/TabButtons/Tab2"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
+[node name="Tab3" type="Control" parent="TabBar/TabButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 100)
+
+[node name="Bg" type="ColorRect" parent="TabBar/TabButtons/Tab3"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.15, 0.12, 0.1, 0.8)
+
+[node name="Icon" type="TextureRect" parent="TabBar/TabButtons/Tab3"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -22.0
+offset_top = 10.0
+offset_right = 22.0
+offset_bottom = 54.0
+grow_horizontal = 2
+texture = ExtResource("icon_social")
+expand_mode = 1
+stretch_mode = 5
+modulate = Color(1, 1, 1, 0.5)
+
+[node name="TabLabel" type="Label" parent="TabBar/TabButtons/Tab3"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.7, 0.65, 0.55, 0.7)
+theme_override_font_sizes/font_size = 13
+text = "Social"
+horizontal_alignment = 1
+
+[node name="TouchArea" type="Button" parent="TabBar/TabButtons/Tab3"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
+[node name="Tab4" type="Control" parent="TabBar/TabButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 100)
+
+[node name="Bg" type="ColorRect" parent="TabBar/TabButtons/Tab4"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.15, 0.12, 0.1, 0.8)
+
+[node name="Icon" type="TextureRect" parent="TabBar/TabButtons/Tab4"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -22.0
+offset_top = 10.0
+offset_right = 22.0
+offset_bottom = 54.0
+grow_horizontal = 2
+texture = ExtResource("icon_settings")
+expand_mode = 1
+stretch_mode = 5
+modulate = Color(1, 1, 1, 0.5)
+
+[node name="TabLabel" type="Label" parent="TabBar/TabButtons/Tab4"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.7, 0.65, 0.55, 0.7)
+theme_override_font_sizes/font_size = 13
+text = "Settings"
+horizontal_alignment = 1
+
+[node name="TouchArea" type="Button" parent="TabBar/TabButtons/Tab4"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true

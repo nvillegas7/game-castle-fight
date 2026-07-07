@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="UnitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/unit_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"scorpion"
+display_name = "Scorpion"
+faction = &"horde"
+max_hp = 110
+attack_damage = 26
+attack_speed_ticks = 22
+attack_range = 6
+aggro_range = 8
+move_speed = 1
+armor = 1
+magic_defense = 0
+bounty = 10
+skill_id = &"barbed_bolt"
+skill_param_1 = 300
+skill_param_2 = 35
+skill_id_2 = &"siege_momentum"
+skill_param_3 = 5
+skill_param_4 = 25
+attack_type = 1
+armor_type = 1
+role = 4

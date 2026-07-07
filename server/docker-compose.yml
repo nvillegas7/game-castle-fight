@@ -22,10 +22,16 @@ services:
       postgres:
         condition: service_healthy
     entrypoint:
-      - /nakama/nakama
-      - --database.address=postgres:localdb@postgres:5432/nakama
-      - --socket.server_key=castleclash_dev
-      - --logger.level=INFO
+      - /bin/sh
+      - -c
+      - >
+        /nakama/nakama migrate up
+        --database.address=postgres:localdb@postgres:5432/nakama
+        &&
+        exec /nakama/nakama
+        --database.address=postgres:localdb@postgres:5432/nakama
+        --socket.server_key=castleclash_dev
+        --logger.level=INFO
     ports:
       - "7349:7349"   # gRPC
       - "7350:7350"   # HTTP/WebSocket API

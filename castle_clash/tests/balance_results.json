@@ -1,0 +1,812 @@
+{
+  "avg_ticks": 2299,
+  "crashes": 0,
+  "draws": 0,
+  "horde_wins": 52,
+  "kingdom_wins": 48,
+  "matches": [
+    {
+      "castle0_hp": -35,
+      "castle1_hp": 5000,
+      "match": 0,
+      "seed": 12345,
+      "ticks": 2171,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -41,
+      "match": 1,
+      "seed": 12346,
+      "ticks": 2350,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -6,
+      "match": 2,
+      "seed": 12347,
+      "ticks": 2242,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -35,
+      "castle1_hp": 5000,
+      "match": 3,
+      "seed": 12348,
+      "ticks": 2682,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -2,
+      "match": 4,
+      "seed": 12349,
+      "ticks": 2161,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -4,
+      "match": 5,
+      "seed": 12350,
+      "ticks": 2257,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -8,
+      "castle1_hp": 5000,
+      "match": 6,
+      "seed": 12351,
+      "ticks": 2359,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -2,
+      "match": 7,
+      "seed": 12352,
+      "ticks": 2322,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -7,
+      "match": 8,
+      "seed": 12353,
+      "ticks": 2146,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -6,
+      "castle1_hp": 5000,
+      "match": 9,
+      "seed": 12354,
+      "ticks": 2466,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -37,
+      "castle1_hp": 5000,
+      "match": 10,
+      "seed": 12355,
+      "ticks": 2189,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -48,
+      "castle1_hp": 5000,
+      "match": 11,
+      "seed": 12356,
+      "ticks": 2413,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -9,
+      "castle1_hp": 5000,
+      "match": 12,
+      "seed": 12357,
+      "ticks": 2255,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -31,
+      "castle1_hp": 5000,
+      "match": 13,
+      "seed": 12358,
+      "ticks": 2360,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -44,
+      "castle1_hp": 5000,
+      "match": 14,
+      "seed": 12359,
+      "ticks": 2343,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -1,
+      "match": 15,
+      "seed": 12360,
+      "ticks": 2412,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -5,
+      "castle1_hp": 5000,
+      "match": 16,
+      "seed": 12361,
+      "ticks": 2256,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -4,
+      "match": 17,
+      "seed": 12362,
+      "ticks": 2472,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -7,
+      "castle1_hp": 5000,
+      "match": 18,
+      "seed": 12363,
+      "ticks": 2348,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -32,
+      "match": 19,
+      "seed": 12364,
+      "ticks": 2242,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -51,
+      "castle1_hp": 5000,
+      "match": 20,
+      "seed": 12365,
+      "ticks": 2223,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -1,
+      "castle1_hp": 5000,
+      "match": 21,
+      "seed": 12366,
+      "ticks": 2238,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -47,
+      "match": 22,
+      "seed": 12367,
+      "ticks": 2235,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -29,
+      "match": 23,
+      "seed": 12368,
+      "ticks": 2208,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -37,
+      "match": 24,
+      "seed": 12369,
+      "ticks": 2384,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -50,
+      "match": 25,
+      "seed": 12370,
+      "ticks": 2175,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 0,
+      "castle1_hp": 5000,
+      "match": 26,
+      "seed": 12371,
+      "ticks": 2321,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -2,
+      "match": 27,
+      "seed": 12372,
+      "ticks": 2218,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": 0,
+      "match": 28,
+      "seed": 12373,
+      "ticks": 2200,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -5,
+      "match": 29,
+      "seed": 12374,
+      "ticks": 2253,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -1,
+      "match": 30,
+      "seed": 12375,
+      "ticks": 2288,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -34,
+      "castle1_hp": 5000,
+      "match": 31,
+      "seed": 12376,
+      "ticks": 2188,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -7,
+      "match": 32,
+      "seed": 12377,
+      "ticks": 2258,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -2,
+      "castle1_hp": 5000,
+      "match": 33,
+      "seed": 12378,
+      "ticks": 2247,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -3,
+      "match": 34,
+      "seed": 12379,
+      "ticks": 2212,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -11,
+      "castle1_hp": 5000,
+      "match": 35,
+      "seed": 12380,
+      "ticks": 2679,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 0,
+      "castle1_hp": 5000,
+      "match": 36,
+      "seed": 12381,
+      "ticks": 2327,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -12,
+      "castle1_hp": 5000,
+      "match": 37,
+      "seed": 12382,
+      "ticks": 2360,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -5,
+      "castle1_hp": 5000,
+      "match": 38,
+      "seed": 12383,
+      "ticks": 2400,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -52,
+      "castle1_hp": 5000,
+      "match": 39,
+      "seed": 12384,
+      "ticks": 2208,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -4,
+      "match": 40,
+      "seed": 12385,
+      "ticks": 2293,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -48,
+      "castle1_hp": 5000,
+      "match": 41,
+      "seed": 12386,
+      "ticks": 2441,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -27,
+      "castle1_hp": 5000,
+      "match": 42,
+      "seed": 12387,
+      "ticks": 2157,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -6,
+      "castle1_hp": 5000,
+      "match": 43,
+      "seed": 12388,
+      "ticks": 2210,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -3,
+      "match": 44,
+      "seed": 12389,
+      "ticks": 2256,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -5,
+      "castle1_hp": 5000,
+      "match": 45,
+      "seed": 12390,
+      "ticks": 2160,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -12,
+      "castle1_hp": 5000,
+      "match": 46,
+      "seed": 12391,
+      "ticks": 2509,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 0,
+      "castle1_hp": 5000,
+      "match": 47,
+      "seed": 12392,
+      "ticks": 2149,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -16,
+      "match": 48,
+      "seed": 12393,
+      "ticks": 2290,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -44,
+      "castle1_hp": 5000,
+      "match": 49,
+      "seed": 12394,
+      "ticks": 2207,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -5,
+      "castle1_hp": 5000,
+      "match": 50,
+      "seed": 12395,
+      "ticks": 2241,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -28,
+      "match": 51,
+      "seed": 12396,
+      "ticks": 2166,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -32,
+      "match": 52,
+      "seed": 12397,
+      "ticks": 2242,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -47,
+      "match": 53,
+      "seed": 12398,
+      "ticks": 2153,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -26,
+      "castle1_hp": 5000,
+      "match": 54,
+      "seed": 12399,
+      "ticks": 2140,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -6,
+      "castle1_hp": 5000,
+      "match": 55,
+      "seed": 12400,
+      "ticks": 2268,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -23,
+      "castle1_hp": 5000,
+      "match": 56,
+      "seed": 12401,
+      "ticks": 2173,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -20,
+      "castle1_hp": 5000,
+      "match": 57,
+      "seed": 12402,
+      "ticks": 2221,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -7,
+      "match": 58,
+      "seed": 12403,
+      "ticks": 2179,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -5,
+      "castle1_hp": 5000,
+      "match": 59,
+      "seed": 12404,
+      "ticks": 2230,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 0,
+      "castle1_hp": 5000,
+      "match": 60,
+      "seed": 12405,
+      "ticks": 2229,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -9,
+      "match": 61,
+      "seed": 12406,
+      "ticks": 2327,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -1,
+      "match": 62,
+      "seed": 12407,
+      "ticks": 2615,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -11,
+      "match": 63,
+      "seed": 12408,
+      "ticks": 2257,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -3,
+      "match": 64,
+      "seed": 12409,
+      "ticks": 2579,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -7,
+      "castle1_hp": 5000,
+      "match": 65,
+      "seed": 12410,
+      "ticks": 2292,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -3,
+      "match": 66,
+      "seed": 12411,
+      "ticks": 2411,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -18,
+      "match": 67,
+      "seed": 12412,
+      "ticks": 2762,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -37,
+      "castle1_hp": 5000,
+      "match": 68,
+      "seed": 12413,
+      "ticks": 2234,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -34,
+      "match": 69,
+      "seed": 12414,
+      "ticks": 2709,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -2,
+      "match": 70,
+      "seed": 12415,
+      "ticks": 2221,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -2,
+      "castle1_hp": 5000,
+      "match": 71,
+      "seed": 12416,
+      "ticks": 2341,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -20,
+      "match": 72,
+      "seed": 12417,
+      "ticks": 2262,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -2,
+      "castle1_hp": 5000,
+      "match": 73,
+      "seed": 12418,
+      "ticks": 2116,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -42,
+      "castle1_hp": 5000,
+      "match": 74,
+      "seed": 12419,
+      "ticks": 2284,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -51,
+      "match": 75,
+      "seed": 12420,
+      "ticks": 2209,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -4,
+      "castle1_hp": 5000,
+      "match": 76,
+      "seed": 12421,
+      "ticks": 2158,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -39,
+      "castle1_hp": 5000,
+      "match": 77,
+      "seed": 12422,
+      "ticks": 2616,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -3,
+      "castle1_hp": 5000,
+      "match": 78,
+      "seed": 12423,
+      "ticks": 2238,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -4,
+      "match": 79,
+      "seed": 12424,
+      "ticks": 2181,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -7,
+      "match": 80,
+      "seed": 12425,
+      "ticks": 2227,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -5,
+      "match": 81,
+      "seed": 12426,
+      "ticks": 2632,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -11,
+      "castle1_hp": 5000,
+      "match": 82,
+      "seed": 12427,
+      "ticks": 2294,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -45,
+      "castle1_hp": 5000,
+      "match": 83,
+      "seed": 12428,
+      "ticks": 2157,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -31,
+      "match": 84,
+      "seed": 12429,
+      "ticks": 2152,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -41,
+      "match": 85,
+      "seed": 12430,
+      "ticks": 2256,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -1,
+      "castle1_hp": 5000,
+      "match": 86,
+      "seed": 12431,
+      "ticks": 2228,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -1,
+      "castle1_hp": 5000,
+      "match": 87,
+      "seed": 12432,
+      "ticks": 2336,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -3,
+      "castle1_hp": 5000,
+      "match": 88,
+      "seed": 12433,
+      "ticks": 2194,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -9,
+      "match": 89,
+      "seed": 12434,
+      "ticks": 2327,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -18,
+      "castle1_hp": 5000,
+      "match": 90,
+      "seed": 12435,
+      "ticks": 2161,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -5,
+      "match": 91,
+      "seed": 12436,
+      "ticks": 2212,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -4,
+      "match": 92,
+      "seed": 12437,
+      "ticks": 2563,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -20,
+      "match": 93,
+      "seed": 12438,
+      "ticks": 3269,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -1,
+      "match": 94,
+      "seed": 12439,
+      "ticks": 2178,
+      "winner": 0
+    },
+    {
+      "castle0_hp": -2,
+      "castle1_hp": 5000,
+      "match": 95,
+      "seed": 12440,
+      "ticks": 2237,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -4,
+      "castle1_hp": 5000,
+      "match": 96,
+      "seed": 12441,
+      "ticks": 2155,
+      "winner": 1
+    },
+    {
+      "castle0_hp": -10,
+      "castle1_hp": 5000,
+      "match": 97,
+      "seed": 12442,
+      "ticks": 2140,
+      "winner": 1
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": 0,
+      "match": 98,
+      "seed": 12443,
+      "ticks": 2159,
+      "winner": 0
+    },
+    {
+      "castle0_hp": 5000,
+      "castle1_hp": -3,
+      "match": 99,
+      "seed": 12444,
+      "ticks": 2300,
+      "winner": 0
+    }
+  ],
+  "max_ticks": 3269,
+  "median_ticks": 2247,
+  "min_ticks": 2116
+}

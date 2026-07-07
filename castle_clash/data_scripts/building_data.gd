@@ -28,6 +28,12 @@ extends Resource
 @export_group("Requirements")
 @export var requires_building: StringName = &""
 
+@export_group("Combat")
+# T-079: per-building HP and armor. max_hp=0 → use formula max(300, gold_cost*5).
+# armor defaults to 2 (basic). Set 5 for towers/walls, 3-4 for spawners, etc.
+@export var max_hp: int = 0
+@export var armor: int = 2
+
 @export_group("Grid")
 @export var grid_size: Vector2i = Vector2i(1, 1)
 

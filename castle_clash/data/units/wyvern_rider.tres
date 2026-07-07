@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UnitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/unit_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"wyvern_rider"
+display_name = "Wyvern Rider"
+faction = &"horde"
+max_hp = 200
+attack_damage = 18
+attack_speed_ticks = 14
+attack_range = 3
+aggro_range = 8
+move_speed = 5
+armor = 0
+magic_defense = 2
+bounty = 10
+skill_id = &"poison_spit"
+skill_param_1 = 200
+skill_param_2 = 25
+skill_id_2 = &"evasion"
+skill_param_3 = 20
+skill_param_4 = 0
+attack_type = 1
+armor_type = 0
+role = 3
+can_hit_air = true

@@ -145,11 +145,21 @@ static func sqrt_fp(a: int) -> int:
 		return ONE
 
 	var val: int = a << SHIFT
-	var guess: int = val >> 1 if val > ONE else ONE
 
-	for i in 6:
+	# Use bit-length for a good initial guess (converges in ~4 iterations)
+	var bits: int = 0
+	var temp: int = val
+	while temp > 0:
+		temp >>= 1
+		bits += 1
+	var guess: int = 1 << ((bits + 1) >> 1)
+
+	for i in 10:
 		if guess == 0:
 			return 0
-		guess = (guess + val / guess) >> 1
+		var next_guess: int = (guess + val / guess) >> 1
+		if next_guess >= guess:
+			break  # Converged
+		guess = next_guess
 
 	return guess

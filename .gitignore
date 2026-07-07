@@ -7,6 +7,9 @@ castle_clash/build/
 *.pck
 *.zip
 
+# Cloudflare Wrangler cache
+castle_clash/.wrangler/
+
 # OS files
 .DS_Store
 Thumbs.db

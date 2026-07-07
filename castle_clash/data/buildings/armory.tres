@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/building_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"armory"
+display_name = "Armory"
+faction = &"kingdom"
+gold_cost = 100
+sell_refund_percent = 50
+income_bonus = 0
+units_per_wave = 0
+spawn_interval_ticks = 0
+tier = 2
+requires_building = &"barracks"
+grid_size = Vector2i(2, 2)

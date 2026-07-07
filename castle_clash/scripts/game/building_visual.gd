@@ -7,6 +7,11 @@ var tier: int = 1
 var display_name: String = ""
 var width: float = 60.0
 var height: float = 60.0
+var hp_ratio: float = 1.0:
+	set(value):
+		if not is_equal_approx(hp_ratio, value):
+			hp_ratio = value
+			queue_redraw()
 
 # Building shape types
 const SHAPE_FORT := 0      # Barracks / War Camp
@@ -59,6 +64,12 @@ const TYPE_TO_SHAPE := {
 	&"plunder_camp": SHAPE_MINE,
 	&"guard_tower": SHAPE_DEF_TOWER,
 	&"flame_tower": SHAPE_DEF_TOWER,
+	&"gryphon_roost": SHAPE_TOWER,
+	&"wyvern_nest": SHAPE_TOWER,
+	&"ballista_workshop": SHAPE_WORKSHOP,
+	&"scorpion_foundry": SHAPE_WORKSHOP,
+	&"royal_stable": SHAPE_FORT,
+	&"beast_pen": SHAPE_FORT,
 }
 
 
@@ -115,13 +126,30 @@ func _draw() -> void:
 	# Building footprint outline
 	draw_rect(Rect2(-hw + 3, -hh + 5, width - 6, height - 9), Color(0, 0, 0, 0.35), false, 1.5)
 
+	# HP bar (always visible above building)
+	var bar_w: float = width * 0.8
+	var bar_h: float = 4.0
+	var bar_x: float = -bar_w * 0.5
+	var bar_y: float = -hh - 4.0
+	draw_rect(Rect2(bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2), Color(0, 0, 0, 0.55))
+	draw_rect(Rect2(bar_x, bar_y, bar_w, bar_h), Color(0.15, 0.1, 0.05, 0.7))
+	var fill_col: Color
+	if hp_ratio > 0.6:
+		fill_col = Color(0.2, 0.8, 0.25)
+	elif hp_ratio > 0.3:
+		fill_col = Color(0.9, 0.8, 0.15)
+	else:
+		fill_col = Color(0.9, 0.2, 0.1)
+	draw_rect(Rect2(bar_x, bar_y, bar_w * hp_ratio, bar_h), fill_col)
+
 	# Tier stars with shadow and highlight
 	if tier > 1:
+		var star_base_y: float = -hh - 8.0
 		for i in tier:
 			var star_x: float = -((tier - 1) * 6.0) * 0.5 + i * 6.0
-			draw_circle(Vector2(star_x, -hh + 5), 2.8, Color(0, 0, 0, 0.5))
-			draw_circle(Vector2(star_x, -hh + 4), 2.8, p.accent)
-			draw_circle(Vector2(star_x, -hh + 3.5), 1.3, Color(1, 1, 1, 0.35))
+			draw_circle(Vector2(star_x, star_base_y + 5), 2.8, Color(0, 0, 0, 0.5))
+			draw_circle(Vector2(star_x, star_base_y + 4), 2.8, p.accent)
+			draw_circle(Vector2(star_x, star_base_y + 3.5), 1.3, Color(1, 1, 1, 0.35))
 
 	# Name label below
 	# (Drawn by game_arena as a Label node for text rendering)

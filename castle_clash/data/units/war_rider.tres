@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="UnitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/unit_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"war_rider"
+display_name = "War Rider"
+faction = &"horde"
+max_hp = 380
+attack_damage = 28
+attack_speed_ticks = 12
+attack_range = 1
+aggro_range = 7
+move_speed = 5
+armor = 5
+magic_defense = 2
+bounty = 14
+skill_id = &"savage_charge"
+skill_param_1 = 250
+skill_param_2 = 25
+skill_id_2 = &"war_cry"
+skill_param_3 = 20
+skill_param_4 = 30
+attack_type = 0
+armor_type = 2
+role = 0

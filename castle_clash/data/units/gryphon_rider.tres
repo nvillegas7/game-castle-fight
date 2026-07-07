@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UnitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/unit_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"gryphon_rider"
+display_name = "Gryphon Rider"
+faction = &"kingdom"
+max_hp = 180
+attack_damage = 16
+attack_speed_ticks = 14
+attack_range = 3
+aggro_range = 8
+move_speed = 5
+armor = 1
+magic_defense = 1
+bounty = 10
+skill_id = &"dive_bomb"
+skill_param_1 = 200
+skill_param_2 = 30
+skill_id_2 = &"evasion"
+skill_param_3 = 20
+skill_param_4 = 0
+attack_type = 1
+armor_type = 0
+role = 3
+can_hit_air = true

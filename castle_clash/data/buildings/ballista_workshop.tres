@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_scripts/building_data.gd" id="1"]
+[ext_resource type="Resource" path="res://data/units/ballista_unit.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"ballista_workshop"
+display_name = "Ballista Workshop"
+faction = &"kingdom"
+gold_cost = 110
+sell_refund_percent = 50
+spawns_unit = ExtResource("2")
+units_per_wave = 1
+spawn_interval_ticks = 110
+tier = 2
+requires_building = &"siege_workshop"
+grid_size = Vector2i(2, 2)

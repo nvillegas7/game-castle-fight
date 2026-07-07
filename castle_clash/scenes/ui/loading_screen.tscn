@@ -1,0 +1,91 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/loading_screen.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/sprites/ui/logo.png" id="3"]
+
+[node name="LoadingScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Logo" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -110.0
+offset_top = 420.0
+offset_right = 110.0
+offset_bottom = 700.0
+grow_horizontal = 2
+texture = ExtResource("3")
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 720.0
+offset_right = 200.0
+offset_bottom = 780.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.35, 1)
+theme_override_colors/font_outline_color = Color(0.15, 0.08, 0.02, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 40
+text = "CASTLE FIGHT"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ProgressBarBg" type="ColorRect" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -180.0
+offset_top = 830.0
+offset_right = 180.0
+offset_bottom = 858.0
+grow_horizontal = 2
+color = Color(0.06, 0.04, 0.02, 0.85)
+
+[node name="ProgressTrack" type="ColorRect" parent="ProgressBarBg"]
+layout_mode = 0
+offset_left = 3.0
+offset_top = 3.0
+offset_right = 357.0
+offset_bottom = 25.0
+color = Color(0.15, 0.1, 0.06, 0.7)
+
+[node name="ProgressFill" type="ColorRect" parent="ProgressBarBg"]
+layout_mode = 0
+offset_left = 3.0
+offset_top = 3.0
+offset_right = 357.0
+offset_bottom = 25.0
+color = Color(0.9, 0.72, 0.12, 1)
+
+[node name="StatusLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 870.0
+offset_right = 200.0
+offset_bottom = 900.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.9, 0.85, 0.65, 0.85)
+theme_override_colors/font_outline_color = Color(0.1, 0.06, 0.02, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 16
+text = "Loading..."
+horizontal_alignment = 1
+vertical_alignment = 1

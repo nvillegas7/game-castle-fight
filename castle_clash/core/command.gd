@@ -6,6 +6,7 @@ enum Type {
 	PLACE_BUILDING,
 	SELL_BUILDING,
 	USE_ABILITY,
+	ACTIVATE_BUILDING,
 }
 
 
@@ -34,4 +35,12 @@ static func use_ability(player_id: int, ability_id: StringName, target_x: int, t
 		"ability_id": ability_id,
 		"target_x": target_x,
 		"target_y": target_y,
+	}
+
+
+static func activate_building(player_id: int, building_id: int) -> Dictionary:
+	return {
+		"type": Type.ACTIVATE_BUILDING,
+		"player_id": player_id,
+		"building_id": building_id,
 	}

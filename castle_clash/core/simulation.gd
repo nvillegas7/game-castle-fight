@@ -85,10 +85,16 @@ const TERRAIN_OBSTACLE_MARKER: int = -3  # T-074: non-entity static obstacle (tr
 # Arena pixel-space constants (portrait vertical march)
 # Player (team 0) builds at bottom, marches UP (decreasing Y)
 # Enemy (team 1) builds at top, marches DOWN (increasing Y)
+# T-096: team Y geometry is mirror-symmetric around FLIP_PIVOT_Y=520 (the T-085
+# perspective-flip midpoint). Castle centers and zone tops satisfy
+# value_team_0 + value_team_1 = 1040.
 const TEAM_0_SPAWN_Y: int = 695   # Top edge of player build zone
-const TEAM_1_SPAWN_Y: int = 345   # Bottom edge of enemy build zone
-const CASTLE_0_Y: int = 920       # Player castle (center=922, 55px from grass bottom)
-const CASTLE_1_Y: int = 70        # Enemy castle (top)
+const TEAM_1_ZONE_Y: int = 65     # Top edge of enemy build zone (symmetric mirror of team 0)
+const TEAM_1_SPAWN_Y: int = 345   # Bottom edge of enemy build zone (65 + 10 * 28)
+const CASTLE_0_Y: int = 920       # Player castle center (symmetric: 2*520 - CASTLE_1_Y)
+const CASTLE_1_Y: int = 120       # Enemy castle center (T-096: was 70; now 2*520 - CASTLE_0_Y)
+const CASTLE_FOOTPRINT_W: int = 5 # 5 cells wide (was full 9 between cols 1-9)
+const CASTLE_FOOTPRINT_H: int = 2 # 2 cells tall (was 3 rows with ±1 from center)
 const ARENA_LEFT: int = 60
 const ARENA_RIGHT: int = 660
 
@@ -146,9 +152,13 @@ func initialize(seed_value: int, player_data: Array, mode_config: Dictionary = {
 			"income": FP.from_int(base_income),
 		})
 
+	# T-089: castle HP 10000 → 5000 so a dominant army resolves the match in 1-2 minutes
+	# after reaching the castle instead of the previous 3+ minute grind.
+	# T-090: castle_wrath_available tracks whether the one-time panic button is still
+	# usable. Becomes ready when castle HP < 30%; consumed on first USE_ABILITY.
 	castles = [
-		{ "team": 0, "hp": FP.from_int(10000), "max_hp": FP.from_int(10000) },
-		{ "team": 1, "hp": FP.from_int(10000), "max_hp": FP.from_int(10000) },
+		{ "team": 0, "hp": FP.from_int(5000), "max_hp": FP.from_int(5000), "castle_wrath_available": true, "castle_wrath_ready_emitted": false },
+		{ "team": 1, "hp": FP.from_int(5000), "max_hp": FP.from_int(5000), "castle_wrath_available": true, "castle_wrath_ready_emitted": false },
 	]
 
 	# Add castles as targetable entities so units can chase and attack them
@@ -168,33 +178,33 @@ func initialize(seed_value: int, player_data: Array, mode_config: Dictionary = {
 			"max_hp": castle.max_hp,
 			"armor": FP.ZERO,
 			"armor_type": 3,  # Fortified
+			# T-096: grid_size lets _in_attack_range + _check_castle_damage use the same
+			# building-style edge-distance formula. Hitbox extends ±hw/±hh from (x, y).
+			"grid_size_x": CASTLE_FOOTPRINT_W,
+			"grid_size_y": CASTLE_FOOTPRINT_H,
 		}
 		entities.append(castle_entity)
 		castle["entity_id"] = castle_id
 
 	# Initialize unit occupancy grid (covers full arena)
 	_init_unit_grid()
-	# Mark castle rows as impassable. The wall must block the castle row
-	# AND rows BEHIND the castle (away from attackers), but NOT the row in
-	# FRONT of the castle — attackers need that row to reach melee attack range.
-	# - Castle 0 (team 0, bottom of arena, attackers come from above): mark
-	#   center row + 1 row behind (toward higher Y / off-screen south).
-	# - Castle 1 (team 1, top of arena, attackers come from below): mark
-	#   center row only (rows behind are off-grid at row -1, -2, ...).
-	# Y-clamp in _move_unit (lines ~1781-1784) provides defense in depth so
-	# units can never punch through the castle Y line even if they slip the wall.
+	# T-096: Castle occupies its 5×2 build-zone footprint only — flanking cells
+	# (cols 0-2, 8-10 on castle rows) are walkable. Attackers can approach from
+	# the side unless the defender places blocking buildings there.
+	# Convert build-zone footprint cells → unit_grid cells (they may span 2-3
+	# unit_grid rows per build-zone row due to zone offsets).
 	for castle in castles:
-		var castle_py: int = CASTLE_0_Y if castle.team == 0 else CASTLE_1_Y
-		var center_row: int = (castle_py - UNIT_GRID_Y_OFFSET) / CELL_SIZE_PX
-		var num_rows_behind: int = 1 if castle.team == 0 else 0  # team 1 castle is at row 0
-		for offset in range(0, num_rows_behind + 1):
-			# Behind = away from attackers. Team 0 attackers come from low Y, so
-			# "behind castle 1" = rows above (lower Y). Team 1 attackers come from
-			# high Y, so "behind castle 0" = rows below (higher Y).
-			var row: int = (center_row + offset) if castle.team == 0 else (center_row - offset)
-			if row >= 0 and row < UNIT_GRID_ROWS:
-				for col in GRID_COLS:
-					unit_grid[row * GRID_COLS + col] = [-2]
+		var fp: Array = _castle_grid_footprint(castle.team)
+		var zone_y: int = TEAM_0_SPAWN_Y if castle.team == 0 else TEAM_1_ZONE_Y
+		var py_top: int = zone_y + fp[0] * CELL_SIZE_PX
+		var py_bot: int = zone_y + (fp[1] + 1) * CELL_SIZE_PX
+		var u_row_top: int = (py_top - UNIT_GRID_Y_OFFSET) / CELL_SIZE_PX
+		var u_row_bot: int = (py_bot - UNIT_GRID_Y_OFFSET) / CELL_SIZE_PX
+		for u_row in range(u_row_top, u_row_bot + 1):
+			if u_row < 0 or u_row >= UNIT_GRID_ROWS:
+				continue
+			for u_col in range(fp[2], fp[3] + 1):
+				unit_grid[u_row * GRID_COLS + u_col] = [CASTLE_CELL_MARKER]
 
 	# Initialize grids and flow fields
 	grid_cells.clear()
@@ -329,6 +339,12 @@ func step(commands: Array) -> Dictionary:
 			var ce = _find_entity_by_id(castle_eid)
 			if ce:
 				ce.hp = castle.hp
+		# T-090: emit castle_wrath_ready once when HP crosses the 30% threshold.
+		if castle.get("castle_wrath_available", false) and not castle.get("castle_wrath_ready_emitted", false):
+			var wrath_threshold: int = FP.div(FP.mul(castle.max_hp, FP.from_int(CASTLE_WRATH_HP_THRESHOLD_PCT)), FP.from_int(100))
+			if FP.lt(castle.hp, wrath_threshold):
+				castle["castle_wrath_ready_emitted"] = true
+				events.append({"type": "castle_wrath_ready", "team": castle.team, "castle_id": castle_eid})
 
 	# 5. Check win condition (only first castle to fall wins)
 	if not match_over:
@@ -431,25 +447,6 @@ func compute_checksum() -> int:
 
 
 ## Detailed checksum breakdown for desync debugging — prints each component.
-func compute_checksum_debug() -> int:
-	var cs_tick: int = tick
-	var cs_castles: int = (castles[0].hp * 31) ^ (castles[1].hp * 37)
-	var cs_entities: int = 0
-	for entity in entities:
-		cs_entities = cs_entities ^ (entity.id * 41) ^ (entity.get("x", 0) * 43) ^ (entity.get("y", 0) * 47) ^ (entity.get("hp", 0) * 53)
-	var rng_state := rng.get_state()
-	var cs_rng: int = 0
-	for s in rng_state:
-		cs_rng = cs_rng ^ (s * 59)
-	var cs_grid: int = 0
-	for pi in grid_cells.size():
-		for row in grid_cells[pi]:
-			for cell in row:
-				cs_grid = cs_grid ^ (cell * 61)
-	var total: int = cs_tick ^ cs_castles ^ cs_entities ^ cs_rng ^ cs_grid
-	print("[CS-DETAIL] tick=%d castles=%d entities=%d rng=%d grid=%d total=%d rng_state=%s ent_count=%d" % [
-		cs_tick, cs_castles, cs_entities, cs_rng, cs_grid, total, str(rng_state), entities.size()])
-	return total
 
 
 # --- Helpers ---
@@ -487,6 +484,90 @@ func _process_command(cmd: Dictionary) -> Array[Dictionary]:
 			events.append_array(_handle_sell_building(cmd))
 		Command.Type.ACTIVATE_BUILDING:
 			events.append_array(_handle_activate_building(cmd))
+		Command.Type.USE_ABILITY:
+			events.append_array(_handle_use_ability(cmd))
+	return events
+
+
+# BUG-33: USE_ABILITY commands were silently dropped. Route to per-ability handlers.
+# T-090 adds castle_wrath as the first real ability.
+func _handle_use_ability(cmd: Dictionary) -> Array[Dictionary]:
+	var events: Array[Dictionary] = []
+	var ability_id: StringName = cmd.get("ability_id", &"")
+	match ability_id:
+		&"castle_wrath":
+			events.append_array(_handle_castle_wrath(cmd))
+		_:
+			push_warning("Unknown USE_ABILITY id: %s" % str(ability_id))
+	return events
+
+
+# T-090: Castle Wrath — one-time AoE when castle HP drops below 30%. 200 Magic damage to
+# all enemies within 5 cells (140px) of the activating team's castle.
+const CASTLE_WRATH_RANGE_PX: int = 140  # 5 cells × 28px
+const CASTLE_WRATH_DAMAGE: int = 200
+const CASTLE_WRATH_HP_THRESHOLD_PCT: int = 30  # triggers availability when HP < 30%
+
+func _handle_castle_wrath(cmd: Dictionary) -> Array[Dictionary]:
+	var events: Array[Dictionary] = []
+	var player_index := get_player_index(cmd.player_id)
+	if player_index == -1:
+		return events
+	var team: int = players[player_index].team
+	var castle: Dictionary = castles[team]
+	if not castle.get("castle_wrath_available", false):
+		events.append({"type": "castle_wrath_refused", "team": team, "reason": "already_used"})
+		return events  # already used or never became available
+	# Require HP < 30% at activation time (prevents pre-emptive use).
+	var hp_threshold: int = FP.div(FP.mul(castle.max_hp, FP.from_int(CASTLE_WRATH_HP_THRESHOLD_PCT)), FP.from_int(100))
+	if FP.gte(castle.hp, hp_threshold):
+		events.append({"type": "castle_wrath_refused", "team": team, "reason": "hp_above_threshold"})
+		return events
+
+	var castle_entity = _find_entity_by_id(castle.entity_id)
+	if castle_entity == null:
+		events.append({"type": "castle_wrath_refused", "team": team, "reason": "castle_missing"})
+		return events
+	# Consume only after every guard passed — a refused cast must not burn the charge.
+	castle["castle_wrath_available"] = false
+
+	var range_sq: int = FP.mul(FP.from_int(CASTLE_WRATH_RANGE_PX), FP.from_int(CASTLE_WRATH_RANGE_PX))
+	var wrath_dmg: int = FP.from_int(CASTLE_WRATH_DAMAGE)
+	# Measure to the castle EDGE with the exact formula _in_attack_range uses, so any
+	# unit close enough to attack the castle is inside the blast. The castle hitbox is
+	# grid_size_x=5 × grid_size_y=2 cells (hw=70px, hh=28px): a catapult legally sieges
+	# at 140px from the EDGE (168-210px from center), which the old center-to-center
+	# check missed entirely.
+	var hw: int = FP.from_int(castle_entity.get("grid_size_x", 2) * CELL_SIZE_PX / 2)
+	var hh: int = FP.from_int(castle_entity.get("grid_size_y", 2) * CELL_SIZE_PX / 2)
+	var hit_ids: Array = []
+	for other in entities:
+		if other.type != "unit" or other.team == team:
+			continue
+		if FP.lte(other.hp, FP.ZERO):
+			continue
+		var dx: int = FP.max_fp(FP.sub(FP.abs_fp(FP.sub(other.x, castle_entity.x)), hw), FP.ZERO)
+		var dy: int = FP.max_fp(FP.sub(FP.abs_fp(FP.sub(other.y, castle_entity.y)), hh), FP.ZERO)
+		var edge_dist_sq: int = FP.add(FP.mul(dx, dx), FP.mul(dy, dy))
+		if FP.gt(edge_dist_sq, range_sq):
+			continue
+		# Magic damage with per-target magic_defense reduction (WC3 formula).
+		var md: int = other.get("magic_defense", FP.ZERO)
+		var final: int = FP.div(wrath_dmg, FP.add(FP.ONE, FP.div(FP.mul(md, FP.from_int(6)), FP.from_int(100))))
+		final = FP.max_fp(final, FP.ONE)
+		other.hp = FP.sub(other.hp, final)
+		hit_ids.append(other.id)
+		events.append({"type": "unit_attacked", "attacker_id": castle.entity_id, "target_id": other.id, "damage": final, "target_hp": other.hp, "target_x": other.x, "target_y": other.y})
+
+	events.append({
+		"type": "castle_wrath_activated",
+		"team": team,
+		"castle_id": castle.entity_id,
+		"target_ids": hit_ids,
+		"center_x": castle_entity.x,
+		"center_y": castle_entity.y,
+		"range_px": CASTLE_WRATH_RANGE_PX,
+	})
 	return events
 
 
@@ -544,7 +625,7 @@ func _handle_place_building(cmd: Dictionary) -> Array[Dictionary]:
 	next_entity_id += 1
 
 	# Compute building center pixel position for targeting
-	var zone_y: int = 695 if player.team == 0 else 55
+	var zone_y: int = TEAM_0_SPAWN_Y if player.team == 0 else TEAM_1_ZONE_Y
 	var bld_center_x: int = GRID_ORIGIN_X + gx * CELL_SIZE_PX + (size_x * CELL_SIZE_PX) / 2
 	var bld_center_y: int = zone_y + gy * CELL_SIZE_PX + (size_y * CELL_SIZE_PX) / 2
 
@@ -646,7 +727,7 @@ func _handle_sell_building(cmd: Dictionary) -> Array[Dictionary]:
 	entities.remove_at(building_idx)
 	_rebuild_flow_field(player_index)
 
-	events.append({ "type": "building_destroyed", "entity_id": entity.id })
+	events.append({ "type": "building_destroyed", "entity_id": entity.id, "reason": "sold" })
 	events.append({
 		"type": "gold_changed",
 		"player_id": cmd.player_id,
@@ -671,7 +752,7 @@ func _update_towers() -> Array[Dictionary]:
 
 		# Tower pixel position in portrait (centered in grid footprint)
 		var tower_x: int = FP.from_int(GRID_ORIGIN_X + entity.grid_x * CELL_SIZE_PX + (entity.grid_size_x * CELL_SIZE_PX) / 2)
-		var zone_y: int = 695 if entity.team == 0 else 55  # Player zone bottom, enemy zone top
+		var zone_y: int = TEAM_0_SPAWN_Y if entity.team == 0 else TEAM_1_ZONE_Y  # Player zone top, enemy zone top
 		var tower_y: int = FP.from_int(zone_y + entity.grid_y * CELL_SIZE_PX + (entity.grid_size_y * CELL_SIZE_PX) / 2)
 
 		# Find nearest enemy unit in range
@@ -719,6 +800,8 @@ func _update_towers() -> Array[Dictionary]:
 				"target_id": best_id,
 				"damage": final_dmg,
 				"target_hp": best_target.hp,
+				"target_x": best_target.x,
+				"target_y": best_target.y,
 			})
 
 	return events
@@ -923,6 +1006,7 @@ func _spawn_from_building(building: Dictionary) -> Array[Dictionary]:
 			"attack_type": ud.attack_type,
 			"armor_type": ud.armor_type,
 			"role": ud.role,
+			"can_hit_air": ud.can_hit_air,
 			"bounty": ud.bounty,
 			"skill_id": ud.skill_id,
 			"skill_param_1": ud.skill_param_1,
@@ -936,6 +1020,7 @@ func _spawn_from_building(building: Dictionary) -> Array[Dictionary]:
 			"skill_2_stacks": 0,
 			"skill_2_active": false,
 			"mana_shield_hp": FP.from_int(ud.skill_param_3) if ud.skill_id_2 == &"mana_shield" else FP.ZERO,
+			"arcane_shield_hp": FP.from_int(ud.skill_param_3) if ud.skill_id_2 == &"arcane_shield" else FP.ZERO,
 			"x": FP.clamp_fp(FP.add(spawn_x, x_offset), FP.from_int(ARENA_LEFT), FP.from_int(ARENA_RIGHT)),
 			"y": spawn_y,
 			"prev_x": FP.clamp_fp(FP.add(spawn_x, x_offset), FP.from_int(ARENA_LEFT), FP.from_int(ARENA_RIGHT)),
@@ -1087,7 +1172,7 @@ func _update_units() -> Array[Dictionary]:
 			var dist_sq: int = FP.mul(dx, dx) + FP.mul(dy, dy)
 			if FP.lte(dist_sq, fz.radius_sq):
 				entity.hp = FP.sub(entity.hp, fz.damage)
-				events.append({"type": "unit_attacked", "attacker_id": -1, "target_id": entity.id, "damage": fz.damage, "target_hp": entity.hp})
+				events.append({"type": "unit_attacked", "attacker_id": -1, "target_id": entity.id, "damage": fz.damage, "target_hp": entity.hp, "target_x": entity.x, "target_y": entity.y})
 
 	# Snapshot positions before movement (for visual interpolation)
 	for entity in entities:
@@ -1371,7 +1456,7 @@ func _resolve_building_collisions() -> void:
 	var build_terrain_rects: Array = []
 	for pi in grid_cells.size():
 		var team: int = players[pi].team
-		var zone_y: int = TEAM_0_SPAWN_Y if team == 0 else 55
+		var zone_y: int = TEAM_0_SPAWN_Y if team == 0 else TEAM_1_ZONE_Y
 		for gy in GRID_ROWS:
 			for gx in GRID_COLS:
 				if grid_cells[pi][gy][gx] != TERRAIN_OBSTACLE_MARKER:
@@ -1494,13 +1579,16 @@ func _perk_bounty(base_bounty: int, killer_player_index: int) -> int:
 # --- Castle Grid Helpers ---
 
 ## Returns [row_min, row_max, col_min, col_max] for a team's castle grid footprint.
+## T-096: symmetric 5-wide × 2-tall footprint at the back of each team's build zone.
+## Team 0 castle occupies the last 2 rows (8-9); team 1 castle occupies the first 2 rows (0-1).
+## Both use the middle 5 columns (3-7), leaving cols 0-2 and 8-10 buildable on castle rows
+## for "flanking" defensive placement — per the "castle is a regular building" design.
 func _castle_grid_footprint(team: int) -> Array:
-	var castle_y: int = CASTLE_0_Y if team == 0 else CASTLE_1_Y
-	var zone_y: int = TEAM_0_SPAWN_Y if team == 0 else 55
-	var row_center: int = (castle_y - zone_y) / CELL_SIZE_PX
-	var row_min: int = maxi(0, row_center - 1)
-	var row_max: int = mini(GRID_ROWS - 1, row_center + 1)
-	return [row_min, row_max, 1, GRID_COLS - 2]
+	var col_min: int = (GRID_COLS - CASTLE_FOOTPRINT_W) / 2   # (11-5)/2 = 3
+	var col_max: int = col_min + CASTLE_FOOTPRINT_W - 1        # 3+4 = 7
+	if team == 0:
+		return [GRID_ROWS - CASTLE_FOOTPRINT_H, GRID_ROWS - 1, col_min, col_max]  # rows 8-9
+	return [0, CASTLE_FOOTPRINT_H - 1, col_min, col_max]                          # rows 0-1
 
 ## Returns the BFS goal row (row immediately in front of the castle).
 func _castle_front_row(team: int) -> int:
@@ -1567,7 +1655,7 @@ func _rebuild_flow_field(player_index: int) -> void:
 func _pixel_to_grid(x_fp: int, y_fp: int, target_team: int) -> Array:
 	var px: int = FP.to_int(x_fp)
 	var py: int = FP.to_int(y_fp)
-	var zone_y: int = 695 if target_team == 0 else 55
+	var zone_y: int = TEAM_0_SPAWN_Y if target_team == 0 else TEAM_1_ZONE_Y
 	var local_x: int = px - GRID_ORIGIN_X
 	var local_y: int = py - zone_y
 	if local_x < 0 or local_x >= GRID_COLS * CELL_SIZE_PX:
@@ -1865,14 +1953,11 @@ func _unstick_unit(unit: Dictionary) -> void:
 ## enemies/buildings they encounter along the way — then resume marching.
 ## Re-evaluates every tick so units respond to new threats immediately.
 func _acquire_target(unit: Dictionary) -> void:
-	# Nearest enemy entity. No range filter. No fallback logic.
-	# Castle, buildings, units — all treated equally. Nearest wins.
-	# Siege role: prefers buildings when available.
-	var is_siege: bool = unit.role == 4
+	# Nearest enemy entity. Castle, buildings, units — all treated equally.
+	# BUG-28: ground units without can_hit_air skip flying (role==3) enemies.
+	var can_hit_air: bool = unit.get("can_hit_air", false)
 	var best_id: int = -1
 	var best_dist: int = 0x7FFFFFFFFFFFFFF
-	var best_bldg_id: int = -1
-	var best_bldg_dist: int = 0x7FFFFFFFFFFFFFF
 
 	for other in entities:
 		if other.team == unit.team:
@@ -1881,17 +1966,14 @@ func _acquire_target(unit: Dictionary) -> void:
 			continue
 		if other.type != "unit" and other.type != "building" and other.type != "castle":
 			continue
+		if other.type == "unit" and other.get("role", 0) == 3 and not can_hit_air:
+			continue
 		var dist_sq: int = _distance_squared_2d(unit, other)
 		if dist_sq < best_dist:
 			best_dist = dist_sq
 			best_id = other.id
-		if is_siege and other.type == "building" and dist_sq < best_bldg_dist:
-			best_bldg_dist = dist_sq
-			best_bldg_id = other.id
 
-	if is_siege and best_bldg_id != -1:
-		unit.target_id = best_bldg_id
-	elif best_id != -1:
+	if best_id != -1:
 		unit.target_id = best_id
 
 
@@ -1909,7 +1991,7 @@ func _is_blocked_by_building(from_entity: Dictionary, to_entity: Dictionary) -> 
 	# If attacker is outside and target is inside build zone, check the column
 	var grid: Array = grid_cells[_get_player_index_for_team(check_team)]
 	# Simple vertical check: scan grid rows between from and to
-	var zone_y: int = 695 if check_team == 0 else 55
+	var zone_y: int = TEAM_0_SPAWN_Y if check_team == 0 else TEAM_1_ZONE_Y
 	var from_row: int = clampi((FP.to_int(from_entity.y) - zone_y) / CELL_SIZE_PX, 0, GRID_ROWS - 1)
 	var to_row: int = clampi((FP.to_int(to_entity.y) - zone_y) / CELL_SIZE_PX, 0, GRID_ROWS - 1)
 	var col: int = clampi((FP.to_int(to_entity.x) - GRID_ORIGIN_X) / CELL_SIZE_PX, 0, GRID_COLS - 1)
@@ -1956,13 +2038,10 @@ func _move_unit(unit: Dictionary) -> void:
 	var old_x: int = unit.x
 	var old_y: int = unit.y
 	_move_unit_inner(unit)  # Obstacle check is inside — unit won't enter trees/buildings
-	# Hard barrier: castle Y clamp
-	if unit.team == 0:
-		# Castle 1: midpoint between too-close (28px) and too-far (80px)
-		unit.y = FP.max_fp(unit.y, FP.from_int(CASTLE_1_Y + 40))
-	else:
-		# Castle 0: original clamp (was working correctly before)
-		unit.y = FP.min_fp(unit.y, FP.from_int(CASTLE_0_Y - CELL_SIZE_PX))
+	# T-096: Y-clamp removed. Castle is now a regular 5×2 building obstacle in the
+	# occupancy grid; units path around it via flow field and the occupancy check
+	# below (_can_enter_cell) prevents entering castle cells. Flanking cells (cols
+	# 0-2, 8-10 on castle rows) are walkable — intended defensive design.
 
 	# Occupancy grid capacity check
 	var new_x: int = unit.x
@@ -1989,22 +2068,13 @@ func _move_unit(unit: Dictionary) -> void:
 
 ## Check if a unit is within attack range of a target.
 ## Units: center-to-center 2D distance.
-## Buildings: center-to-EDGE distance (buildings are 2x2 cells, attack the nearest face).
-## Castle: Y-only distance (full-width wall).
+## Buildings + Castles: center-to-EDGE distance via grid_size_x/y (T-096 unified).
 func _in_attack_range(unit: Dictionary, target: Dictionary) -> bool:
 	var range_sq: int = FP.mul(unit.attack_range, unit.attack_range)
-	if target.type == "castle":
-		# Both castles use Y-edge distance (visual ~160px tall, half-height = 40px).
-		# BUG-PATH1 fix per A1's transfer note: castle attack range was asymmetric —
-		# castle 1 got the 40px hh expansion but castle 0 didn't, leaving team 1
-		# melee with effectively 0px of valid attack positioning (only y=892, the
-		# Y-clamp pixel). Now both castles are symmetric.
-		var y_dist: int = FP.abs_fp(FP.sub(unit.y, target.y))
-		var castle_hh: int = FP.from_int(40)
-		y_dist = FP.max_fp(FP.sub(y_dist, castle_hh), FP.ZERO)
-		return FP.lte(FP.mul(y_dist, y_dist), range_sq)
-	if target.type == "building":
-		# Distance to nearest edge of the building AABB, not center
+	if target.type == "building" or target.type == "castle":
+		# T-096: castle now carries grid_size_x=5, grid_size_y=2 so the same edge
+		# formula applies. This replaces the old Y-only 40px magic number that
+		# caused BUG-PATH1 asymmetries.
 		var hw: int = FP.from_int(target.get("grid_size_x", 2) * CELL_SIZE_PX / 2)
 		var hh: int = FP.from_int(target.get("grid_size_y", 2) * CELL_SIZE_PX / 2)
 		var dx: int = FP.max_fp(FP.sub(FP.abs_fp(FP.sub(unit.x, target.x)), hw), FP.ZERO)
@@ -2072,11 +2142,10 @@ func _move_unit_inner(unit: Dictionary) -> void:
 			unit.target_id = -1
 		elif _in_attack_range(unit, target):
 			return  # In range, don't move
-		elif target.type == "castle":
-			# Castle is a wall — march Y-only
-			move_dy = -speed if unit.team == 0 else speed
 		else:
-			# Direct chase toward target
+			# T-096: castles use the same chase logic as buildings — move X+Y toward
+			# the target. The edge-distance _in_attack_range with castle grid_size handles
+			# stopping when at the hitbox. Flanking attackers converge on the castle X.
 			var dx: int = target.x - unit.x
 			var dy: int = target.y - unit.y
 			var dist_sq: int = FP.add(FP.mul(dx, dx), FP.mul(dy, dy))
@@ -2207,6 +2276,19 @@ func _perform_attack(attacker: Dictionary, target: Dictionary) -> Array[Dictiona
 			target["mana_shield_hp"] = FP.ZERO
 			events.append({"type": "skill_proc", "unit_id": target.id, "skill": "mana_shield_break"})
 
+	# --- Arcane Shield (Mage second skill): absorb first N points of MAGIC damage, one-time ---
+	if attacker.attack_type == 2:
+		var arcane_hp: int = target.get("arcane_shield_hp", FP.ZERO)
+		if FP.gt(arcane_hp, FP.ZERO):
+			if FP.gte(arcane_hp, final_damage):
+				target["arcane_shield_hp"] = FP.sub(arcane_hp, final_damage)
+				final_damage = FP.ZERO
+				events.append({"type": "skill_proc", "unit_id": target.id, "skill": "arcane_shield"})
+			else:
+				final_damage = FP.sub(final_damage, arcane_hp)
+				target["arcane_shield_hp"] = FP.ZERO
+				events.append({"type": "skill_proc", "unit_id": target.id, "skill": "arcane_shield_break"})
+
 	target.hp = FP.sub(target.hp, final_damage)
 
 	events.append({
@@ -2215,6 +2297,10 @@ func _perform_attack(attacker: Dictionary, target: Dictionary) -> Array[Dictiona
 		"target_id": target.id,
 		"damage": final_damage,
 		"target_hp": target.hp,
+		# Position rides in the payload so the dispatcher never re-looks-up the
+		# target — a lethal hit removes the entity in _cleanup_dead the same step.
+		"target_x": target.x,
+		"target_y": target.y,
 	})
 
 	# --- On-kill skill: Blood Frenzy (attacker) ---
@@ -2239,7 +2325,26 @@ func _perform_attack(attacker: Dictionary, target: Dictionary) -> Array[Dictiona
 				continue
 			if FP.lte(_distance_squared_2d(target, other), splash_range_sq):
 				other.hp = FP.sub(other.hp, splash_dmg)
-				events.append({"type": "unit_attacked", "attacker_id": attacker.id, "target_id": other.id, "damage": splash_dmg, "target_hp": other.hp})
+				events.append({"type": "unit_attacked", "attacker_id": attacker.id, "target_id": other.id, "damage": splash_dmg, "target_hp": other.hp, "target_x": other.x, "target_y": other.y})
+
+	# --- On-hit skill: Fireball (attacker) ---
+	# Mage (T-084): param_1‰ splash to enemies within param_2 pixels of target. Magic-typed.
+	if attacker.get("skill_id", &"") == &"fireball":
+		var fb_range_sq: int = FP.mul(FP.from_int(attacker.skill_param_2), FP.from_int(attacker.skill_param_2))
+		var fb_dmg: int = FP.div(FP.mul(final_damage, FP.from_int(attacker.skill_param_1)), FP.from_int(1000))
+		fb_dmg = FP.max_fp(fb_dmg, FP.ONE)
+		var fb_hit_ids: Array = []
+		for other in entities:
+			if other.type != "unit" or other.team == attacker.team or other.id == target.id:
+				continue
+			if FP.lte(other.hp, FP.ZERO):
+				continue
+			if FP.lte(_distance_squared_2d(target, other), fb_range_sq):
+				other.hp = FP.sub(other.hp, fb_dmg)
+				fb_hit_ids.append(other.id)
+				events.append({"type": "unit_attacked", "attacker_id": attacker.id, "target_id": other.id, "damage": fb_dmg, "target_hp": other.hp, "target_x": other.x, "target_y": other.y})
+		if fb_hit_ids.size() > 0:
+			events.append({"type": "skill_proc", "unit_id": attacker.id, "skill": "fireball", "targets": fb_hit_ids, "center_x": target.x, "center_y": target.y})
 
 	# --- Cleave (legacy second skill): 30% splash to enemies near target ---
 	if attacker.get("skill_id_2", &"") == &"cleave":
@@ -2254,7 +2359,7 @@ func _perform_attack(attacker: Dictionary, target: Dictionary) -> Array[Dictiona
 				continue
 			if FP.lte(_distance_squared_2d(target, other), cleave_range_sq):
 				other.hp = FP.sub(other.hp, cleave_dmg)
-				events.append({"type": "unit_attacked", "attacker_id": attacker.id, "target_id": other.id, "damage": cleave_dmg, "target_hp": other.hp})
+				events.append({"type": "unit_attacked", "attacker_id": attacker.id, "target_id": other.id, "damage": cleave_dmg, "target_hp": other.hp, "target_x": other.x, "target_y": other.y})
 
 	# --- Lance Pierce (T-076): line attack from lancer through target. Damages every
 	# enemy in a narrow rectangle along the attacker→target direction, extending up to
@@ -2308,7 +2413,7 @@ func _perform_attack(attacker: Dictionary, target: Dictionary) -> Array[Dictiona
 				var hit_other: Dictionary = hit.entity
 				hit_other.hp = FP.sub(hit_other.hp, lp_dmg)
 				lp_target_ids.append(hit.id)
-				events.append({"type": "unit_attacked", "attacker_id": attacker.id, "target_id": hit.id, "damage": lp_dmg, "target_hp": hit_other.hp})
+				events.append({"type": "unit_attacked", "attacker_id": attacker.id, "target_id": hit.id, "damage": lp_dmg, "target_hp": hit_other.hp, "target_x": hit_other.x, "target_y": hit_other.y})
 			if lp_hits.size() > 0:
 				events.append({"type": "skill_proc", "unit_id": attacker.id, "skill": "lance_pierce", "targets": lp_target_ids})
 
@@ -2371,6 +2476,8 @@ func _try_heal(healer: Dictionary) -> Array[Dictionary]:
 		"target_id": best_id,
 		"amount": heal_amount,
 		"target_hp": best_entity.hp,
+		"target_x": best_entity.x,
+		"target_y": best_entity.y,
 	}]
 
 
@@ -2444,7 +2551,7 @@ func _check_attack_skills(entity: Dictionary) -> Array[Dictionary]:
 				continue
 			if FP.lte(_distance_squared_2d(entity, other), range_sq):
 				other.hp = FP.sub(other.hp, volley_dmg)
-				events.append({"type": "unit_attacked", "attacker_id": entity.id, "target_id": other.id, "damage": volley_dmg, "target_hp": other.hp})
+				events.append({"type": "unit_attacked", "attacker_id": entity.id, "target_id": other.id, "damage": volley_dmg, "target_hp": other.hp, "target_x": other.x, "target_y": other.y})
 				targets_hit += 1
 		if targets_hit > 0:
 			events.append({"type": "skill_proc", "unit_id": entity.id, "skill": "volley"})
@@ -2458,7 +2565,7 @@ func _check_attack_skills(entity: Dictionary) -> Array[Dictionary]:
 			if target and FP.gt(target.hp, FP.ZERO):
 				var bonus: int = FP.div(FP.mul(entity.attack_damage, FP.from_int(entity.skill_param_1)), FP.from_int(100))
 				target.hp = FP.sub(target.hp, bonus)
-				events.append({"type": "unit_attacked", "attacker_id": entity.id, "target_id": target.id, "damage": bonus, "target_hp": target.hp})
+				events.append({"type": "unit_attacked", "attacker_id": entity.id, "target_id": target.id, "damage": bonus, "target_hp": target.hp, "target_x": target.x, "target_y": target.y})
 				events.append({"type": "skill_proc", "unit_id": entity.id, "skill": "charge_hit"})
 
 	return events
@@ -2505,16 +2612,15 @@ func _check_castle_damage(unit: Dictionary) -> Array[Dictionary]:
 	if target == null:
 		return events
 
-	# Castle: use edge distance matching _in_attack_range exactly.
-	# BUG-PATH1 fix: this used to subtract 80 only for castle 1 — making it
-	# impossible for team 1 melee to deal castle damage (they'd transition to
-	# ATTACK state at y=853 per _in_attack_range, then this function would say
-	# "out of range" because y_dist=67 > 28 with no hh subtraction). Now both
-	# castles get the same 40px hh expansion, matching _in_attack_range.
-	var y_dist: int = FP.abs_fp(FP.sub(unit.y, target.y))
-	var castle_hh: int = FP.from_int(40)
-	y_dist = FP.max_fp(FP.sub(y_dist, castle_hh), FP.ZERO)
-	if not FP.lte(FP.mul(y_dist, y_dist), range_sq):
+	# T-096: castle uses the SAME edge-distance formula as buildings + _in_attack_range.
+	# grid_size_x=5, grid_size_y=2 → hw=70, hh=28. Range check now includes X too
+	# so flanking attackers hit the castle from the side when unblocked.
+	var hw: int = FP.from_int(target.get("grid_size_x", 2) * CELL_SIZE_PX / 2)
+	var hh: int = FP.from_int(target.get("grid_size_y", 2) * CELL_SIZE_PX / 2)
+	var dx: int = FP.max_fp(FP.sub(FP.abs_fp(FP.sub(unit.x, target.x)), hw), FP.ZERO)
+	var dy: int = FP.max_fp(FP.sub(FP.abs_fp(FP.sub(unit.y, target.y)), hh), FP.ZERO)
+	var edge_dist_sq: int = FP.add(FP.mul(dx, dx), FP.mul(dy, dy))
+	if not FP.lte(edge_dist_sq, range_sq):
 		return events
 	if unit.attack_cooldown > 0:
 		return events
@@ -2570,6 +2676,10 @@ func _cleanup_dead() -> Array[Dictionary]:
 				"team": entity.get("team", -1),
 				"x": entity.get("x", 0),
 				"y": entity.get("y", 0),
+				# Payload must be self-contained: the entity is removed below,
+				# BEFORE the dispatcher runs, so re-lookups always miss.
+				"bounty": entity.get("bounty", 0),
+				"reason": "killed",
 			})
 			# Kill bounty: award gold to the opposing team's players (Pillage perk: +50%)
 			if entity.type == "unit":

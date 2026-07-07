@@ -43,7 +43,7 @@ before the fix, or the passing criterion.
 |----|------|--------|-------|-----------------------|
 | 2.1 | Extract opponent AI → `arena_ai.gd` (ends game_arena.gd SHARED contention; balance suite then tests the REAL AI) | A5 | 2 | balance suite green against extracted AI |
 | 2.2 | Extract terrain/decoration builder → `arena_terrain.gd` (~670 one-shot lines) | A2 | 2 | pixel-identical autotest captures (golden diff) |
-| 2.3 | Shared style module `ui_style.gd` + project Theme resource with MorkDungeon.ttf defaults | A2 | 2 | highest-leverage visual change; theme applied |
+| 2.3 | ⏳ PARTIAL (602eb84): project Theme with NinjaNormal default font wired via gui/theme/custom — every screen now themed. TODO: MorkDungeon title-font variation for headings; shared `ui_style.gd` for StyleBoxes | A2 | 2 | highest-leverage visual change ✓ (font applied) |
 | 2.4 | Shared `scenic_background.gd` (delete the 250-line verbatim copy) | A2 | 2 | one source, both callers use it |
 | 2.5 | Sim read facade (O(1) get_entity, castle_ratio, player_gold) + `z_layers.gd` constants | A5/A1 | 2 | removes 80+ private reads / per-frame O(n²) scans |
 

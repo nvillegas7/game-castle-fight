@@ -719,7 +719,10 @@ func _sync_unit_positions() -> void:
 			)
 			var t: float = GameManager.tick_interpolation
 			# T-085: Transform sim coords → screen coords (Y-flip for Player 2)
-			visual.position = sim_to_screen(prev_pos.lerp(curr_pos, clampf(t, 0.0, 1.0)))
+			# T-059 fix: hold position during hit-stop so the impact reads as a
+			# freeze-then-snap, not a unit sliding through its own hit.
+			if not visual.is_in_hitstop():
+				visual.position = sim_to_screen(prev_pos.lerp(curr_pos, clampf(t, 0.0, 1.0)))
 
 			# Use simulation-authoritative movement flag
 			visual.set_moving(entity.get("is_moving", false))

@@ -96,6 +96,9 @@ func flash_hit() -> void:
 func trigger_hitstop() -> void:
 	_hitstop_timer = HITSTOP_DURATION
 
+func is_in_hitstop() -> bool:
+	return _hitstop_timer > 0.0
+
 
 # --- Process ---
 

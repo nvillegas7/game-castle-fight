@@ -173,6 +173,15 @@ func setup(sprite_frames: SpriteFrames, p_team: int, p_role: int, p_unit_type: S
 
 func trigger_hitstop() -> void:
 	_hitstop_timer = HITSTOP_DURATION
+	# T-059 fix: actually freeze the animation frame. Previously the timer was
+	# set but nothing paused the sprite, so hit-stop was a no-op. Position is
+	# frozen in parallel by game_arena._sync_unit_positions (is_in_hitstop guard).
+	if _has_sprites and _sprite:
+		_sprite.speed_scale = 0.0
+
+
+func is_in_hitstop() -> bool:
+	return _hitstop_timer > 0.0
 
 
 ## Play attack animation with timing contrast (slow wind-up, fast strike, medium recovery).
@@ -251,6 +260,11 @@ func set_walk_speed_ratio(ratio: float) -> void:
 	if is_equal_approx(_walk_speed_ratio, ratio):
 		return
 	_walk_speed_ratio = ratio
+	# Don't touch speed_scale during hit-stop — it's frozen at 0 and resumes to
+	# the stored ratio when the stop ends (else game_arena's per-frame call here
+	# would immediately un-freeze the sprite).
+	if _hitstop_timer > 0.0:
+		return
 	if _anim_state == 1 and _has_sprites and _sprite:
 		_sprite.speed_scale = _walk_speed_ratio
 
@@ -310,9 +324,12 @@ const _GROUND_STRIDE_PX: float = 35.0  # pixels traveled per sin cycle (~1 body 
 const _FLYING_STRIDE_PX: float = 60.0  # longer "glide" for flying bob
 
 func _process(delta: float) -> void:
-	# T-059: Hit-stop — freeze all animation updates
+	# T-059: Hit-stop — freeze all animation updates + the sprite frame.
 	if _hitstop_timer > 0:
 		_hitstop_timer -= delta
+		if _hitstop_timer <= 0.0 and _has_sprites and _sprite:
+			# Resume: walk cadence if walking, else normal speed.
+			_sprite.speed_scale = _walk_speed_ratio if _anim_state == 1 else 1.0
 		return  # Skip ALL animation updates — freeze in place
 
 	if _hit_flash > 0:

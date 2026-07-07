@@ -719,19 +719,19 @@ func _sync_unit_positions() -> void:
 			)
 			var t: float = GameManager.tick_interpolation
 			# T-085: Transform sim coords → screen coords (Y-flip for Player 2)
-			visual.position = sim_to_screen(prev_pos.lerp(curr_pos, clampf(t, 0.0, 1.0)))
+			# T-059 fix: hold position during hit-stop so the impact reads as a
+			# freeze-then-snap, not a unit sliding through its own hit.
+			if not visual.is_in_hitstop():
+				visual.position = sim_to_screen(prev_pos.lerp(curr_pos, clampf(t, 0.0, 1.0)))
 
 			# Use simulation-authoritative movement flag
 			visual.set_moving(entity.get("is_moving", false))
 
-			# BUG-40 round 2: feed walk cadence ratio so legs match ground travel.
-			# Baseline = footman at 2 cells/sec = 2 * 28 * 0.80 = 44.8 px/tick
-			# (the 0.80 is T-077's global speed penalty baked into spawn).
+			# BUG-40 fix: feed walk cadence ratio so legs match ground travel.
+			# move_speed is px/TICK (~4.48 for a footman); the old baseline 44.8 was
+			# px/SEC, so legs ran at ~10% speed (foot-skate). See walk_ratio_for_speed.
 			var curr_speed: float = FP.to_float(entity.get("move_speed", 0))
-			var walk_ratio: float = 1.0
-			if curr_speed > 0.0:
-				walk_ratio = curr_speed / 44.8
-			visual.set_walk_speed_ratio(walk_ratio)
+			visual.set_walk_speed_ratio(CombatTuning.walk_ratio_for_speed(curr_speed))
 
 			# Facing: face toward target X position
 			if entity.target_id != -1:

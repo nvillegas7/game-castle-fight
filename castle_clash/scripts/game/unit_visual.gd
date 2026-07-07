@@ -17,6 +17,7 @@ var _anim_timer: float = 0.0
 var _anim_duration: float = 0.0
 var _is_moving: bool = false
 var _walk_phase: float = 0.0
+var _walk_speed_ratio: float = 1.0
 
 # Timing
 var _time: float = 0.0
@@ -83,11 +84,20 @@ func set_moving(moving: bool) -> void:
 	elif _anim_state == AnimState.WALKING and not moving:
 		_anim_state = AnimState.IDLE
 
+## BUG-40: the sprite path had this; the procedural fallback did not, so
+## game_arena's per-frame call errored whenever a unit fell back to procedural
+## art. Scales the leg cycle so it matches ground travel like the sprite path.
+func set_walk_speed_ratio(ratio: float) -> void:
+	_walk_speed_ratio = maxf(ratio, 0.0)
+
 func flash_hit() -> void:
 	_hit_flash = 0.12
 
 func trigger_hitstop() -> void:
 	_hitstop_timer = HITSTOP_DURATION
+
+func is_in_hitstop() -> bool:
+	return _hitstop_timer > 0.0
 
 
 # --- Process ---
@@ -147,9 +157,9 @@ func _process(delta: float) -> void:
 			_anim_state = AnimState.WALKING if _is_moving else AnimState.IDLE
 			_anim_timer = 0.0
 
-	# Walk phase
+	# Walk phase — scaled by move-speed ratio so legs match ground travel.
 	if _anim_state == AnimState.WALKING:
-		_walk_phase += delta * 8.0
+		_walk_phase += delta * 8.0 * _walk_speed_ratio
 
 	# Compute attack offsets
 	_compute_attack_offsets()

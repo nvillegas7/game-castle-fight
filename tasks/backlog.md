@@ -13,11 +13,11 @@ before the fix, or the passing criterion.
 
 | ID | Item | Domain | Phase | Detector / Acceptance |
 |----|------|--------|-------|-----------------------|
-| 1A-1 | Canvas-transform-inverse for screen→grid in building_grid.gd (place :272, sell :352, radial :374) — pattern exists at :173 | A2 | 1A | RED zoom-input scenario: ghost+placement land on tapped cell at zoom≠1 |
-| 1A-2 | Dedup emulated-mouse vs touch (ignore DEVICE_ID_EMULATION mouse) — fixes tap-to-place on mobile | A2 | 1A | `emulated_mouse_dedup` scenario asserts single commit |
+| ~~1A-1~~ | ✅ DONE (2701d96) Canvas-transform-inverse for screen→grid — place under zoom fixed; place_building_zoomed 5/0 | A2 | 1A | — |
+| ~~1A-2~~ | ✅ DONE (fa508cb) Dedup emulated-mouse vs touch — mobile tap-to-place fixed; place_building_touch RED→GREEN + touch harness added | A2 | 1A | — |
 | 1A-3 | Hand-rolled two-finger pinch-zoom + pan from ScreenTouch/ScreenDrag; enable Android pan-and-scale | A2 | 1A | `pinch_zoom_pan` scenario asserts camera transform |
 | 1A-4 | Radial menu at true cell center; scale hit radius by zoom; kill double-fire path | A2 | 1A | `radial_menu_under_zoom` scenario (see BUG-34) |
-| 1A-5 | Reparent Blocked!/no-gold popup + info panel to UILayer; wheel-zoom event.pressed guard; zoom-to-cursor; ZOOM_MIN 1.0 | A2 | 1A | popup renders in screen space regardless of pan/zoom |
+| 1A-5 | ⏳ PARTIAL (6ea781f: wheel event.pressed guard + ZOOM_MIN 1.0 done). TODO: reparent Blocked!/info popup to UILayer; zoom-to-cursor; fix middle-drag pan (consumed by STOP ColorRect) | A2 | 1A | popup renders in screen space regardless of pan/zoom |
 | 1B-1 | Commit lockstep rework; build.sh → hashed deploy; verify served artifacts | A1 | 1B | live build no longer runs pre-fix current_tick+1 race |
 | 1B-2 | Surface lobby aborts (version_mismatch/config_timeout) in main_menu instead of hanging on "Starting…" | A2 | 1B | abort reason shown, no infinite spinner |
 | 1B-3 | Total command ordering: per-player seq number; sort (player_id, seq) | A1 | 1B | test_multiplayer.gd asserts deterministic apply order |

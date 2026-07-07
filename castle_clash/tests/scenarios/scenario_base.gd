@@ -328,6 +328,39 @@ func tap(vp_pos: Vector2) -> void:
 	await _pump()
 
 
+# --- Touch synthesis ---
+# A real touchscreen delivers, per finger, BOTH an InputEventScreenTouch AND an
+# emulated InputEventMouseButton (device = DEVICE_ID_EMULATION) because Godot's
+# emulate_mouse_from_touch is on. Faithful mobile repro must feed both.
+
+func _feed_touch(vp_pos: Vector2, index: int, pressed: bool) -> void:
+	var ev := InputEventScreenTouch.new()
+	ev.position = _input_xform * vp_pos
+	ev.index = index
+	ev.pressed = pressed
+	Input.parse_input_event(ev)
+
+
+func _feed_touch_drag(vp_pos: Vector2, index: int, rel_vp: Vector2) -> void:
+	var ev := InputEventScreenDrag.new()
+	ev.position = _input_xform * vp_pos
+	ev.index = index
+	ev.relative = _input_xform.basis_xform(rel_vp)
+	Input.parse_input_event(ev)
+
+
+## Single-finger tap via a ScreenTouch. Godot's emulate_mouse_from_touch (on by
+## default) auto-generates the emulated MouseButton twin during event flush —
+## exactly like a real device — so we feed ONLY the touch. Feeding an explicit
+## twin as well produced a duplicate that masked the very bug this reproduces.
+func tap_touch(vp_pos: Vector2, index: int = 0) -> void:
+	await _calibrate_input()
+	_feed_touch(vp_pos, index, true)
+	await _pump()
+	_feed_touch(vp_pos, index, false)
+	await _pump()
+
+
 ## Press-drag-release between two viewport positions over `duration` seconds.
 func drag(from_vp: Vector2, to_vp: Vector2, duration: float = 0.3,
 		button: MouseButton = MOUSE_BUTTON_LEFT) -> void:

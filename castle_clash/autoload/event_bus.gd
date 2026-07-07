@@ -27,6 +27,9 @@ signal unit_died(unit_id: int, killer_id: int, bounty: int, pos_x: float, pos_y:
 signal unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float)
 signal unit_healed(healer_id: int, target_id: int, amount: int, target_x: float, target_y: float)
 signal skill_activated(unit_id: int, skill_id: StringName)
+## Special-building active ability (War Horn rally_cry, Blood Totem blood_rage).
+## Fires for BOTH teams from the sim, so enemy activations are visible/audible.
+signal ability_activated(building_id: int, team: int, ability: String, duration: int)
 
 # -- Castle --
 signal castle_damaged(team: int, damage: int, remaining_hp: int, attacker_id: int)

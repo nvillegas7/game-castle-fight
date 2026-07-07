@@ -1809,7 +1809,39 @@ func _setup_terrain_decorations() -> void:
 		spr.modulate.a = rng.randf_range(0.35, 0.6)  # T-039: reduced from 0.5-0.8
 		deco_layer.add_child(spr)
 
-	# Trees removed from this map — no decorative or simulation trees rendered
+	# KR-style tree-line framing the battlefield down both far edges. Kept OUTSIDE
+	# the central build + combat lanes (x<95 and x>625) and at z=0 (behind units),
+	# so the readability reason trees were originally pulled is respected by
+	# FRAMING rather than filling — units still read clearly on top.
+	if not tree_sheets.is_empty():
+		for band in [Vector2(18, 92), Vector2(628, 702)]:  # (x_min, x_max) per edge
+			var ty: float = 70.0
+			while ty < 980.0:
+				var sheet: Texture2D = tree_sheets[rng.randi() % tree_sheets.size()]
+				var spr := Sprite2D.new()
+				# Tree frames are square (h×h); take frame 0 directly — the generic
+				# _extract_sprite_frame mis-detects Tree1/2 as 8 frames (they're 6).
+				var fh: int = int(sheet.get_height())
+				var at := AtlasTexture.new()
+				at.atlas = sheet
+				at.region = Rect2(0, 0, fh, fh)
+				spr.texture = at
+				spr.position = Vector2(rng.randf_range(band.x, band.y), ty)
+				spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				var s: float = rng.randf_range(0.40, 0.58)
+				spr.scale = Vector2(s, s)
+				# Root at the base so the trunk sits on the ground and sways from there.
+				var tsz: Vector2 = spr.texture.get_size() if spr.texture else Vector2(192, 192)
+				spr.offset = Vector2(0, -tsz.y * 0.5)
+				spr.modulate.a = rng.randf_range(0.85, 1.0)
+				deco_layer.add_child(spr)
+				var sway := spr.create_tween().set_loops()
+				var sdur: float = rng.randf_range(2.6, 3.8)
+				var samp: float = deg_to_rad(rng.randf_range(1.5, 3.0))
+				sway.tween_interval(rng.randf_range(0.0, sdur))
+				sway.tween_property(spr, "rotation", samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+				sway.tween_property(spr, "rotation", -samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+				ty += rng.randf_range(92.0, 132.0)
 
 	# Water rocks — scatter along both water edges (more density, bigger, varied).
 	# Each rock gets a gentle sine bob (±2.5px y, 3-5s period, staggered phase)

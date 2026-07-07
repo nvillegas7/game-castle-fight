@@ -53,7 +53,8 @@ before the fix, or the passing criterion.
 |----|------|--------|-------|-----------------------|
 | 3.1 | Re-enable buried features: tutorial (gate games_played==0), game-mode selector (Blitz/Mirror). Faction selection DEFERRED (Decision 2) | A2 | 3 | tutorial + mode selector reachable |
 | 3.2 | Battle tab: single CTA hierarchy (merge BATTLE ribbon + PLAY ONLINE), legible inactive tab labels, progression display restored | A2 | 3 | per-screen golden + layout assertions |
-| 3.3 | Battle-zone readability: lane markings through dead mid-band, gold elixir-bar fill + cheapest-card marker, locked cards→grayscale+padlock, wave preview strip | A2 | 3 | golden diff; no permanent red-card noise |
+| 3.3 | Battle-zone READABILITY (HUD): gold elixir-bar fill + cheapest-card marker, locked cards→grayscale+padlock, wave preview strip | A2 | 3 | golden diff; no permanent red-card noise |
+| 3.3b | **Battlefield terrain ART overhaul** (user-flagged, HIGH visible impact): replace the 3 flat tinted bands with a richly-composited arena — defined road/path down the lanes, textured/varied grass, trees + rocks + environmental detail along edges, matching the loading-screen's terrain quality. KR proves static+small-units works IF the terrain art carries it. Sequenced after 2.2 (extract arena_terrain.gd). | A2/A6 | 3 | side-by-side vs KR ref + loading screen; golden |
 | 3.4 | Mobile hardening: ability/wrath buttons ≥88px, safe-area insets on header/tab bar, tap-and-hold replaces hover | A2 | 3 | layout assertion: touch targets ≥88px |
 | 3.5 | End screen takeover: hide HUD/gold bar/card hand behind results; restore on replay | A2 | 3 | golden: results screen has no bleed-through |
 | 3.6 | Army tab: real unit sprites (not spawner buildings), tappable detail popup, de-spreadsheet rows | A2/A6 | 3 | golden + tap scenario |

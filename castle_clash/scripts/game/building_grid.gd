@@ -147,6 +147,14 @@ func _input(event: InputEvent) -> void:
 	if player_index != local_idx:
 		return
 
+	# T-097 fix: on touchscreens Godot's emulate_mouse_from_touch delivers BOTH a
+	# ScreenTouch and an emulated MouseButton for every finger. Both reaching this
+	# handler with different finger ids (mouse=-1, touch=0) tripped the multi-touch
+	# cancel guard below, so a single-finger tap-to-place never committed on mobile.
+	# Ignore the emulated twin here; cards/Controls still consume it via _gui_input.
+	if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return
+
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 		if selected_building != null:
 			deselect_building()

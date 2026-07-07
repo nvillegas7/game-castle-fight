@@ -114,6 +114,8 @@ func _ready() -> void:
 	# T-090 Castle Wrath — HUD button + shockwave VFX
 	EventBus.castle_wrath_ready.connect(_on_castle_wrath_ready)
 	EventBus.castle_wrath_activated.connect(_on_castle_wrath_activated)
+	# 1D-1: special-building ability activations (both teams) → ring + SFX
+	EventBus.ability_activated.connect(_on_ability_activated)
 	# CR-standard: handle mid-match disconnect and desync
 	EventBus.match_aborted.connect(_on_match_aborted)
 	EventBus.desync_detected.connect(_on_desync_detected)
@@ -904,28 +906,32 @@ func _update_ability_buttons() -> void:
 
 
 func _on_ability_pressed(building_id: int) -> void:
+	# Fire-and-forget. The ring + SFX are driven by the sim-confirmed
+	# ability_activated event below, so they play for BOTH players and only when
+	# the ability actually activates (not on a press the sim later rejects).
 	NetworkManager.send_command(Command.activate_building(GameManager.local_player_id, building_id))
+
+
+## Ring + SFX for a special-building activation (War Horn / Blood Totem). Driven
+## by EventBus.ability_activated so the ENEMY's activations are visible + audible
+## too — previously only the local player's press-time prediction showed anything.
+func _on_ability_activated(building_id: int, team: int, _ability: String, _duration: int) -> void:
 	SFX.play_skill()
-	# Expanding ring visual effect
-	var entity = null
-	for e in GameManager.simulation.entities:
-		if e.id == building_id:
-			entity = e
-			break
-	if entity:
-		var center := Vector2(FP.to_float(entity.x), FP.to_float(entity.y))
-		var ring_color := Color(0.3, 0.6, 1.0, 0.6) if entity.team == 0 else Color(1.0, 0.35, 0.3, 0.6)
-		var ring := Node2D.new()
-		ring.position = center
-		ring.z_index = 40
-		units_layer.add_child(ring)
-		ring.draw.connect(func():
-			ring.draw_arc(Vector2.ZERO, ring.scale.x * 30, 0, TAU, 32, ring_color, 3.0)
-		)
-		var tw := ring.create_tween()
-		tw.tween_property(ring, "scale", Vector2(8, 8), 0.6).set_ease(Tween.EASE_OUT)
-		tw.parallel().tween_property(ring, "modulate:a", 0.0, 0.6)
-		tw.tween_callback(ring.queue_free)
+	var visual = _building_visuals.get(building_id)
+	if visual == null:
+		return
+	var ring_color := Color(0.3, 0.6, 1.0, 0.6) if team == 0 else Color(1.0, 0.35, 0.3, 0.6)
+	var ring := Node2D.new()
+	ring.position = visual.position
+	ring.z_index = 40
+	units_layer.add_child(ring)
+	ring.draw.connect(func():
+		ring.draw_arc(Vector2.ZERO, ring.scale.x * 30, 0, TAU, 32, ring_color, 3.0)
+	)
+	var tw := ring.create_tween()
+	tw.tween_property(ring, "scale", Vector2(8, 8), 0.6).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(ring, "modulate:a", 0.0, 0.6)
+	tw.tween_callback(ring.queue_free)
 
 
 ## Advance ambient scenery — cloud parallax and water-foam alpha breathing.

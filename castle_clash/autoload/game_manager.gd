@@ -318,6 +318,11 @@ func _advance_simulation_tick() -> void:
 				EventBus.prep_phase_ended.emit()
 			"skill_proc":
 				EventBus.skill_activated.emit(event.unit_id, StringName(event.skill))
+			"ability_activated":
+				# Was silently dropped — no arm here — so War Horn / Blood Totem
+				# activations were invisible + inaudible (esp. the enemy's).
+				EventBus.ability_activated.emit(
+					event.building_id, event.team, event.ability, event.duration)
 			"match_over":
 				state = State.MATCH_OVER
 				set_process(false)

@@ -24,12 +24,12 @@ before the fix, or the passing criterion.
 | ~~1B-4~~ | ✅ DONE Freeze match on desync (GameManager._on_desync_detected → MATCH_OVER + set_process(false)) | A1 | 1B | — |
 | ~~1B-5~~ | ✅ DONE (453725a) order-sensitive checksum covering all mutable state + subchecksums + state dump. TODO(minor): dense checksum send in first 200 ticks | A1/A5 | 1B | — |
 | 1B-6 | ⏳ DEFERRED (dedicated task): extract LockstepPeer (RefCounted, injected transport+clock) → two-peer headless harness with FakeRelay + BUG-DESYNC1 stall-boundary scenario. Note: test_multiplayer `_test_two_sim_json_wire_lockstep` already covers 520-tick determinism + dup/out-of-order delivery; this adds staging/stall-timing coverage. Risky refactor of live net code — do carefully. | A1 | 1B | BUG-DESYNC1 scenario red on +1 staging, green on +2 |
-| 1C-1 | Walk-cadence divisor bug (game_arena.gd:729 px/sec vs px/tick) — units foot-skate at ~10% cadence | A2 | 1C | see BUG-40; per-cycle displacement ≈ 1 body width |
-| 1C-2 | Make hit-stop real (pause sprite + skip position sync during stop) or delete the claim | A2 | 1C | no position drift during hit-stop |
+| ~~1C-1~~ | ✅ DONE (a7efa38) Foot-skate fixed — CombatTuning.walk_ratio_for_speed (px/tick baseline 4.48, was px/sec 44.8). test_combat_feel 5/0 | A2 | 1C | — |
+| ~~1C-2~~ | ✅ DONE (d84d354) Hit-stop real — freeze sprite frame + hold position on impact (is_in_hitstop guard) | A2 | 1C | — |
 | 1C-3 | Impact timing: delay damage number/flash to strike frame (melee) / projectile arrival (ranged); arrow impact puff | A2 | 1C | damage number fires on impact frame |
 | 1C-4 | Dedupe attacker swing VFX on AoE multi-victim events | A2 | 1C | one swing VFX per attack, N hit VFX |
-| 1C-5 | Delete dead flow-field/LOS/aggro code paths; fix docs to match straight-line reality (Decision 3) | A5 | 1C | behavior audit still green; docs updated |
-| 1C-6 | Guard/stub set_walk_speed_ratio on procedural fallback (per-frame error spam) | A2 | 1C | no runtime errors on fallback unit |
+| ~~1C-5~~ | ✅ DONE Removed ~171 lines dead code (_separate_units, LOS helpers, combat_flow_fields, _cell_team_count, hysteresis). Kept aggro_range (in checksum) + flow_fields (tool reads it). Golden byte-identical → zero behavior change. | A5 | 1C | — |
+| ~~1C-6~~ | ✅ DONE (a7efa38) set_walk_speed_ratio added to procedural fallback — no more per-frame error | A2 | 1C | — |
 | 1D-1 | Route ability_activated sim event → EventBus → VFX/SFX (enemy War Horn/Blood Totem invisible+inaudible today) | A5→A2 | 1D | enemy ability produces VFX+SFX on both clients |
 | 1D-2 | Fireball splash uses event payload coords (kill live sim re-lookup) | A5/A2 | 1D | splash VFX at event-reported center |
 | 1D-3 | castle_wrath_refused → button shake/toast; ready-chime only for LOCAL player's castle | A2 | 1D | refusal feedback shown; chime not cross-fired |

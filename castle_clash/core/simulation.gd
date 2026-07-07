@@ -29,8 +29,12 @@ var total_damage: Array[int] = [0, 0]
 # Grid state -- one 2D array per player
 var grid_cells: Array = []
 
-# Flow field pathfinding -- one flat array per player grid (110 ints)
-# Each cell stores direction (0-7) toward castle, -2 = goal, -1 = blocked/unreachable
+# Build-zone flow field -- one flat array per player grid (110 ints).
+# Each cell stores direction (0-7) toward castle, -2 = goal, -1 = blocked/unreachable.
+# VESTIGIAL: unit movement is straight-line-to-nearest-enemy (see _move_unit_inner);
+# nothing reads this field to pick a direction. It is still rebuilt on placement/death
+# and retained only because tools/verify_terrain_obstacles.gd asserts on it. Remove
+# this field and _rebuild_flow_field together once that tool is dropped/updated.
 var flow_fields: Array = []
 
 # Combat zone grid: static obstacles (trees) that units path around
@@ -38,7 +42,6 @@ var flow_fields: Array = []
 const COMBAT_ROWS: int = 13
 const COMBAT_Y: int = 345  # Top of combat zone
 var combat_grid: Array = []  # 2D array [row][col], -1=open, 1=tree
-var combat_flow_fields: Array = []  # [team_0_field, team_1_field] — flat arrays of 11*13
 
 # Burning Ground fire zones: [{x, y, radius_sq, damage, ticks_remaining, team}]
 var fire_zones: Array[Dictionary] = []
@@ -56,7 +59,7 @@ const DIR_DY: Array[int] = [-1, -1, 0, 1, 1, 1, 0, -1]
 const STUCK_THRESHOLD: int = 15  # 1.5 seconds at 10 tps (was 3s, too slow)
 
 # Unit state machine constants
-const UNIT_STATE_MARCH: int = 0   # No target, following flow field toward castle
+const UNIT_STATE_MARCH: int = 0   # No target, marching straight toward enemy castle
 const UNIT_STATE_CHASE: int = 1   # Has target, moving toward it
 const UNIT_STATE_ATTACK: int = 2  # In range, attacking on cooldown
 
@@ -223,14 +226,14 @@ func initialize(seed_value: int, player_data: Array, mode_config: Dictionary = {
 		field.resize(GRID_COLS * GRID_ROWS)
 		field.fill(-1)
 		flow_fields.append(field)
-	# Mark castle cells as grid obstacles so flow field routes around them
+	# Mark castle cells as grid obstacles (used by placement validation / _would_block_path)
 	for i in players.size():
 		var team: int = players[i].team
 		var fp: Array = _castle_grid_footprint(team)
 		for row in range(fp[0], fp[1] + 1):
 			for col in range(fp[2], fp[3] + 1):
 				grid_cells[i][row][col] = CASTLE_CELL_MARKER
-	# Build initial flow fields (castle cells now marked as obstacles)
+	# Build initial (vestigial) flow fields — see flow_fields declaration note
 	for i in players.size():
 		_rebuild_flow_field(i)
 
@@ -241,19 +244,8 @@ func initialize(seed_value: int, player_data: Array, mode_config: Dictionary = {
 		grid_row.resize(GRID_COLS)
 		grid_row.fill(-1)
 		combat_grid.append(grid_row)
-	# Place trees: horizontal tree wall at rows 6-7 with 3 gaps (lane system)
-	# Row 3/9: minor clusters for variety
-	# Row 6-7: main tree wall — gaps at cols 0 (left edge), 4-5 (center), 10 (right edge)
-	# No trees on this map — open combat zone
-	var tree_positions := []
-	# Build combat zone flow fields (one per team march direction)
-	combat_flow_fields.clear()
-	for team in 2:
-		var field: Array = []
-		field.resize(GRID_COLS * COMBAT_ROWS)
-		field.fill(-1)
-		combat_flow_fields.append(field)
-	_rebuild_combat_flow_fields()
+	# No trees on this map — open combat zone. combat_grid stays all-open (-1);
+	# terrain obstacles can still be added at runtime via place_terrain_obstacle_combat.
 
 	# Build damage table as FP values
 	# [attack_type][armor_type]: Physical, Pierce, Magic, Siege vs Light, Medium, Heavy, Fortified
@@ -956,14 +948,13 @@ func remove_terrain_obstacle_build(player_index: int, gx: int, gy: int) -> bool:
 ## Place a terrain obstacle in the shared combat zone at combat-grid (gx, gy).
 ## Combat grid is 11 cols × 13 rows, spanning Y=345..709.
 ## Returns true on success, false if the cell is occupied or out of bounds.
-## Rebuilds the combat flow fields for both teams.
+## The obstacle blocks movement via _is_inside_obstacle / collision resolution.
 func place_terrain_obstacle_combat(gx: int, gy: int) -> bool:
 	if gx < 0 or gy < 0 or gx >= GRID_COLS or gy >= COMBAT_ROWS:
 		return false
 	if combat_grid[gy][gx] != -1:
 		return false
 	combat_grid[gy][gx] = TERRAIN_OBSTACLE_MARKER
-	_rebuild_combat_flow_fields()
 	return true
 
 
@@ -974,7 +965,6 @@ func remove_terrain_obstacle_combat(gx: int, gy: int) -> bool:
 	if combat_grid[gy][gx] != TERRAIN_OBSTACLE_MARKER:
 		return false
 	combat_grid[gy][gx] = -1
-	_rebuild_combat_flow_fields()
 	return true
 
 
@@ -1326,7 +1316,7 @@ func _update_units() -> Array[Dictionary]:
 		_update_stuck_detection(entity)
 
 	# Post-pass: push units out of building/tree bounding boxes
-	# Needed because flow field can slightly overshoot cell boundaries.
+	# Needed because straight-line movement can overshoot into an obstacle's box.
 	# Castle collision removed (handled by occupancy grid full-width wall).
 	_resolve_building_collisions()
 
@@ -1343,7 +1333,7 @@ func _update_units() -> Array[Dictionary]:
 
 # --- Unit State Machine ---
 
-## MARCH state: No target. Follow flow field toward enemy castle.
+## MARCH state: No target. March straight (Y-axis) toward enemy castle.
 func _state_march(unit: Dictionary) -> Array[Dictionary]:
 	var events: Array[Dictionary] = []
 	unit["is_moving"] = true
@@ -1513,41 +1503,6 @@ func _update_stuck_detection(unit: Dictionary) -> void:
 		unit["unstick_count"] = 0  # Reset on real progress
 
 
-## Push overlapping same-team units apart so they spread visually.
-## All units participate (including attackers) but with gentle force
-## so melee units fan out around targets instead of stacking into blobs.
-func _separate_units() -> void:
-	var sep_dist: int = FP.from_int(16)  # Minimum pixels between same-team units
-	var sep_dist_sq: int = FP.mul(sep_dist, sep_dist)
-	var push_force: int = FP.ONE  # 1 pixel per tick (gentle, won't shove out of attack range)
-
-	# Only check nearby MOVING units — attacking units plant their feet (Clash Royale model)
-	var units: Array = []
-	for e in entities:
-		if e.type == "unit" and FP.gt(e.hp, FP.ZERO) and e.get("is_moving", true):
-			units.append(e)
-
-	for i in units.size():
-		var a: Dictionary = units[i]
-		for j in range(i + 1, units.size()):
-			var b: Dictionary = units[j]
-			if a.team != b.team:
-				continue
-			var dx: int = a.x - b.x
-			var dy: int = a.y - b.y
-			var dist_sq: int = FP.mul(dx, dx) + FP.mul(dy, dy)
-			if dist_sq > 0 and FP.lt(dist_sq, sep_dist_sq):
-				# Push apart along the delta vector
-				var dist: int = FP.sqrt_fp(dist_sq)
-				if dist > 0:
-					var push_x: int = FP.div(FP.mul(dx, push_force), dist)
-					var push_y: int = FP.div(FP.mul(dy, push_force), dist)
-					a.x = FP.add(a.x, push_x)
-					a.y = FP.add(a.y, push_y)
-					b.x = FP.sub(b.x, push_x)
-					b.y = FP.sub(b.y, push_y)
-
-
 ## Push units out of building bounding boxes so they path around buildings.
 func _resolve_building_collisions() -> void:
 	# Collect all living buildings with their bounding rects
@@ -1708,7 +1663,11 @@ func _castle_front_row(team: int) -> int:
 		return mini(GRID_ROWS - 1, fp[1] + 1)  # Row below castle bottom (team 1: row 2)
 
 
-# --- Flow Field Pathfinding ---
+# --- Build-Zone Flow Field (vestigial) ---
+# NOTE: this BFS field is NOT consulted by unit movement — units move
+# straight-line toward their nearest-enemy target (_move_unit_inner). The field is
+# kept only because tools/verify_terrain_obstacles.gd asserts on flow_fields[]. It
+# can be deleted along with the flow_fields var once that tool is dropped/updated.
 
 ## Rebuild the flow field for a player's grid via BFS from castle front row.
 func _rebuild_flow_field(player_index: int) -> void:
@@ -1774,14 +1733,6 @@ func _pixel_to_grid(x_fp: int, y_fp: int, target_team: int) -> Array:
 	return [local_y / CELL_SIZE_PX, local_x / CELL_SIZE_PX]
 
 
-## Get player_index that owns a given team's grid.
-func _get_player_index_for_team(team: int) -> int:
-	for i in players.size():
-		if players[i].team == team:
-			return i
-	return 0
-
-
 ## Convert pixel position to combat zone grid [row, col]. Returns [-1,-1] if outside.
 func _pixel_to_combat_grid(x_fp: int, y_fp: int) -> Array:
 	var px: int = FP.to_int(x_fp)
@@ -1793,23 +1744,6 @@ func _pixel_to_combat_grid(x_fp: int, y_fp: int) -> Array:
 	if local_y < 0 or local_y >= COMBAT_ROWS * CELL_SIZE_PX:
 		return [-1, -1]
 	return [local_y / CELL_SIZE_PX, local_x / CELL_SIZE_PX]
-
-
-## Combat grid with 1-cell hysteresis at boundaries to prevent oscillation.
-## Units within 1 cell of the combat zone edge are treated as inside the zone.
-func _pixel_to_combat_grid_hysteresis(x_fp: int, y_fp: int) -> Array:
-	var px: int = FP.to_int(x_fp)
-	var py: int = FP.to_int(y_fp)
-	var local_x: int = px - GRID_ORIGIN_X
-	var local_y: int = py - COMBAT_Y
-	if local_x < 0 or local_x >= GRID_COLS * CELL_SIZE_PX:
-		return [-1, -1]
-	# Extend combat zone by 1 cell on each side for movement checks
-	if local_y < -CELL_SIZE_PX or local_y >= COMBAT_ROWS * CELL_SIZE_PX + CELL_SIZE_PX:
-		return [-1, -1]
-	var row: int = clampi(local_y / CELL_SIZE_PX, 0, COMBAT_ROWS - 1)
-	var col: int = local_x / CELL_SIZE_PX
-	return [row, col]
 
 
 # --- Unit Occupancy Grid ---
@@ -1877,19 +1811,6 @@ func _can_enter_cell(col: int, row: int, team: int) -> bool:
 	return same_team_count < CELL_CAPACITY
 
 
-## Count same-team units in a cell (for flow field weighting).
-func _cell_team_count(col: int, row: int, team: int) -> int:
-	if row < 0 or row >= UNIT_GRID_ROWS or col < 0 or col >= GRID_COLS:
-		return 0
-	var idx: int = row * GRID_COLS + col
-	var count: int = 0
-	for uid in unit_grid[idx]:
-		var u = _find_entity_by_id(uid)
-		if u != null and u.team == team:
-			count += 1
-	return count
-
-
 ## Initialize the unit occupancy grid. Call during initialize().
 func _init_unit_grid() -> void:
 	unit_grid.clear()
@@ -1898,49 +1819,6 @@ func _init_unit_grid() -> void:
 		unit_grid[i] = []
 
 
-## Build flow fields for combat zone (one per team march direction).
-## Team 0 marches UP (goal = row 0 = top of combat zone)
-## Team 1 marches DOWN (goal = row COMBAT_ROWS-1 = bottom of combat zone)
-func _rebuild_combat_flow_fields() -> void:
-	for team in 2:
-		var field: Array = combat_flow_fields[team]
-		for i in field.size():
-			field[i] = -1
-		var goal_row: int = 0 if team == 0 else COMBAT_ROWS - 1
-		var queue: Array = []
-		for col in GRID_COLS:
-			if combat_grid[goal_row][col] == -1:
-				var idx: int = goal_row * GRID_COLS + col
-				field[idx] = -2
-				queue.append(idx)
-		var head: int = 0
-		while head < queue.size():
-			var current: int = queue[head]
-			head += 1
-			var cur_row: int = current / GRID_COLS
-			var cur_col: int = current % GRID_COLS
-			for dir in 8:
-				var nr: int = cur_row + DIR_DY[dir]
-				var nc: int = cur_col + DIR_DX[dir]
-				if nr < 0 or nr >= COMBAT_ROWS or nc < 0 or nc >= GRID_COLS:
-					continue
-				var n_idx: int = nr * GRID_COLS + nc
-				if field[n_idx] != -1:
-					continue
-				if combat_grid[nr][nc] != -1:
-					continue
-				if DIR_DX[dir] != 0 and DIR_DY[dir] != 0:
-					if combat_grid[cur_row + DIR_DY[dir]][cur_col] != -1:
-						continue
-					if combat_grid[cur_row][cur_col + DIR_DX[dir]] != -1:
-						continue
-				field[n_idx] = (dir + 4) % 8
-				queue.append(n_idx)
-		combat_flow_fields[team] = field
-
-
-## Occupancy-weighted combat flow field rebuild (Dijkstra-style multi-pass BFS).
-## Cells with more units cost more, causing units to naturally distribute across gaps.
 ## Get list of tree obstacle positions as pixel-space rects (for collision).
 func get_combat_tree_rects() -> Array:
 	var rects: Array = []
@@ -2012,7 +1890,7 @@ func _would_block_path(player_index: int, gx: int, gy: int, sx: int, sy: int) ->
 	return true  # No path — would block
 
 
-## Teleport a stuck unit to the nearest reachable flow field cell.
+## Teleport a stuck unit to the nearest reachable occupancy-grid cell.
 ## Wall-safe unstick: scan 8 neighbor cells, pick the passable one closest to enemy castle.
 ## Guaranteed not to teleport through walls (only moves 1 cell).
 func _unstick_unit(unit: Dictionary) -> void:
@@ -2086,56 +1964,7 @@ func _acquire_target(unit: Dictionary) -> void:
 		unit.target_id = best_id
 
 
-## Check if a building blocks line of sight between two entities.
-## Simple check: if both are in/near the same build zone, check if any building
-## occupies a grid cell between them on the Y axis.
-func _is_blocked_by_building(from_entity: Dictionary, to_entity: Dictionary) -> bool:
-	# Only check in build zones where buildings exist
-	var check_team: int = to_entity.team  # Check the target's team's build zone
-	var from_grid: Array = _pixel_to_grid(from_entity.x, from_entity.y, check_team)
-	var to_grid: Array = _pixel_to_grid(to_entity.x, to_entity.y, check_team)
-	# If neither is in the build zone, no buildings to block
-	if from_grid[0] == -1 and to_grid[0] == -1:
-		return false
-	# If attacker is outside and target is inside build zone, check the column
-	var grid: Array = grid_cells[_get_player_index_for_team(check_team)]
-	# Simple vertical check: scan grid rows between from and to
-	var zone_y: int = TEAM_0_SPAWN_Y if check_team == 0 else TEAM_1_ZONE_Y
-	var from_row: int = clampi((FP.to_int(from_entity.y) - zone_y) / CELL_SIZE_PX, 0, GRID_ROWS - 1)
-	var to_row: int = clampi((FP.to_int(to_entity.y) - zone_y) / CELL_SIZE_PX, 0, GRID_ROWS - 1)
-	var col: int = clampi((FP.to_int(to_entity.x) - GRID_ORIGIN_X) / CELL_SIZE_PX, 0, GRID_COLS - 1)
-	var min_row: int = mini(from_row, to_row)
-	var max_row: int = maxi(from_row, to_row)
-	for row in range(min_row, max_row + 1):
-		if grid[row][col] != -1:
-			return true  # Building blocks the path
-	return false
-
-
-## Check if combat zone trees block LOS between two entities.
-func _is_blocked_by_tree(from_entity: Dictionary, to_entity: Dictionary) -> bool:
-	var from_cg: Array = _pixel_to_combat_grid(from_entity.x, from_entity.y)
-	var to_cg: Array = _pixel_to_combat_grid(to_entity.x, to_entity.y)
-	# Both must be in or near combat zone
-	if from_cg[0] == -1 and to_cg[0] == -1:
-		return false
-	# Scan combat grid rows between from and to for tree obstacles in both columns
-	var from_row: int = clampi((FP.to_int(from_entity.y) - COMBAT_Y) / CELL_SIZE_PX, 0, COMBAT_ROWS - 1)
-	var to_row: int = clampi((FP.to_int(to_entity.y) - COMBAT_Y) / CELL_SIZE_PX, 0, COMBAT_ROWS - 1)
-	var from_col: int = clampi((FP.to_int(from_entity.x) - GRID_ORIGIN_X) / CELL_SIZE_PX, 0, GRID_COLS - 1)
-	var to_col: int = clampi((FP.to_int(to_entity.x) - GRID_ORIGIN_X) / CELL_SIZE_PX, 0, GRID_COLS - 1)
-	var min_row: int = mini(from_row, to_row)
-	var max_row: int = maxi(from_row, to_row)
-	for row in range(min_row, max_row + 1):
-		if row >= 0 and row < COMBAT_ROWS:
-			if combat_grid[row][from_col] != -1:
-				return true
-			if from_col != to_col and combat_grid[row][to_col] != -1:
-				return true
-	return false
-
-
-## Full 2D distance squared (for aggro detection and combat range).
+## Full 2D distance squared (for combat range checks).
 func _distance_squared_2d(a: Dictionary, b: Dictionary) -> int:
 	var dx: int = a.x - b.x
 	var dy: int = a.y - b.y
@@ -2148,9 +1977,9 @@ func _move_unit(unit: Dictionary) -> void:
 	var old_y: int = unit.y
 	_move_unit_inner(unit)  # Obstacle check is inside — unit won't enter trees/buildings
 	# T-096: Y-clamp removed. Castle is now a regular 5×2 building obstacle in the
-	# occupancy grid; units path around it via flow field and the occupancy check
-	# below (_can_enter_cell) prevents entering castle cells. Flanking cells (cols
-	# 0-2, 8-10 on castle rows) are walkable — intended defensive design.
+	# occupancy grid; the occupancy check below (_can_enter_cell) prevents entering
+	# castle cells. Flanking cells (cols 0-2, 8-10 on castle rows) are walkable —
+	# intended defensive design.
 
 	# Occupancy grid capacity check
 	var new_x: int = unit.x

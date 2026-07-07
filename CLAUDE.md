@@ -233,11 +233,11 @@ Note: `test_audio_visual.gd` / `test_tutorial_visual.gd` are windowed autoload f
 
 **Architecture you built/own**:
 1. **Unit Occupancy Grid** — 11×34 cell grid, capacity 2 units/cell, register/unregister on spawn/death/move
-2. **Explicit State Machine** — MARCH/CHASE/ATTACK/SIEGE states (replaced 270-line implicit if/else)
+2. **Explicit State Machine** — MARCH/CHASE/ATTACK states (SIEGE removed; castle is a normal nearest-target obstacle)
 3. **Committed Targeting** — Sticky lock-on (keep target until death), enemy-half castle fallback
 4. **Castle Wall** — Castle rows blocked full-width in occupancy grid (3 rows)
 5. **Preventive Collision** — Pre-move occupancy check with Y-only/X-only fallbacks, wall-safe unstick
-6. **Weighted Flow Field** — Dijkstra-style BFS (empty=1, occupied=3, full=6), rebuilds every 10 ticks
+6. **Movement is straight-line-to-nearest-enemy** — the old "weighted flow field" was never wired into movement decisions and its dead code was removed 2026-07-07 (1C-5). A vestigial build-zone `flow_fields` BFS remains only because a terrain test tool reads it.
 7. **Combat zone trees** — Horizontal tree wall at rows 6-7 with 3 gaps (lane system)
 8. **WC3 armor formula** — `damage / (1 + armor * 0.06)`, 4×4 damage type matrix
 

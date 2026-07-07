@@ -60,16 +60,23 @@
 - When a conversation is getting long (many tool calls, large outputs), proactively checkpoint findings to memory
 - Before reading large files or running expensive operations, save current state first
 
-## Multi-Agent Team Protocol (7 Agents)
+## Multi-Agent Team Protocol (7 Agents) — SUPERSEDED 2026-07-07
 
-### New Agent Onboarding (READ THIS IF THE USER TOLD YOU YOUR ROLE ID)
+> **This 7-agent cron-polling model is RETIRED. See `tasks/PROCESS.md` for the
+> current operating model: one orchestrator session + ephemeral scoped
+> subagents.** Do NOT start a `/loop`, do NOT "onboard as an agent", do NOT read
+> `tasks/dispatch.md` as a live task queue (it is archived under
+> `tasks/archive/`). The live task list is `tasks/backlog.md`.
+>
+> The role/ownership tables below are RETAINED, but reinterpreted as **subagent
+> scoping** — i.e. which domain owns which files when the orchestrator fans out
+> parallel fix agents (A1=infra/net, A2=UI, A3=audio, A4=tests, A5=sim/data,
+> A6=sprites). They are reference for the File Ownership Map, not a roster of
+> separate Claude instances to spawn or a `/loop` to run.
 
-When the user tells you "you are A[n]", do these 4 things:
+### (Historical) New Agent Onboarding — DO NOT FOLLOW; see tasks/PROCESS.md
 
-1. Read this CLAUDE.md (you're doing it now) — find your role-specific section below
-2. Read `tasks/dispatch.md` — find tasks with Owner-agent = your ID, follow the pickup protocol
-3. Read `tasks/lessons.md` — avoid repeating past mistakes
-4. **Start your autonomous loop** — after onboarding and completing any immediate work, invoke the `/loop` skill with your role's interval and prompt from the table below:
+The steps below described the retired model and are kept only for context:
 
 | Role | Command |
 |------|---------|
@@ -185,17 +192,22 @@ Then find your role below for full context:
 
 **Test suites** (in `tests/`):
 
+**The gate**: `bash tests/run_all.sh` (see `tasks/PROCESS.md`). `SKIP_VISUAL=1` = L0 headless only (<1 min); no env = L0 + L1 visual; `RUN_NIGHTLY=1` adds L3. Facts corrected 2026-07-07 (the table below had drifted):
+
 | Test | Command | What It Does | Runtime |
 |------|---------|-------------|---------|
-| **Headless simulation** | `godot --headless -s tests/test_simulation.gd` | 239+ deterministic tests: FP math, sprites, combat, income, targeting, buildings | ~2 seconds |
-| **Video test** | `godot --path castle_clash -- --autotest` | 60s AI-vs-AI gameplay, captures 30 screenshots + game state JSON | ~60 seconds |
-| **Behavior audit** | `godot --headless -s tests/test_behavior_audit.gd` | Analyzes unit movement: zigzags, stuck units, targeting consistency | ~5 seconds |
-| **Balance test** | `godot --headless -s tests/test_balance.gd` | Runs 100 AI-vs-AI matches, reports faction win rates | ~30 seconds |
-| **Audio-visual test** | `godot --headless -s tests/test_audio_visual.gd` | Checks audio file loading, sprite loading | ~2 seconds |
-| **Tutorial test** | `godot --headless -s tests/test_tutorial_visual.gd` | Verifies tutorial flow | ~5 seconds |
-| **Unit showcase** | `godot --headless -s tests/test_unit_showcase.gd` | Individual unit behavior check | ~5 seconds |
+| **Headless simulation** | `godot --headless -s tests/test_simulation.gd` | 395 deterministic asserts: FP math, sprites, combat, income, targeting, buildings | ~2 s |
+| **Determinism lint** | `godot --headless -s tests/test_banned_api.gd` | Hard-fails on RNG/clock/node/transcendental leaks in the sim core; float ratchet | ~1 s |
+| **Replay determinism** | `godot --headless -s tests/test_replay_determinism.gd` | Re-run identity + golden trace over a fixed-seed match (`-- --rebless` to re-pin) | ~10 s |
+| **Behavior audit** | `godot --headless -s tests/test_behavior_audit.gd` | Unit movement: zigzags, stuck units, targeting consistency (24 asserts) | ~2 s |
+| **Multiplayer** | `godot --headless -s tests/test_multiplayer.gd` | Checksum divergence/identity + MATCH_CONFIG wire round-trip (123 asserts) | ~2 s |
+| **Balance test** | `godot --headless -s tests/test_balance.gd` | 100 AI-vs-AI matches, faction win rates | **~176 s** (was mislabeled ~30 s) |
+| **Screen layout (L1)** | `godot --headless -s tests/test_screen_layout.gd` | Pixel detectors — needs a fresh capture (`tests/capture.sh`) or it FAILS, not passes | ~1 s |
+| **Capture pipeline** | `bash tests/capture.sh` | Windowed --autotest → 20 PNGs + manifest in `test_output/autotest/`, retries once | ~60–90 s |
 
-**QA workflow**: Read dispatch.md → process QA_REVIEW items → run relevant tests → set DONE or QA_FAIL with notes → file bugs in `tasks/qa-bug-tracker.md`.
+Note: `test_audio_visual.gd` / `test_tutorial_visual.gd` are windowed autoload flag tests (`godot --path castle_clash -- --audiotest` / `--tutorialtest`), NOT `--headless -s` scripts. Captures live in `test_output/` (gitignored), not `/tmp`.
+
+**QA workflow**: pick from `tasks/backlog.md` → write the failing test/detector first → fix → run the gate → one evidence-citing commit → update backlog. Bugs in `tasks/qa-bug-tracker.md`.
 
 **Key rule** (from lessons): Don't flag test-scenario artifacts as bugs. Verify in actual game context first. Always run test BEFORE a change for baseline, then after to confirm improvement.
 
@@ -255,14 +267,13 @@ Then find your role below for full context:
 
 **Memory to read**: `memory/feedback_sprite_compositing.md` (layer order, sizing, positioning rules)
 
-### Session Boot Sequence (ALL AGENTS MUST FOLLOW)
-1. **Read `tasks/dispatch.md`** completely — this is the single source of truth for all work
-2. Read `tasks/lessons.md` for relevant project lessons
-3. Follow the **Agent Pickup Protocol** in dispatch.md (check QA_FAIL → IN_PROGRESS → claim READY)
-4. If no tasks available, check `tasks/qa-bug-tracker.md` for self-directed work
-5. **Before modifying ANY file**, verify you own it in the File Ownership Map below
-6. When done with a task, set status to QA_REVIEW in dispatch.md
-7. Before ending session, update Agent Registry status to IDLE
+### Session Boot Sequence — SUPERSEDED, see `tasks/PROCESS.md`
+The dispatch.md/QA_REVIEW/Agent-Registry workflow below is retired. Current boot:
+1. Read `tasks/PROCESS.md` (operating model + gate) and `tasks/lessons.md`.
+2. Live task list is `tasks/backlog.md`; open bugs in `tasks/qa-bug-tracker.md`.
+3. Use the File Ownership Map below as **subagent scoping** (which domain owns which files).
+4. Per-task: write the failing test/detector first → fix → `bash tests/run_all.sh` → one evidence-citing commit → update `tasks/backlog.md`.
+5. `tasks/dispatch.md` is archived under `tasks/archive/` — historical reference only.
 
 ### Agent Roles (Industry-Standard Game Dev Team)
 

@@ -428,25 +428,134 @@ func can_place_building(player_id: int, building_type: StringName, grid_x: int, 
 	return true
 
 
+# --- Determinism checksum (see tasks/design-verification-workflow.md) ---
+# Order-sensitive FNV-1a-style rolling hash over ALL mutable sim state. Replaces
+# the old order-insensitive XOR, which cancelled on swapped values and omitted
+# gold, unit state, targets and cooldowns — the silent-desync class Factorio
+# documented in FFF-340 ("state outside the checksum").
+const _FNV_OFFSET: int = -3750763034362895579   # 14695981039346656037 as signed 64-bit
+const _FNV_PRIME: int = 1099511628211
+
+
+# GDScript int is 64-bit two's-complement; overflow wraps deterministically.
+func _mix(h: int, v: int) -> int:
+	return (h ^ v) * _FNV_PRIME
+
+
+func _mix_val(h: int, value) -> int:
+	match typeof(value):
+		TYPE_INT:
+			return _mix(h, value)
+		TYPE_BOOL:
+			return _mix(h, 1 if value else 0)
+		TYPE_STRING, TYPE_STRING_NAME:
+			return _mix(h, hash(value))
+		TYPE_VECTOR2I:
+			return _mix(_mix(h, value.x), value.y)
+		TYPE_FLOAT:
+			# Sim state must be fixed-point; a float here is itself a determinism
+			# bug. Hash it anyway so the checksum notices rather than skipping.
+			return _mix(h, hash(value))
+		_:
+			return _mix(h, hash(value))
+
+
+# Insertion-order walk. Both lockstep peers construct dicts with identical code,
+# so key order is identical; the rolling hash is order-sensitive by design.
+func _mix_dict(h: int, d: Dictionary) -> int:
+	for key in d:
+		h = _mix(h, hash(key))
+		h = _mix_val(h, d[key])
+	return h
+
+
 func compute_checksum() -> int:
-	var checksum: int = tick
-	checksum = checksum ^ (castles[0].hp * 31)
-	checksum = checksum ^ (castles[1].hp * 37)
-	for entity in entities:
-		checksum = checksum ^ (entity.id * 41)
-		checksum = checksum ^ (entity.get("x", 0) * 43)
-		checksum = checksum ^ (entity.get("y", 0) * 47)
-		checksum = checksum ^ (entity.get("hp", 0) * 53)
+	var h: int = _FNV_OFFSET
+	for v in [tick, next_entity_id, wave_number, wave_timer, prep_ticks_remaining,
+			winning_team, (1 if prep_phase else 0), (1 if match_over else 0)]:
+		h = _mix(h, v)
+	for arr in [units_spawned, units_killed, total_damage]:
+		for v in arr:
+			h = _mix(h, v)
+	for p in players:
+		h = _mix_val(h, p.get("gold", 0))
+		h = _mix_val(h, p.get("income", 0))
+	for c in castles:
+		h = _mix_dict(h, c)
+	for e in entities:
+		h = _mix_dict(h, e)
+	for fz in fire_zones:
+		h = _mix_dict(h, fz)
 	for s in rng.get_state():
-		checksum = checksum ^ (s * 59)
+		h = _mix(h, s)
 	for pi in grid_cells.size():
 		for row in grid_cells[pi]:
 			for cell in row:
-				checksum = checksum ^ (cell * 61)
-	return checksum
+				h = _mix(h, cell)
+	return h
 
 
-## Detailed checksum breakdown for desync debugging — prints each component.
+## Per-subsystem checksums so a desync report names WHICH system diverged
+## (Riot's hierarchical-state pattern), instead of only THAT one did.
+func compute_subchecksums() -> Dictionary:
+	var units_h: int = _FNV_OFFSET
+	var buildings_h: int = _FNV_OFFSET
+	for e in entities:
+		match e.get("type", ""):
+			"unit":
+				units_h = _mix_dict(units_h, e)
+			"building":
+				buildings_h = _mix_dict(buildings_h, e)
+	var economy_h: int = _FNV_OFFSET
+	for p in players:
+		economy_h = _mix_val(economy_h, p.get("gold", 0))
+		economy_h = _mix_val(economy_h, p.get("income", 0))
+	var castles_h: int = _FNV_OFFSET
+	for c in castles:
+		castles_h = _mix_dict(castles_h, c)
+	var rng_h: int = _FNV_OFFSET
+	for s in rng.get_state():
+		rng_h = _mix(rng_h, s)
+	var grid_h: int = _FNV_OFFSET
+	for pi in grid_cells.size():
+		for row in grid_cells[pi]:
+			for cell in row:
+				grid_h = _mix(grid_h, cell)
+	return {
+		"tick": tick,
+		"entity_count": entities.size(),
+		"units": units_h,
+		"buildings": buildings_h,
+		"economy": economy_h,
+		"castles": castles_h,
+		"rng": rng_h,
+		"grid": grid_h,
+	}
+
+
+## Full ordered state dump (raw fixed-point ints, sorted keys) so two peers'
+## state at the first divergent tick can be line-diffed (Factorio desync-report
+## pattern). Written to disk on first checksum mismatch.
+func dump_state_json() -> String:
+	var state := {
+		"tick": tick,
+		"next_entity_id": next_entity_id,
+		"wave_number": wave_number,
+		"wave_timer": wave_timer,
+		"prep_phase": prep_phase,
+		"prep_ticks_remaining": prep_ticks_remaining,
+		"match_over": match_over,
+		"winning_team": winning_team,
+		"units_spawned": units_spawned,
+		"units_killed": units_killed,
+		"total_damage": total_damage,
+		"rng_state": rng.get_state(),
+		"players": players,
+		"castles": castles,
+		"entities": entities,
+		"fire_zones": fire_zones,
+	}
+	return JSON.stringify(state, "  ")
 
 
 # --- Helpers ---

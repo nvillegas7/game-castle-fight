@@ -8,6 +8,10 @@ var _sprite: Sprite2D = null
 var _prev_hp: float = 1.0
 var _fire_nodes: Array[Node2D] = []
 var _glow_color: Color = Color.TRANSPARENT
+# Local-space half height/width of the scaled sprite — HP bar, glow, and fire
+# placement all derive from these so they track the design-flow castle scale.
+var _half_h: float = 56.0
+var _half_w: float = 70.0
 
 # T-008: HP bars handled by game_arena.gd (.tscn ColorRects + BigBar overlay)
 # castle_visual.gd only handles sprite, damage tint, fire, and glow
@@ -25,8 +29,16 @@ func _ready() -> void:
 		_sprite.texture = tex
 		_sprite.centered = true
 		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var s: float = 160.0 / tex.get_height()
+		# Design-flow port (design/arena_target.png): castle renders at 0.9x
+		# NATIVE scale — the mockup-scale landmark (was 160px→112px effective,
+		# 1.7x too small vs the spec; forensics wf_772ab315). The parent
+		# CastleVisual node carries scale 0.7 in the scene, so compensate here
+		# to land at 0.9 effective. Sim footprint/hitbox unchanged.
+		var parent_s: float = scale.x if scale.x > 0.0 else 1.0
+		var s: float = 0.9 / parent_s
 		_sprite.scale = Vector2(s, s)
+		_half_h = tex.get_height() * s * 0.5
+		_half_w = tex.get_width() * s * 0.5
 		add_child(_sprite)
 
 
@@ -44,11 +56,11 @@ func _process(_delta: float) -> void:
 		else:
 			_sprite.modulate = Color.WHITE
 
-	# Sprite-based fire at low HP
+	# Sprite-based fire at low HP (offsets scale with the sprite)
 	if hp_ratio < 0.5 and _fire_nodes.is_empty():
 		# Add fire sprites
-		var fire1 := Effects.create_fire(Vector2(-20, -5), 0.45)
-		var fire2 := Effects.create_fire(Vector2(18, -8), 0.4)
+		var fire1 := Effects.create_fire(Vector2(-_half_w * 0.3, -_half_h * 0.1), 0.45)
+		var fire2 := Effects.create_fire(Vector2(_half_w * 0.28, -_half_h * 0.15), 0.4)
 		add_child(fire1)
 		add_child(fire2)
 		_fire_nodes.append(fire1)
@@ -71,17 +83,17 @@ func _process(_delta: float) -> void:
 
 func _draw() -> void:
 	if _glow_color.a > 0:
-		# Soft radial glow behind castle
+		# Soft radial glow behind castle (radius tracks sprite size)
 		for i in range(3, 0, -1):
-			var r: float = 50.0 + i * 20.0
+			var r: float = _half_w * 0.72 + i * _half_w * 0.28
 			var c := Color(_glow_color.r, _glow_color.g, _glow_color.b, _glow_color.a * (0.4 / i))
 			draw_circle(Vector2.ZERO, r, c)
 
 	# HP bar at castle top — same style as building_visual (no gaps)
-	var bar_w: float = 120.0
+	var bar_w: float = _half_w * 1.3
 	var bar_h: float = 6.0
 	var bar_x: float = -bar_w * 0.5
-	var bar_y: float = -56.0 - 4.0  # sprite half-height (56) + 4px gap, same as buildings
+	var bar_y: float = -_half_h - 10.0  # sprite half-height + gap, same idea as buildings
 	draw_rect(Rect2(bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2), Color(0, 0, 0, 0.55))
 	draw_rect(Rect2(bar_x, bar_y, bar_w, bar_h), Color(0.15, 0.1, 0.05, 0.7))
 	var fill_col: Color

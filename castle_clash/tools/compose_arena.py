@@ -111,7 +111,10 @@ BUILDINGS = {
 
 # Enemy (red, top) half placements; player half auto-mirrored.
 ENEMY_HALF = {
-    "castle": (360, 210),          # big centered fortress, base y=210
+    # Castle anchored at its CENTER on the sim castle position (360,120) — the
+    # game's visual must track the sim anchor (VFX/attacks target it), so the
+    # spec uses the same anchor. Mirror = (360,920), exactly the sim's player castle.
+    "castle": (360, 120),
     "towers": [(140, 268), (580, 268)],
     "houses": [("house1", 122, 150), ("house2", 598, 146)],
     # stone wall (solid stone face row) castle base → towers, like mockup v2
@@ -197,7 +200,8 @@ def render(show_grid: bool = False) -> Image.Image:
             x += TS
 
         cx, cy = ENEMY_HALF["castle"]
-        blit(img, load(bdir / "Castle.png"), cx, my(cy), BUILDINGS["castle"]["scale"])
+        blit(img, load(bdir / "Castle.png"), cx, my(cy), BUILDINGS["castle"]["scale"],
+             anchor="center")
         for tx, ty in ENEMY_HALF["towers"]:
             blit(img, load(bdir / "Tower.png"), tx, my(ty), BUILDINGS["tower"]["scale"])
         for hname, hx, hy in ENEMY_HALF["houses"]:

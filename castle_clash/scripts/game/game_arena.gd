@@ -519,8 +519,8 @@ func _create_unit_visual(entity: Dictionary) -> Node2D:
 		sv.position = sim_to_screen(Vector2(FP.to_float(entity.x), FP.to_float(entity.y)))
 		sv.setup(sprite_frames, entity.team, entity.get("role", 0), ut)
 		sv.facing = 1.0 if entity.team == 0 else -1.0
-		# T-039: Brighten units +10% so they pop above muted terrain
-		sv.modulate = Color(1.1, 1.1, 1.1)
+		# Design-flow: native palette — terrain is no longer muted, so no brighten
+		sv.modulate = Color.WHITE
 		return sv
 	else:
 		var uv: Node2D = UnitVisualScript.new()
@@ -530,8 +530,8 @@ func _create_unit_visual(entity: Dictionary) -> Node2D:
 		uv.unit_type = ut
 		uv.hp_ratio = 1.0
 		uv.facing = 1.0 if entity.team == 0 else -1.0
-		# T-039: Brighten units +10%
-		uv.modulate = Color(1.1, 1.1, 1.1)
+		# Design-flow: native palette (no brighten)
+		uv.modulate = Color.WHITE
 		return uv
 
 
@@ -946,13 +946,15 @@ func _tick_ambient(delta: float) -> void:
 		c.position.x += speed * delta
 		if c.position.x > 740.0:
 			c.position.x = -60.0
-	# Water foam alpha breathes ±0.15 around a 0.55 base at ~0.35 Hz per sprite.
-	# Each sprite has its own phase so the shore isn't synchronized.
+	# Water foam alpha breathes ±0.15 around a 0.85 base at ~0.35 Hz per sprite
+	# (design-flow: decorations near-opaque; the old 0.55 base made the dashes
+	# invisible over water). Each sprite has its own phase so the shore isn't
+	# synchronized.
 	for f in _ambient_foams:
 		if not is_instance_valid(f):
 			continue
 		var phase: float = f.get_meta("breath_phase", 0.0)
-		var alpha: float = 0.55 + 0.15 * sin(_ambient_time * 2.2 + phase)
+		var alpha: float = 0.85 + 0.15 * sin(_ambient_time * 2.2 + phase)
 		f.modulate.a = alpha
 
 
@@ -1380,39 +1382,44 @@ func _polish_arena_visuals() -> void:
 		hud_hbox.offset_top = 8
 		hud_hbox.offset_bottom = -6
 
-	# GrassMain stays visible as green fallback behind tiles.
 	# CombatLane hidden entirely — terrain tiles (T-060) handle the combat zone visual.
-	# Keeping CombatLane visible caused it to render ON TOP of terrain tiles (higher child index),
-	# creating a hard brown-to-green seam at y=695 instead of smooth tiled transitions.
 	var combat_lane := get_node_or_null("CombatLane")
 	if combat_lane:
 		combat_lane.visible = false
 
-	# Darken water borders
+	# Design-flow port (design/arena_target.png is the spec): water is the NATIVE
+	# Tiny Swords teal — the old modulate tints turned (71,171,169) into a murky
+	# (28,86,93) gutter, the single largest palette divergence from the mockups.
+	# WaterBase now paints the full screen in the native texel color (the water
+	# tile is perfectly flat, std=0, so a ColorRect is pixel-identical to tiling
+	# it); the old 45px straight TextureRect strips are hidden.
 	var water_base := get_node_or_null("WaterBase")
 	if water_base:
-		water_base.color = Color(0.12, 0.18, 0.22, 1)
+		water_base.color = Color8(71, 171, 169)
 	var water_left := get_node_or_null("WaterLeft")
 	if water_left:
-		water_left.modulate = Color(0.4, 0.5, 0.55, 1)
+		water_left.visible = false
 	var water_right := get_node_or_null("WaterRight")
 	if water_right:
-		water_right.modulate = Color(0.4, 0.5, 0.55, 1)
+		water_right.visible = false
+	# GrassMain shrinks to sit exactly under the tiled platform (fallback fill);
+	# its dark edge children belonged to the old full-bleed rectangle.
+	var grass_main := get_node_or_null("GrassMain")
+	if grass_main:
+		grass_main.position = Vector2(72, 56)
+		grass_main.size = Vector2(576, 896)
+		for child in grass_main.get_children():
+			child.visible = false
 
 
 # --- T-060: Kingdom Rush 3-Layer Terrain ---
 
 func _build_terrain_textures() -> void:
-	# Lush symmetric meadow — matches the Claude Design v1/v2/v3 mockups: ONE green field
-	# across the whole arena (enemy zone + combat lane + player zone), no brown dirt band,
-	# no reddish enemy tint. The old 3-tinted-band look read as "muddy"; the mockups are a
-	# single lush meadow whose zones are implied by buildings, not ground colour.
-	#
-	# Grass is a UNIFORM sunny green (color1). Per-tile hue mixing was tried and rejected —
-	# adjacent tiles of different hue betray the 64px grid as visible rectangular patches
-	# (the mockups have none). Like the mockups, all organic variation comes from the
-	# decoration layer (trees, sheep, bushes, flowers, gold), not from the base tile.
-	var tm1 = load("res://assets/sprites/terrain/Tilemap_color1.png")  # bright sunny 152,181,82
+	# Design-flow port of design/arena_target.png (the approved pixel spec, built
+	# by tools/compose_arena.py from these same assets — see tasks/design-flow.md).
+	# Values below mirror the compositor's LAYOUT table verbatim; change the look
+	# THERE first (0.1s/render), re-approve, then port the numbers here.
+	var tm1 = load("res://assets/sprites/terrain/Tilemap_color1.png")  # sunny green
 	if tm1 == null:
 		return
 
@@ -1425,88 +1432,69 @@ func _build_terrain_textures() -> void:
 	if grass_node:
 		move_child(terrain_layer, grass_node.get_index() + 1)
 
-	# Use 1:1 scale (64px tiles at game size) for fewer visible seams
 	var ts: float = 64.0
 
-	var grass_center := AtlasTexture.new()
-	grass_center.atlas = tm1
-	grass_center.region = Rect2(64, 64, 64, 64)  # (1,1) = center fill
+	# Grass ISLAND PLATFORM on native-teal water: x=[72,648] y=[56,952] (9x14
+	# tiles) with proper 3x3 edge/corner tiles — this resurrects _build_tiled_zone,
+	# which had the exact coastline logic and sat as dead code while the field
+	# shipped as a full-bleed rectangle. Uniform center tile (per-tile hue mixing
+	# betrays the 64px grid — lessons.md 2026-07-07); variation = decoration.
+	_build_tiled_zone(terrain_layer, tm1, Rect2(72, 56, 576, 896), 1.0, ts, Color.WHITE)
 
-	# One seamless green field spanning all three zones (y=0..1010). No mid-field edge
-	# rows or boundary shadows — those only made sense to delineate the old distinct bands.
-	_fill_zone_with_tile(terrain_layer, grass_center, Rect2(40, 0, 640, 1010), ts)
-
-	_add_castle_ramparts(terrain_layer, tm1, ts)
+	_add_fortress_dressing(terrain_layer, tm1, ts)
 
 	_add_water_foam()
 
 
-## Stone ramparts framing each castle (mockup v2): a low cliff-edge wall hugging each castle's
-## base, so the castle sits ON the wall line with the wings extending out toward the flanking
-## towers — a fortress line, exactly the mockup composition. Uses the tilemap's grass-topped
-## cliff-edge tile (elevated bottom-edge centre, col 6 row 3) repeated straight across (corner
-## tiles hook down, so we use only the straight edge). Enemy (top) wall as-is (stone face
-## points down toward combat); player (bottom) wall vertically flipped (stone face points up).
-## Rendered in terrain_layer (z=0) so castle/towers/buildings/units (z>=1) sit in front.
-## Symmetric about the play-area midline (y=520): centres 157 and 883.
-func _add_castle_ramparts(parent: Node2D, tm: Texture2D, ts: float) -> void:
+## Fortress dressing per half (design/arena_target.png): a solid stone wall row
+## (elevated stone-face tile, col6 row4) running castle base → flanking Tower.png
+## sprites, plus decorative houses at the outer corners — mockup v2's composition
+## anchors. Towers/houses sit at x<206 / x>514, OUTSIDE the gameplay column, so
+## they can't be confused with placeable buildings. Enemy half as-authored; the
+## player half is the exact mirror about y=520 with blue variants.
+func _add_fortress_dressing(parent: Node2D, tm: Texture2D, ts: float) -> void:
 	if tm == null:
 		return
-	# A single grass-topped cliff-edge row (col6 row3) as a low stone terrace hugging each
-	# castle base — a subtle fortress line, not a dominant wall (the 2-row solid-stone version
-	# read as a clashing teal band detached from the castle). Enemy row faces down toward
-	# combat; the player row is vertically flipped to face up.
-	var edge := AtlasTexture.new()
-	edge.atlas = tm
-	edge.region = Rect2(6 * 64, 3 * 64, 64, 64)  # grass-topped cliff edge
-	var wall_x0: float = 150.0
-	var wall_x1: float = 570.0
-	# top-left y per faction, tucked right under each castle. Symmetric about y=520.
-	for spec in [[100.0, false], [876.0, true]]:
-		var wy: float = spec[0]
-		var flip: bool = spec[1]
-		var x: float = wall_x0
-		while x < wall_x1:
+	var stone := AtlasTexture.new()
+	stone.atlas = tm
+	stone.region = Rect2(6 * 64, 4 * 64, 64, 64)  # solid stone face
+	# LAYOUT (compositor ENEMY_HALF): wall_y=150, wall_x=(140,580),
+	# towers ground (140,268)/(580,268) scale 0.72, houses (122,150)/(598,146) scale 0.62
+	for spec in [[false, "red"], [true, "blue"]]:
+		var flip: bool = spec[0]
+		var team_dir: String = spec[1]
+		# Stone wall row (behind the castle body; terrain_layer z=0 keeps
+		# castle/buildings/units in front)
+		var wy: float = 150.0 if not flip else 2.0 * FLIP_PIVOT_Y - 150.0 - ts
+		var x: float = 140.0
+		while x < 580.0:
 			var spr := Sprite2D.new()
-			spr.texture = edge
+			spr.texture = stone
 			spr.centered = false
 			spr.position = Vector2(x, wy)
 			spr.flip_v = flip
 			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			parent.add_child(spr)
 			x += ts
-
-
-## Fill a zone rect with a single tiled center texture (no edge variety)
-func _fill_zone_with_tile(parent: Node2D, tile: AtlasTexture, rect: Rect2, ts: float, tint: Color = Color.WHITE) -> void:
-	for y in range(0, ceili(rect.size.y / ts)):
-		for x in range(0, ceili(rect.size.x / ts)):
+		# Flanking towers + corner houses (bottom-anchored sprites on ground y)
+		var dressing := [
+			["Tower.png", 140.0, 268.0, 0.72],
+			["Tower.png", 580.0, 268.0, 0.72],
+			["House1.png", 122.0, 150.0, 0.62],
+			["House2.png", 598.0, 146.0, 0.62],
+		]
+		for d in dressing:
+			var tex: Texture2D = load("res://assets/sprites/buildings/%s/%s" % [team_dir, d[0]])
+			if tex == null:
+				continue
+			var gy: float = d[2] if not flip else 2.0 * FLIP_PIVOT_Y - d[2]
 			var spr := Sprite2D.new()
-			spr.texture = tile
-			spr.centered = false
-			spr.position = Vector2(rect.position.x + x * ts, rect.position.y + y * ts)
+			spr.texture = tex
+			spr.position = Vector2(d[1], gy)
+			spr.offset = Vector2(0, -tex.get_height() * 0.5)  # bottom-anchored
+			spr.scale = Vector2(d[3], d[3])
 			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			spr.modulate = tint
 			parent.add_child(spr)
-
-
-## Add a row of edge tiles at a zone boundary
-func _add_edge_row(parent: Node2D, atlas: Texture2D, rect: Rect2, ts: float, is_top: bool) -> void:
-	# Top edge = tilemap row 0, bottom edge = tilemap row 2, center col = 1
-	var tile_row: int = 0 if is_top else 2
-	var edge_tile := AtlasTexture.new()
-	edge_tile.atlas = atlas
-	edge_tile.region = Rect2(64, tile_row * 64, 64, 64)  # (1, 0) or (1, 2) = edge center
-
-	var edge_y: float = rect.position.y - ts if is_top else rect.position.y
-	for x in range(0, ceili(rect.size.x / ts)):
-		var spr := Sprite2D.new()
-		spr.texture = edge_tile
-		spr.centered = false
-		spr.position = Vector2(rect.position.x + x * ts, edge_y)
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		spr.modulate.a = 0.7
-		parent.add_child(spr)
 
 
 ## Build a tiled zone using flat ground tiles (cols 0-3) with proper edges
@@ -1558,90 +1546,6 @@ func _build_tiled_zone(parent: Node2D, atlas: Texture2D, rect: Rect2, tile_s: fl
 			parent.add_child(spr)
 
 
-## Build elevated zone using elevated tiles (cols 5-8) with cliff edges
-func _build_elevated_zone(parent: Node2D, atlas: Texture2D, rect: Rect2, tile_s: float, ts: float, tint: Color) -> void:
-	var cols: int = ceili(rect.size.x / ts)
-	var rows: int = ceili(rect.size.y / ts)
-
-	for row in rows:
-		for col in cols:
-			var gx: int  # Grid col in tilemap (5-8 for elevated)
-			var gy: int
-
-			var is_top: bool = (row == 0)
-			var is_bot: bool = (row == rows - 1)
-			var is_left: bool = (col == 0)
-			var is_right: bool = (col == cols - 1)
-
-			# Use cliff tiles for edges (rows 3-5 in tilemap = cliff face)
-			if is_top and is_left:
-				gx = 5; gy = 0  # Elev TL
-			elif is_top and is_right:
-				gx = 7; gy = 0  # Elev TR
-			elif is_bot and is_left:
-				gx = 5; gy = 3  # Cliff TL (bottom of elevated = cliff top)
-			elif is_bot and is_right:
-				gx = 7; gy = 3  # Cliff TR
-			elif is_top:
-				gx = 6; gy = 0  # Elev top edge
-			elif is_bot:
-				gx = 6; gy = 3  # Cliff top edge
-			elif is_left:
-				gx = 5; gy = 1  # Elev left
-			elif is_right:
-				gx = 7; gy = 1  # Elev right
-			else:
-				gx = 6; gy = 1  # Elev center fill
-
-			var tile := AtlasTexture.new()
-			tile.atlas = atlas
-			tile.region = Rect2(gx * 64, gy * 64, 64, 64)
-
-			var spr := Sprite2D.new()
-			spr.texture = tile
-			spr.centered = false
-			spr.position = Vector2(rect.position.x + col * ts, rect.position.y + row * ts)
-			spr.scale = Vector2(tile_s, tile_s)
-			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			spr.modulate = tint
-			parent.add_child(spr)
-
-
-func _tile_texture_over_rect(tex: AtlasTexture, rect: Rect2, tile_scale: float, tint: Color) -> void:
-	var tw: float = tex.region.size.x * tile_scale
-	var th: float = tex.region.size.y * tile_scale
-	var layer := Node2D.new()
-	layer.z_index = -1
-	add_child(layer)
-	for row in ceili(rect.size.y / th):
-		for col in ceili(rect.size.x / tw):
-			var spr := Sprite2D.new()
-			spr.texture = tex
-			spr.centered = false
-			spr.position = Vector2(rect.position.x + col * tw, rect.position.y + row * th)
-			spr.scale = Vector2(tile_scale, tile_scale)
-			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			spr.modulate = tint
-			layer.add_child(spr)
-
-
-func _add_zone_transition(y_pos: float, is_top: bool) -> void:
-	var trans := Node2D.new()
-	trans.z_index = -1
-	add_child(trans)
-	for i in 6:
-		var strip := ColorRect.new()
-		var alpha: float = (5 - i) * 0.035
-		if is_top:
-			strip.color = Color(0.38, 0.58, 0.25, alpha)
-			strip.position = Vector2(40, y_pos - 24 + i * 6.0)
-		else:
-			strip.color = Color(0.72, 0.6, 0.38, alpha if i < 3 else 0)
-			strip.position = Vector2(40, y_pos - 12 + i * 6.0)
-		strip.size = Vector2(640, 6)
-		trans.add_child(strip)
-
-
 func _add_water_foam() -> void:
 	var foam_tex = load("res://assets/sprites/terrain/Water Foam.png")
 	if foam_tex == null:
@@ -1660,263 +1564,169 @@ func _add_water_foam() -> void:
 		atlas.region = Rect2(i * fs, 0, fs, fs)
 		sf.add_frame(&"foam", atlas)
 
-	# Dense foam along both water-grass boundaries (every ~80px for full coverage).
-	# Each foam sprite gets a small alpha-phase offset so the shoreline
-	# "breathes" — alpha oscillates ±0.15 around a 0.55 base in physics_process.
+	# Foam dashes hugging the island coastline on ALL FOUR edges (design/
+	# arena_target.png): staggered small dashes, near-opaque, animated. Each foam
+	# sprite keeps a small alpha-phase offset so the shoreline "breathes"
+	# (±0.15 around a 0.85 base in physics_process).
 	_ambient_foams.clear()
-	for y_pos in range(100, 950, 80):
+	var dash_specs: Array = []
+	var idx: int = 0
+	for x_pos in range(72, 600, 60):  # top + bottom coasts
+		var jig: float = 8.0 if idx % 2 == 0 else -5.0
+		dash_specs.append([Vector2(x_pos + 30 + jig, 70), false, false])
+		dash_specs.append([Vector2(x_pos + 30 - jig, 956), false, true])
+		idx += 1
+	idx = 0
+	for y_pos in range(56, 904, 60):  # left + right coasts
+		var jig: float = 9.0 if idx % 2 == 0 else -6.0
+		dash_specs.append([Vector2(70, y_pos + 30 + jig), false, false])
+		dash_specs.append([Vector2(650, y_pos + 30 - jig), true, false])
+		idx += 1
+	for spec in dash_specs:
 		var foam := AnimatedSprite2D.new()
 		foam.sprite_frames = sf
-		foam.position = Vector2(42, y_pos)
-		foam.scale = Vector2(0.22, 0.22)
+		foam.position = spec[0]
+		foam.scale = Vector2(0.32, 0.32)
+		foam.flip_h = spec[1]
+		foam.flip_v = spec[2]
 		foam.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		foam.modulate = Color(0.85, 0.92, 1.0, 0.55)
+		foam.modulate = Color(1.0, 1.0, 1.0, 0.85)
 		foam.z_index = -1
 		foam.play(&"foam")
 		foam.frame = randi() % fc
 		add_child(foam)
 		foam.set_meta("breath_phase", randf() * TAU)
 		_ambient_foams.append(foam)
-	for y_pos in range(140, 950, 80):
-		var foam := AnimatedSprite2D.new()
-		foam.sprite_frames = sf
-		foam.position = Vector2(678, y_pos)
-		foam.scale = Vector2(0.22, 0.22)
-		foam.flip_h = true
-		foam.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		foam.modulate = Color(0.85, 0.92, 1.0, 0.55)
-		foam.z_index = -1
-		foam.play(&"foam")
-		foam.frame = randi() % fc
-		add_child(foam)
-		foam.set_meta("breath_phase", randf() * TAU)
-		_ambient_foams.append(foam)
-
-	# (Removed) mid-field boundary shadows at y=343/693 — they drew horizontal seams that
-	# only read correctly when the arena had 3 distinct colour bands. The meadow is now one
-	# uniform green field, so those strips would look like unexplained shadow lines.
 
 
 func _setup_terrain_decorations() -> void:
+	# Design-flow port of design/arena_target.png — placements mirror the
+	# compositor's LAYOUT tables VERBATIM (tools/compose_arena.py). Change the
+	# look there first (0.1s/render), re-approve, then port the numbers here.
+	#
+	# Rules (tasks/design-flow.md): FULL opacity, native palette, no random
+	# rotation of pixel art, no procedural vector shapes. Readability comes from
+	# placement — everything decorative lives OUTSIDE the gameplay column
+	# x=[206,514] except two small midfield rock accents. Player half mirrors the
+	# enemy half about y=520. Animations (sway/graze/bob) stay — they're the
+	# game's advantage over a static mockup.
 	var deco_base := "res://assets/sprites/terrain/"
 
-	# Load decoration textures (extract single frames from sprite sheets)
-	var bush_sheets: Array[Texture2D] = []
-	for i in range(1, 5):
-		var path: String = deco_base + "Decorations/Bushe%d.png" % i
-		if ResourceLoader.exists(path):
-			bush_sheets.append(load(path))
-
-	var rocks: Array[Texture2D] = []
-	for i in range(1, 5):
-		var path: String = deco_base + "Decorations/Rock%d.png" % i
-		if ResourceLoader.exists(path):
-			rocks.append(load(path))
-
-	var tree_sheets: Array[Texture2D] = []
-	for i in range(1, 5):
-		var path: String = deco_base + "Resources/Tree%d.png" % i
-		if ResourceLoader.exists(path):
-			tree_sheets.append(load(path))
-
-	var clouds: Array[Texture2D] = []
-	for i in range(1, 9):
-		var path: String = deco_base + "Decorations/Clouds_%02d.png" % i
-		if ResourceLoader.exists(path):
-			clouds.append(load(path))
-
-	var water_rocks: Array[Texture2D] = []
-	for i in range(1, 5):
-		var path: String = deco_base + "Decorations/Water Rocks_%02d.png" % i
-		if ResourceLoader.exists(path):
-			water_rocks.append(load(path))
-
-	var stumps: Array[Texture2D] = []
-	for i in range(1, 5):
-		var path: String = deco_base + "Resources/Stump %d.png" % i
-		if ResourceLoader.exists(path):
-			stumps.append(load(path))
-
-	# Place decorations on zones (above terrain rects, below buildings z=1)
 	var deco_layer := Node2D.new()
 	deco_layer.z_index = 0
 	deco_layer.name = "DecorationLayer"
 	add_child(deco_layer)
 
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 42  # Deterministic decoration placement
+	rng.seed = 42  # Deterministic phase staggering for animations
 
-	# Bushes scattered randomly near edges and zone boundaries
-	for _b in 14:
-		if bush_sheets.is_empty():
-			break
-		var bx: float
-		var by: float = rng.randf_range(150, 910)
-		# 50% near left edge, 50% near right edge (well inside grass)
-		if rng.randf() < 0.5:
-			bx = rng.randf_range(120, 210)
-		else:
-			bx = rng.randf_range(510, 600)
-		var sheet: Texture2D = bush_sheets[rng.randi() % bush_sheets.size()]
-		var spr := Sprite2D.new()
-		spr.texture = _extract_sprite_frame(sheet, rng.randi() % 4)
-		spr.position = Vector2(bx, by)
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var s: float = rng.randf_range(0.25, 0.45)
-		spr.scale = Vector2(s, s)
-		spr.modulate.a = rng.randf_range(0.5, 0.7)  # T-039: reduced from 0.7-0.95
-		deco_layer.add_child(spr)
-		# T-049 + ambient pass: subtle scale pulse PLUS wind sway rotation.
-		# Pivot from the bottom-center so the bush sways like a real shrub
-		# rooted in the ground, not spinning in place. Each bush has a unique
-		# period and phase so the field feels organic instead of pulsing in
-		# lockstep.
-		var tex_size: Vector2 = spr.texture.get_size() if spr.texture else Vector2(32, 32)
-		spr.offset = Vector2(0, -tex_size.y * 0.5)  # Rotate around base, not center
-		var bush_tw := spr.create_tween().set_loops()
-		var pulse_dur: float = rng.randf_range(4.0, 6.0)
-		bush_tw.tween_property(spr, "scale", Vector2(s * 1.03, s * 1.03), pulse_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		bush_tw.tween_property(spr, "scale", Vector2(s, s), pulse_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		var sway_tw := spr.create_tween().set_loops()
-		var sway_dur: float = rng.randf_range(1.8, 2.8)
-		var sway_amp: float = deg_to_rad(rng.randf_range(3.0, 5.0))
-		sway_tw.tween_interval(rng.randf_range(0.0, sway_dur))  # Stagger phase across bushes
-		sway_tw.tween_property(spr, "rotation", sway_amp, sway_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		sway_tw.tween_property(spr, "rotation", -sway_amp, sway_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-
-	# Rocks scattered randomly across the arena
-	for _i in 12:
-		if rocks.is_empty():
-			break
-		var rx: float = rng.randf_range(100, 620)
-		var ry: float = rng.randf_range(150, 910)
-		# Avoid castle areas (y=55-120, y=920-1000) and center them more in combat
-		if rng.randf() < 0.5:
-			ry = rng.randf_range(355, 685)  # Combat lane
-		var spr := Sprite2D.new()
-		spr.texture = rocks[rng.randi() % rocks.size()]
-		spr.position = Vector2(rx + rng.randf_range(-20, 20), ry + rng.randf_range(-15, 15))
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var s: float = rng.randf_range(0.18, 0.38)
-		spr.scale = Vector2(s, s)
-		spr.rotation = rng.randf_range(-0.3, 0.3)
-		spr.modulate.a = rng.randf_range(0.35, 0.6)  # T-039: reduced from 0.5-0.8
-		deco_layer.add_child(spr)
-
-	# Trees CLUMPED into small groves at the grass margins (Tiny Swords / KR look):
-	# grouped rather than scattered, trunk kept on grass (x clamped inside 40..680 so
-	# canopies don't float over the water strips), never cropped at screen top/bottom
-	# (y clamped so the full canopy fits). z=0 keeps them behind units; groves sit at
-	# the left/right margins so central lanes stay clean.
+	# --- Trees: 4 clusters per side (LAYOUT tree_clusters), mirrored halves ---
+	var tree_sheets: Array[Texture2D] = []
+	for i in range(1, 5):
+		var path: String = deco_base + "Resources/Tree%d.png" % i
+		if ResourceLoader.exists(path):
+			tree_sheets.append(load(path))
 	if not tree_sheets.is_empty():
-		# Symmetric tree-line framing BOTH margins (mirrored about x=360, matching mockup v2).
-		# Build columns occupy x=[206,514]; trees hug x<180 / x>540 so they frame the arena
-		# without covering placement. Left cluster centres are defined once then mirrored right.
-		var left_centers := [Vector2(80, 172), Vector2(80, 388), Vector2(80, 604), Vector2(80, 838)]
-		var groves: Array[Vector2] = []
-		for c in left_centers:
-			groves.append(c)
-			groves.append(Vector2(720.0 - c.x, c.y))  # mirror to right margin
-		for grove in groves:
-			for _k in rng.randi_range(3, 4):
-				var sheet: Texture2D = tree_sheets[rng.randi() % tree_sheets.size()]
+		# (cx, ground_y, count) — enemy half; player half mirrored below
+		var tree_clusters := [
+			[136.0, 428.0, 3], [584.0, 438.0, 3],
+			[128.0, 580.0, 2], [592.0, 590.0, 2],
+		]
+		for cl in tree_clusters:
+			for k in int(cl[2]):
+				var sheet: Texture2D = tree_sheets[k % tree_sheets.size()]
 				var fh: int = int(sheet.get_height())
 				var at := AtlasTexture.new()
 				at.atlas = sheet
 				at.region = Rect2(0, 0, fh, fh)
-				var spr := Sprite2D.new()
-				spr.texture = at
-				spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-				var s: float = rng.randf_range(0.44, 0.62)
-				spr.scale = Vector2(s, s)
-				spr.position = Vector2(
-					clampf(grove.x + rng.randf_range(-26, 26), 52, 668),
-					clampf(grove.y + rng.randf_range(-26, 26), 158, 872))
-				spr.offset = Vector2(0, -fh * 0.5)
-				spr.modulate.a = rng.randf_range(0.9, 1.0)
-				deco_layer.add_child(spr)
-				var sway := spr.create_tween().set_loops()
-				var sdur: float = rng.randf_range(2.6, 3.8)
-				var samp: float = deg_to_rad(rng.randf_range(1.5, 3.0))
-				sway.tween_interval(rng.randf_range(0.0, sdur))
-				sway.tween_property(spr, "rotation", samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-				sway.tween_property(spr, "rotation", -samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+				var dx: float = (k - cl[2] / 2.0) * 40.0 + 20.0
+				var dy: float = (k % 2) * 26.0
+				for gy in [cl[1] + dy, 2.0 * FLIP_PIVOT_Y - cl[1] + dy]:
+					var spr := Sprite2D.new()
+					spr.texture = at
+					spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+					spr.scale = Vector2(0.52, 0.52)
+					spr.position = Vector2(cl[0] + dx, gy)
+					spr.offset = Vector2(0, -fh * 0.5)  # bottom-anchored (sways from base)
+					deco_layer.add_child(spr)
+					var sway := spr.create_tween().set_loops()
+					var sdur: float = rng.randf_range(2.6, 3.8)
+					var samp: float = deg_to_rad(rng.randf_range(1.5, 3.0))
+					sway.tween_interval(rng.randf_range(0.0, sdur))
+					sway.tween_property(spr, "rotation", samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+					sway.tween_property(spr, "rotation", -samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-	# Water rocks — scatter along both water edges (more density, bigger, varied).
-	# Each rock gets a gentle sine bob (±2.5px y, 3-5s period, staggered phase)
-	# so the shoreline feels alive — same pattern as the duck easter egg.
-	for _wr in 10:
-		if water_rocks.is_empty():
-			break
-		var sheet: Texture2D = water_rocks[rng.randi() % water_rocks.size()]
+	# --- Bushes: 4 fixed spots (LAYOUT bushes), already symmetric pairs ---
+	var bush_layout := [[168.0, 322.0, 1], [552.0, 318.0, 2], [168.0, 740.0, 3], [552.0, 734.0, 4]]
+	for b in bush_layout:
+		var path: String = deco_base + "Decorations/Bushe%d.png" % b[2]
+		if not ResourceLoader.exists(path):
+			continue
+		var sheet: Texture2D = load(path)
 		var spr := Sprite2D.new()
-		var frame_count: int = maxi(1, sheet.get_width() / sheet.get_height())
-		spr.texture = _extract_sprite_frame(sheet, rng.randi() % frame_count)
-		# Alternate between left and right water edges with some randomness
-		var wx: float
-		if _wr % 2 == 0:
-			wx = rng.randf_range(5, 42)  # Left water edge
-		else:
-			wx = rng.randf_range(678, 715)  # Right water edge
-		var wy: float = rng.randf_range(120, 920)
-		spr.position = Vector2(wx, wy)
+		spr.texture = _extract_sprite_frame(sheet, 0)
+		spr.position = Vector2(b[0], b[1])
 		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var s: float = rng.randf_range(0.25, 0.45)  # Bigger than before (was 0.15-0.28)
-		spr.scale = Vector2(s, s)
-		spr.modulate.a = 0.5  # T-039: reduced from 0.7
+		spr.scale = Vector2(0.5, 0.5)
+		var tex_size: Vector2 = spr.texture.get_size() if spr.texture else Vector2(32, 32)
+		spr.offset = Vector2(0, -tex_size.y * 0.5)  # sway from the base
+		deco_layer.add_child(spr)
+		var sway_tw := spr.create_tween().set_loops()
+		var sway_dur: float = rng.randf_range(1.8, 2.8)
+		var sway_amp: float = deg_to_rad(rng.randf_range(3.0, 5.0))
+		sway_tw.tween_interval(rng.randf_range(0.0, sway_dur))
+		sway_tw.tween_property(spr, "rotation", sway_amp, sway_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		sway_tw.tween_property(spr, "rotation", -sway_amp, sway_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+
+	# --- Midfield rock accents: 2 fixed (LAYOUT rocks) — no rotation ---
+	var rock_layout := [[340.0, 508.0, 1], [388.0, 540.0, 2]]
+	for r in rock_layout:
+		var path: String = deco_base + "Decorations/Rock%d.png" % r[2]
+		if not ResourceLoader.exists(path):
+			continue
+		var spr := Sprite2D.new()
+		spr.texture = load(path)
+		spr.position = Vector2(r[0], r[1])
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		spr.scale = Vector2(0.4, 0.4)
+		deco_layer.add_child(spr)
+
+	# --- Water rocks IN the water (LAYOUT water_rocks), gentle bob ---
+	var wrock_layout := [[40.0, 300.0, 1], [684.0, 360.0, 2], [34.0, 700.0, 3], [688.0, 760.0, 4]]
+	for wr in wrock_layout:
+		var path: String = deco_base + "Decorations/Water Rocks_%02d.png" % wr[2]
+		if not ResourceLoader.exists(path):
+			continue
+		var sheet: Texture2D = load(path)
+		var frame_count: int = maxi(1, sheet.get_width() / sheet.get_height())
+		var spr := Sprite2D.new()
+		spr.texture = _extract_sprite_frame(sheet, int(wr[2]) % frame_count)
+		spr.position = Vector2(wr[0], wr[1])
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		spr.scale = Vector2(0.5, 0.5)
 		deco_layer.add_child(spr)
 		var bob_dur: float = rng.randf_range(3.0, 5.0)
 		var bob_amp: float = rng.randf_range(2.0, 3.0)
 		var bob_tw := spr.create_tween().set_loops()
-		bob_tw.tween_interval(rng.randf_range(0.0, bob_dur))  # Stagger so rocks aren't synchronized
-		bob_tw.tween_property(spr, "position:y", wy + bob_amp, bob_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		bob_tw.tween_property(spr, "position:y", wy - bob_amp, bob_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		bob_tw.tween_interval(rng.randf_range(0.0, bob_dur))
+		bob_tw.tween_property(spr, "position:y", wr[1] + bob_amp, bob_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		bob_tw.tween_property(spr, "position:y", wr[1] - bob_amp, bob_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-	# Stumps scattered in grass zones
-	var stump_positions := [
-		Vector2(130, 200), Vector2(530, 260),
-		Vector2(150, 800), Vector2(560, 880),
-	]
-	for pos in stump_positions:
-		if stumps.is_empty():
-			break
-		var spr := Sprite2D.new()
-		spr.texture = stumps[rng.randi() % stumps.size()]
-		spr.position = pos
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var s: float = rng.randf_range(0.2, 0.35)
-		spr.scale = Vector2(s, s)
-		spr.modulate.a = 0.55  # T-039: reduced from 0.75
-		deco_layer.add_child(spr)
+	# --- Gold nugget clusters (LAYOUT gold): 3 nuggets per spot, both halves ---
+	var gold_layout := [[178.0, 508.0], [542.0, 508.0]]
+	for g in gold_layout:
+		for k in 3:
+			var path: String = deco_base + "Resources/Gold Stone %d.png" % ((k % 6) + 1)
+			if not ResourceLoader.exists(path):
+				continue
+			var spr := Sprite2D.new()
+			spr.texture = load(path)
+			spr.position = Vector2(g[0] + (k - 1.5) * 34.0 + 17.0, g[1] + (k % 2) * 16.0)
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			spr.scale = Vector2(0.55, 0.55)
+			deco_layer.add_child(spr)
 
-	# Gold nugget clusters — symmetric flanking "resource piles" (mockups show a bright gold
-	# pile). Brighter + bigger than the old faint stones; mirrored L/R about x=360, kept in the
-	# flanking grass (off the combat centre) so they read as scenery, not a unit.
-	var gold_texs: Array[Texture2D] = []
-	for i in range(1, 7):
-		var gp: String = deco_base + "Resources/Gold Stone %d.png" % i
-		if ResourceLoader.exists(gp):
-			gold_texs.append(load(gp))
-	if not gold_texs.is_empty():
-		var gold_left := [Vector2(150, 470), Vector2(135, 720)]
-		var gold_spots: Array[Vector2] = []
-		for c in gold_left:
-			gold_spots.append(c)
-			gold_spots.append(Vector2(720.0 - c.x, c.y))  # mirror to right flank
-		for spot in gold_spots:
-			for _g in rng.randi_range(2, 3):
-				var spr := Sprite2D.new()
-				spr.texture = gold_texs[rng.randi() % gold_texs.size()]
-				spr.position = spot + Vector2(rng.randf_range(-16, 16), rng.randf_range(-12, 12))
-				spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-				var gs: float = rng.randf_range(0.24, 0.34)
-				spr.scale = Vector2(gs, gs)
-				spr.modulate.a = 0.9
-				deco_layer.add_child(spr)
-
-	# Sheep grazing in the meadow — a charming Tiny-Swords touch present in every mockup.
-	# Symmetric pairs (mirrored about x=360) in the flanking grass, clear of the combat centre
-	# so they never tangle with fighting units. Animated (grazing) + a gentle idle bob.
+	# --- Sheep grazing (LAYOUT sheep): animated, both halves mirrored ---
 	var sheep_tex = load(deco_base + "Resources/Sheep_Grass.png")
 	if sheep_tex:
 		var sheep_sf := SpriteFrames.new()
@@ -1925,39 +1735,37 @@ func _setup_terrain_decorations() -> void:
 		sheep_sf.add_animation(&"graze")
 		sheep_sf.set_animation_speed(&"graze", 6)
 		sheep_sf.set_animation_loop(&"graze", true)
-		var sh_fh: int = sheep_tex.get_height()         # 128
-		var sh_fc: int = sheep_tex.get_width() / sh_fh   # 12 grazing frames
+		var sh_fh: int = sheep_tex.get_height()
+		var sh_fc: int = sheep_tex.get_width() / sh_fh
 		for si in sh_fc:
 			var atlas := AtlasTexture.new()
 			atlas.atlas = sheep_tex
 			atlas.region = Rect2(si * sh_fh, 0, sh_fh, sh_fh)
 			sheep_sf.add_frame(&"graze", atlas)
-		var sheep_left := [Vector2(150, 340), Vector2(120, 500), Vector2(160, 650)]
-		var sheep_spots: Array[Vector2] = []
-		for c in sheep_left:
-			sheep_spots.append(c)
-			sheep_spots.append(Vector2(720.0 - c.x, c.y))  # mirror to right flank
-		for idx in sheep_spots.size():
-			var spos: Vector2 = sheep_spots[idx]
-			var sheep := AnimatedSprite2D.new()
-			sheep.sprite_frames = sheep_sf
-			sheep.position = spos
-			sheep.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			var ss: float = rng.randf_range(0.22, 0.27)
-			sheep.scale = Vector2(ss, ss)
-			sheep.flip_h = (idx % 2 == 1)  # right-side sheep face inward toward the arena
-			sheep.modulate.a = 0.95
-			sheep.z_index = 0
-			sheep.play(&"graze")
-			sheep.frame = rng.randi() % sh_fc
-			deco_layer.add_child(sheep)
-			var sb := sheep.create_tween().set_loops()
-			var sbd: float = rng.randf_range(2.2, 3.4)
-			sb.tween_interval(rng.randf_range(0.0, sbd))
-			sb.tween_property(sheep, "position:y", spos.y + 2.0, sbd * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-			sb.tween_property(sheep, "position:y", spos.y - 2.0, sbd * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		# (cx, cy, flip_h) — enemy half; mirrored below with flipped facing
+		var sheep_layout := [
+			[178.0, 392.0, false], [542.0, 392.0, true],
+			[160.0, 668.0, false], [560.0, 660.0, true],
+		]
+		for sl in sheep_layout:
+			for half in 2:
+				var sy: float = sl[1] if half == 0 else 2.0 * FLIP_PIVOT_Y - sl[1]
+				var sheep := AnimatedSprite2D.new()
+				sheep.sprite_frames = sheep_sf
+				sheep.position = Vector2(sl[0], sy)
+				sheep.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				sheep.scale = Vector2(0.55, 0.55)
+				sheep.flip_h = sl[2] if half == 0 else not sl[2]
+				sheep.play(&"graze")
+				sheep.frame = rng.randi() % sh_fc
+				deco_layer.add_child(sheep)
+				var sb := sheep.create_tween().set_loops()
+				var sbd: float = rng.randf_range(2.2, 3.4)
+				sb.tween_interval(rng.randf_range(0.0, sbd))
+				sb.tween_property(sheep, "position:y", sy + 2.0, sbd * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+				sb.tween_property(sheep, "position:y", sy - 2.0, sbd * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-	# Rubber duck easter egg in water — animated 3-frame sprite sheet (96x32 = 3 frames of 32x32)
+	# --- Rubber duck easter egg (kept, now fully opaque) ---
 	var duck_tex = load(deco_base + "Decorations/Rubber duck.png")
 	if duck_tex:
 		var duck_sf := SpriteFrames.new()
@@ -1966,162 +1774,31 @@ func _setup_terrain_decorations() -> void:
 		duck_sf.add_animation(&"swim")
 		duck_sf.set_animation_speed(&"swim", 3)
 		duck_sf.set_animation_loop(&"swim", true)
-		var duck_frame_w: int = duck_tex.get_height()  # 32
-		var duck_fc: int = duck_tex.get_width() / duck_frame_w  # 3
+		var duck_frame_w: int = duck_tex.get_height()
+		var duck_fc: int = duck_tex.get_width() / duck_frame_w
 		for di in duck_fc:
 			var atlas := AtlasTexture.new()
 			atlas.atlas = duck_tex
 			atlas.region = Rect2(di * duck_frame_w, 0, duck_frame_w, duck_frame_w)
 			duck_sf.add_frame(&"swim", atlas)
-
 		var duck := AnimatedSprite2D.new()
 		duck.sprite_frames = duck_sf
-		duck.position = Vector2(rng.randf_range(8, 30), rng.randf_range(400, 600))
+		duck.position = Vector2(36, rng.randf_range(430, 560))
 		duck.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		duck.scale = Vector2(0.6, 0.6)
-		duck.modulate.a = 0.75
 		duck.play(&"swim")
 		deco_layer.add_child(duck)
-		# Gentle bob + drift animation
 		var duck_tw := duck.create_tween().set_loops()
 		duck_tw.tween_property(duck, "position:y", duck.position.y + 4, 2.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 		duck_tw.tween_property(duck, "position:y", duck.position.y - 4, 2.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		# Slow horizontal drift
 		var drift_tw := duck.create_tween().set_loops()
 		drift_tw.tween_property(duck, "position:x", duck.position.x + 8, 6.0)
 		drift_tw.tween_property(duck, "position:x", duck.position.x - 2, 6.0)
 
-	# Clouds floating across screen (above everything, decorative)
-	var cloud_layer := Node2D.new()
-	cloud_layer.z_index = 50
-	cloud_layer.name = "CloudLayer"
-	add_child(cloud_layer)
-
-	# Clouds drift uniformly rightward at ~8 px/s ± 30% with screen-edge wrap —
-	# continuous parallax instead of the earlier back-and-forth tween, which
-	# looked unnatural (clouds don't reverse direction mid-sky). Speed meta
-	# is read each frame in `_process_ambient_clouds`.
-	_ambient_clouds.clear()
-	for i in 6:
-		if clouds.is_empty():
-			break
-		var spr := Sprite2D.new()
-		spr.texture = clouds[rng.randi() % clouds.size()]
-		spr.position = Vector2(rng.randf_range(-50, 720), rng.randf_range(40, 500))
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var s: float = rng.randf_range(0.2, 0.4)
-		spr.scale = Vector2(s, s)
-		spr.modulate.a = 0.18  # T-039: reduced from 0.25
-		cloud_layer.add_child(spr)
-		spr.set_meta("drift_speed", 8.0 * rng.randf_range(0.7, 1.3))
-		_ambient_clouds.append(spr)
-
-	# T-061: Faction-themed environmental decorations (procedural)
-	_add_faction_decorations(deco_layer, rng)
-
-	# Trees removed from this map
-	# _render_combat_tree_wall(deco_layer, tree_sheets, rng)
-
-
-func _add_faction_decorations(deco_layer: Node2D, rng: RandomNumberGenerator) -> void:
-	# Subtle faction markers + a symmetric wildflower dapple. Scorch marks and combat-lane
-	# debris were removed — the mockups are a clean lush meadow, and those dark smudges
-	# muddied the grass and worked against the peaceful Tiny-Swords look.
-
-	# Blue banners on player side (drawn as flag poles)
-	for pos in [Vector2(180, 760), Vector2(530, 800), Vector2(160, 900), Vector2(555, 870)]:
-		var banner := Node2D.new()
-		banner.position = pos
-		banner.z_index = 1
-		banner.draw.connect(_draw_banner.bind(banner, Color(0.25, 0.45, 0.85, 0.5), rng.randf()))
-		deco_layer.add_child(banner)
-
-	# Red banners on enemy side (mirrors the blue banners for a symmetric faction marker)
-	for pos in [Vector2(180, 120), Vector2(530, 160), Vector2(160, 260), Vector2(555, 230)]:
-		var banner := Node2D.new()
-		banner.position = pos
-		banner.z_index = 1
-		banner.draw.connect(_draw_banner.bind(banner, Color(0.82, 0.22, 0.12, 0.5), rng.randf()))
-		deco_layer.add_child(banner)
-
-	# Wildflowers scattered across the WHOLE meadow (both halves) — small colourful dots
-	# that give the grass organic life, like the mockup, without any tiled patchiness.
-	for _f in 14:
-		var fx: float = rng.randf_range(90, 630)
-		var fy: float = rng.randf_range(150, 960)
-		var flower := Node2D.new()
-		flower.position = Vector2(fx, fy)
-		flower.z_index = 0
-		var fc: Color = [Color(0.9, 0.3, 0.4, 0.5), Color(0.4, 0.3, 0.9, 0.5), Color(0.9, 0.8, 0.2, 0.5)][rng.randi() % 3]
-		flower.draw.connect(_draw_flower.bind(flower, fc))
-		deco_layer.add_child(flower)
-
-
-func _draw_banner(node: Node2D, color: Color, phase: float) -> void:
-	# Pole
-	node.draw_line(Vector2(0, 0), Vector2(0, -20), Color(0.5, 0.35, 0.2, 0.5), 2.0)
-	# Flag (triangle)
-	var wave: float = sin(phase * TAU) * 1.5
-	var pts := PackedVector2Array([
-		Vector2(1, -20), Vector2(12 + wave, -15), Vector2(1, -10)
-	])
-	node.draw_colored_polygon(pts, color)
-
-
-func _draw_flower(node: Node2D, color: Color) -> void:
-	# Small 4-petal flower
-	for i in 4:
-		var a: float = i * TAU / 4.0
-		node.draw_circle(Vector2(cos(a) * 2, sin(a) * 2), 1.5, color)
-	node.draw_circle(Vector2.ZERO, 1.2, Color(0.9, 0.85, 0.3, 0.5))
-
-
-## T-064: Render tree wall in combat zone + worn paths at gaps
-func _render_combat_tree_wall(deco_layer: Node2D, tree_sheets: Array[Texture2D], rng: RandomNumberGenerator) -> void:
-	if tree_sheets.is_empty():
-		return
-	var tree_cells := [
-		[6, 1], [6, 2], [6, 3], [6, 7], [6, 8], [6, 9],
-		[7, 1], [7, 2], [7, 3], [7, 7], [7, 8], [7, 9],
-	]
-	for cell in tree_cells:
-		var row: int = cell[0]
-		var col: int = cell[1]
-		var cx: float = GRID_MARGIN_X + col * CELL_SIZE + CELL_SIZE * 0.5
-		var cy: float = COMBAT_Y + row * CELL_SIZE + CELL_SIZE * 0.5
-		var sheet: Texture2D = tree_sheets[rng.randi() % tree_sheets.size()]
-		var spr := Sprite2D.new()
-		spr.texture = _extract_sprite_frame(sheet, rng.randi() % 4)
-		spr.position = Vector2(cx + rng.randf_range(-3, 3), cy + rng.randf_range(-3, 3))
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var s: float = rng.randf_range(0.28, 0.38)
-		spr.scale = Vector2(s, s)
-		spr.modulate.a = 0.85
-		spr.z_index = 2
-		deco_layer.add_child(spr)
-		# Sway
-		var tw := spr.create_tween().set_loops()
-		var dur: float = rng.randf_range(2.5, 3.5)
-		var amt: float = deg_to_rad(rng.randf_range(1.5, 3.0))
-		tw.tween_property(spr, "rotation", amt, dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(spr, "rotation", -amt, dur).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(spr, "rotation", 0.0, dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-
-	# Worn path at gaps (cols 0, 4-5-6, 10)
-	for gc in [0, 4, 5, 6, 10]:
-		for gr in [6, 7]:
-			var gx: float = GRID_MARGIN_X + gc * CELL_SIZE + CELL_SIZE * 0.5
-			var gy: float = COMBAT_Y + gr * CELL_SIZE + CELL_SIZE * 0.5
-			var path := Node2D.new()
-			path.position = Vector2(gx, gy)
-			path.z_index = 0
-			path.draw.connect(_draw_worn_path.bind(path))
-			deco_layer.add_child(path)
-
-
-func _draw_worn_path(node: Node2D) -> void:
-	node.draw_rect(Rect2(-12, -12, 24, 24), Color(0.5, 0.4, 0.25, 0.2))
-	node.draw_rect(Rect2(-8, -8, 16, 16), Color(0.55, 0.42, 0.28, 0.15))
+	# Removed vs the old builder (design-flow parity with the mockups):
+	# random scatter placement, alpha-faded everything, rotated rocks, stumps,
+	# 0.18-alpha clouds, procedural vector banners/flowers/scorch/debris
+	# (_add_faction_decorations). The mockups contain none of these.
 
 
 # --- Smart AI Opponent ---

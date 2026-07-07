@@ -68,6 +68,13 @@ func _init() -> void:
 	# Phase-2 detector suite (BUG-51/52) — user-reported 2026-04-21.
 	_check_battle_tab_always_lifted()     # BUG-51
 	_check_non_battle_tab_scenic_bleed()  # BUG-52
+	# Arena composition-parity suite (design-flow.md, 2026-07-08) — the approved
+	# pixel spec is design/arena_target.png; these detectors pin its four
+	# load-bearing properties so the port can't drift back.
+	_check_arena_water_native()           # native teal, no modulate tint
+	_check_arena_castle_scale()           # mockup-scale castle (≥160px capture)
+	_check_arena_fortress_towers()        # decorative towers flank each castle
+	_check_arena_coastline_platform()     # platform edge at design x=72
 	_print_results()
 	quit(1 if _fail > 0 else 0)
 
@@ -696,6 +703,141 @@ func _is_scenic_palette(c: Color) -> bool:
 	if c.b > c.r and absf(c.g - c.b) < 0.12 and c.r > 0.24 and c.r < 0.63:
 		return true
 	return false
+
+
+# --- Arena composition-parity suite (design-flow.md) ---
+# Spec: design/arena_target.png (approved 2026-07-08), capture-res twin
+# design/arena_target_capture_res.png. Calibrated 2026-07-08 on 504x896 captures
+# (0.7x of 720x1280 design space). RED-verified against the pre-port build:
+# water (28,85,93) tinted, castle 96px, no towers, coastline at x=28.
+
+const ARENA_CAPTURE: String = "game_002.png"
+
+
+## Grass/foliage family: green dominant, blue clearly below green.
+func _arena_is_green(c: Color) -> bool:
+	return c.g > 0.35 and c.g > c.r and (c.g - c.b) > 0.15
+
+
+## Native Tiny Swords water teal (71,171,169)/255 = (0.28,0.67,0.66).
+func _arena_is_teal(c: Color) -> bool:
+	return c.b > 0.45 and absf(c.g - c.b) < 0.12 and c.g > c.r + 0.15
+
+
+## Water must be the NATIVE pack teal — no modulate tint. The old build multiplied
+## (71,171,169) by (0.4,0.5,0.55) → (28,85,93), a murky near-black gutter.
+func _check_arena_water_native() -> void:
+	print("[Arena water native teal (design-flow parity)]")
+	var img := _load_capture(ARENA_CAPTURE)
+	if img == null:
+		return
+	# Sample well inside the water bands (design x<72 → capture x<50, both sides).
+	var samples := [Vector2i(12, 300), Vector2i(12, 500), Vector2i(492, 350), Vector2i(492, 550)]
+	var bad: int = 0
+	var worst := ""
+	for p in samples:
+		var c: Color = img.get_pixel(p.x, p.y)
+		var dr: float = absf(c.r - 71.0 / 255.0)
+		var dg: float = absf(c.g - 171.0 / 255.0)
+		var db: float = absf(c.b - 169.0 / 255.0)
+		if dr > 0.14 or dg > 0.14 or db > 0.14:
+			bad += 1
+			worst = "(%d,%d)=(%d,%d,%d)" % [p.x, p.y, c.r8, c.g8, c.b8]
+	if bad == 0:
+		_assert_pass("water bands are native teal (71,171,169) at all 4 samples")
+	else:
+		_assert_fail("arena water tinted off native palette — %d/4 samples off, e.g. %s" % [bad, worst],
+			"expected ~(71,171,169); remove modulate tints on water layers")
+
+
+## Castle must render at mockup scale: red-roof bbox ≥160px wide in the top strip
+## (target: ~197px capture; pre-port build: ~96px).
+func _check_arena_castle_scale() -> void:
+	print("[Arena castle scale (design-flow parity)]")
+	var img := _load_capture(ARENA_CAPTURE)
+	if img == null:
+		return
+	# Largest CONTIGUOUS red-roof run on any single row (gaps ≤8px bridged) —
+	# a global bbox would false-pass on scattered small red-roofed buildings
+	# (pre-port build measured a 343px bbox from grid houses vs a 96px castle).
+	# Scan starts at y=34 — BELOW the top HUD ribbon (capture y 0..30), whose
+	# red-leather texture otherwise reads as a full-width "roof" (false PASS).
+	var best_run: int = 0
+	for y in range(34, 170):
+		var run: int = 0
+		var gap: int = 99
+		var cur: int = 0
+		for x in range(100, 404):
+			var c: Color = img.get_pixel(x, y)
+			# Tiny Swords red roof family: strong red, muted green/blue
+			if c.r > 0.55 and c.r > c.g + 0.25 and c.b < 0.40:
+				if gap > 8:
+					cur = 0
+				cur += 1 + mini(gap, 8) if cur > 0 else 1
+				gap = 0
+			else:
+				gap += 1
+			run = maxi(run, cur)
+		best_run = maxi(best_run, run)
+	if best_run >= 160:
+		_assert_pass("enemy castle red-roof run %dpx ≥ 160px (mockup scale)" % best_run)
+	else:
+		_assert_fail("enemy castle too small — widest contiguous red-roof run %dpx < 160px" % best_run,
+			"target castle content ≈197px at capture res (scale 0.9 native)")
+
+
+## Decorative fortress towers must flank the castle at design (140,268)/(580,268)
+## → capture windows around (98,150)/(406,150). Structure = non-green, non-teal,
+## non-dark pixels (cream walls / red roofs), ≥250 px per window.
+func _check_arena_fortress_towers() -> void:
+	print("[Arena fortress towers (design-flow parity)]")
+	var img := _load_capture(ARENA_CAPTURE)
+	if img == null:
+		return
+	var windows := [Rect2i(76, 96, 44, 92), Rect2i(384, 96, 44, 92)]
+	var counts: Array = []
+	for wrect in windows:
+		var n: int = 0
+		for y in range(wrect.position.y, wrect.position.y + wrect.size.y):
+			for x in range(wrect.position.x, wrect.position.x + wrect.size.x):
+				var c: Color = img.get_pixel(x, y)
+				if not _arena_is_green(c) and not _arena_is_teal(c) and (c.r + c.g + c.b) > 0.9:
+					n += 1
+		counts.append(n)
+	if counts[0] >= 250 and counts[1] >= 250:
+		_assert_pass("fortress towers present both flanks (structure px L=%d R=%d)" % [counts[0], counts[1]])
+	else:
+		_assert_fail("fortress towers missing — structure px L=%d R=%d (need ≥250 each)" % [counts[0], counts[1]],
+			"decorative Tower.png at design (140,268)/(580,268) per arena_target.png")
+
+
+## The grass platform edge must sit at design x=72 (capture x≈50), not the old
+## full-bleed rectangle at design x=40 (capture x=28).
+func _check_arena_coastline_platform() -> void:
+	print("[Arena coastline platform edge (design-flow parity)]")
+	var img := _load_capture(ARENA_CAPTURE)
+	if img == null:
+		return
+	# Rows chosen CLEAR of the left tree clusters (design y≈360-470/520-660,
+	# whose teal-green pine foliage fails the grass test and overhangs the coast)
+	# and of the fortress wall/houses: design y = 243, 700, 900.
+	var edges: Array = []
+	for y in [170, 490, 630]:
+		var first_green: int = -1
+		for x in range(0, 200):
+			if _arena_is_green(img.get_pixel(x, y)):
+				first_green = x
+				break
+		edges.append(first_green)
+	var ok: bool = true
+	for e in edges:
+		if e < 42 or e > 62:
+			ok = false
+	if ok:
+		_assert_pass("platform edge at capture x=%s (target 50±6 incl. edge-tile fringe)" % str(edges))
+	else:
+		_assert_fail("platform edge off-spec — first grass x=%s per row (want 44..62)" % str(edges),
+			"grass platform must start at design x=72 with edge tiles, water outside")
 
 
 # --- Pixel-detector helpers ---

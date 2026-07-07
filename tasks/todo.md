@@ -276,5 +276,12 @@ brown "combat" band (color4 olive tinted brown). All 3 mockups are ONE lush gree
 - [x] 5. Gold nugget clusters — brighter (a0.9), symmetric L/R pairs at 2 y-levels
 - [x] 5b. Removed scorch marks + combat debris (muddied clean grass); flowers now full-field symmetric
 - [x] 6. Verified: capture game_008 vs v2 (matches); L0 395/0 green; determinism golden 6/0 byte-identical
-- [ ] 7. DEPLOY (awaiting user OK): `cd castle_clash && ./build.sh` → live castlefight.pages.dev
-- [ ] 8. (Optional follow-up) stone perimeter walls castle→towers (mockup framing; building-layer, higher risk)
+- [x] 7. DEPLOYED — meadow live at castlefight.pages.dev (build 79563ff), then redeployed with ramparts
+- [x] 8. Stone ramparts (user OK'd "try carefully") — DONE as a subtle single-row grass-topped
+      cliff-edge terrace hugging each castle base (mockup v2 fortress line), symmetric about y=520.
+      Iterated: 2-row solid stone was too dominant/teal-clashing/detached → reverted to 1-row.
+      NOTE: a faithful blue-grey CRENELLATED battlement (castle→tower) needs a dedicated wall
+      sprite (A6 art task); tilemap only has water-palette cliff tiles. Offered as follow-up.
+
+**Result: muddy 3-band arena → lush symmetric Tiny-Swords meadow (uniform grass, mirrored
+tree-lines, grazing sheep, gold clusters, wildflowers) + subtle castle ramparts. Live.**

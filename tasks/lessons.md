@@ -137,3 +137,26 @@ I made three compounding mistakes on EVERY round until the last one:
 
 **One-line summary**: When the output looks wrong, inspect the asset + measure the render + re-read the reference. Don't tune positions hoping to converge.
 
+
+---
+
+## Lesson (2026-07-07) — Per-tile hue variation betrays the tile grid
+
+**Context**: 3.3b meadow overhaul. To make grass "not flat" I filled the field with a
+per-tile random pick from 3 lush green hues (color1/2/3). Captured → the arena showed an
+obvious checkerboard of rectangular green patches. The mockups have NONE of this.
+
+**Root cause**: A 64px tile filled with a uniformly-different hue makes its rectangular
+boundary visible. Random per-tile hue = a grid of visible rectangles. This is inherent to
+per-tile colour variation, not a tuning problem — closer hues or brightness jitter only
+reduce it, never remove it.
+
+**Rule — terrain variation comes from decoration, not base-tile hue.** Keep the ground a
+single uniform tile (mockups do exactly this). Get organic variation from NON-grid-aligned
+sprites on top: trees, bushes, sheep, wildflowers, gold, rocks — placed at free x/y, not
+snapped to the 64px grid. Uniform base + scattered decoration reads lush; per-tile hue reads
+tiled. Verified by capture: uniform color1 + decoration matched mockup, hue-mix did not.
+
+**Corollary — "flat" was never about uniform grass.** The original arena looked muddy
+because of the reddish enemy TINT + brown combat-lane tint, not because grass was uniform.
+Fixing the tint (→ one lush green) solved "flat"; adding hue-blocks made it worse.

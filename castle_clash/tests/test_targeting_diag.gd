@@ -200,16 +200,26 @@ func _test_units_dont_walk_past_buildings() -> void:
 						tgt = other
 						break
 				if tgt != null and tgt.type == "castle":
-					# Targeting castle while buildings still alive — check if buildings exist
-					var enemy_buildings_alive: int = 0
+					# T-096: targeting is now pure nearest-enemy — castle, buildings and
+					# units are all treated equally (see Simulation._acquire_target). A unit
+					# is only genuinely "bypassing" a building if an ALIVE enemy building is
+					# actually NEARER to it than the castle it chose. A building still alive
+					# on the far side of the field does NOT mean a unit sieging the castle
+					# walked past it. Measure the real condition: nearest alive enemy building
+					# closer than the castle target.
+					var castle_dist_sq: int = FP.mul(e.x - tgt.x, e.x - tgt.x) + FP.mul(e.y - tgt.y, e.y - tgt.y)
+					var nearer_building: bool = false
 					for other in sim.entities:
 						if other.type == "building" and other.team == 1 and FP.gt(other.hp, FP.ZERO):
-							enemy_buildings_alive += 1
-					if enemy_buildings_alive > 0:
+							var bd_sq: int = FP.mul(e.x - other.x, e.x - other.x) + FP.mul(e.y - other.y, e.y - other.y)
+							if FP.lt(bd_sq, castle_dist_sq):
+								nearer_building = true
+								break
+					if nearer_building:
 						past_enemy_buildings_no_engage += 1
-						print("    Castle-target with %d buildings alive: %s #%d at Y=%d" % [enemy_buildings_alive, e.unit_type, e.id, py])
+						print("    Bypass: %s #%d at Y=%d targets castle but a building is nearer" % [e.unit_type, e.id, py])
 
-	_assert(past_enemy_buildings_no_engage == 0, "no units bypass enemy buildings (%d do)" % past_enemy_buildings_no_engage)
+	_assert(past_enemy_buildings_no_engage == 0, "no units bypass a NEARER enemy building to reach castle (%d do)" % past_enemy_buildings_no_engage)
 
 
 ## Units should start attacking the castle when they reach it, not just stand there.
@@ -227,27 +237,39 @@ func _test_units_attack_castle_when_in_range() -> void:
 		sim.step([])
 
 	var castle_hp: int = FP.to_int(sim.castles[1].hp)
-	var units_sieging: int = 0
-	var units_near_castle_not_sieging: int = 0
+	var castle_max: int = FP.to_int(sim.castles[1].max_hp)  # T-089: 5000, not the stale 10000
+	# T-096: SIEGE state was removed. Attacking the castle is now the same ATTACK state (2)
+	# used for units/buildings, so we identify "sieging" by ATTACK state on a castle target.
+	# Castle also moved to Y=120 (was 70) and units stop at its edge (~Y 150-175), so the old
+	# "py < 130" proximity gate never matched — it made this test pass vacuously.
+	var castle_ent = null
+	for e in sim.entities:
+		if e.type == "castle" and e.team == 1:
+			castle_ent = e
+			break
+
+	var units_attacking_castle: int = 0
+	var units_in_range_not_attacking: int = 0
 
 	for e in sim.entities:
 		if e.type != "unit" or e.team != 0 or FP.lte(e.hp, FP.ZERO):
 			continue
-		var py: int = FP.to_int(e.y)
+		if castle_ent == null or e.target_id != castle_ent.id:
+			continue  # Only judge units that have committed to the castle
 		var state: int = e.get("state", 0)
-		if py < 130:  # Near enemy castle (Y=70)
-			if state == 3:  # SIEGE
-				units_sieging += 1
+		if sim._in_attack_range(e, castle_ent):
+			if state == 2:  # ATTACK (formerly SIEGE for castles)
+				units_attacking_castle += 1
 			else:
-				units_near_castle_not_sieging += 1
-				print("    Near castle not sieging: %s #%d at Y=%d state=%d target=%d is_moving=%s" % [
-					e.unit_type, e.id, py, state, e.target_id, e.get("is_moving", false)])
+				units_in_range_not_attacking += 1
+				print("    In-range castle-targeter not attacking: %s #%d at Y=%d state=%d is_moving=%s" % [
+					e.unit_type, e.id, FP.to_int(e.y), state, e.get("is_moving", false)])
 
-	print("  Castle HP: %d (damaged=%s), sieging=%d, near-but-not-sieging=%d" % [
-		castle_hp, castle_hp < 10000, units_sieging, units_near_castle_not_sieging])
+	print("  Castle HP: %d/%d (damaged=%s), attacking=%d, in-range-not-attacking=%d" % [
+		castle_hp, castle_max, castle_hp < castle_max, units_attacking_castle, units_in_range_not_attacking])
 
-	_assert(castle_hp < 10000, "castle takes damage (HP=%d)" % castle_hp)
-	_assert(units_near_castle_not_sieging == 0, "all units near castle are sieging (%d not)" % units_near_castle_not_sieging)
+	_assert(castle_hp < castle_max, "castle takes damage (HP=%d/%d)" % [castle_hp, castle_max])
+	_assert(units_in_range_not_attacking == 0, "all in-range castle targeters are attacking (%d not)" % units_in_range_not_attacking)
 
 
 ## Castle should always be the fallback target — no unit should ever have target_id=-1.
@@ -279,7 +301,8 @@ func _test_castle_always_target_fallback() -> void:
 	_assert(no_target_ticks < total_checks * 0.02, "< 2%% of unit-ticks without target (%d/%d)" % [no_target_ticks, total_checks])
 
 
-## Units should transition through combat states (CHASE→ATTACK for units, CHASE→SIEGE for castle).
+## Units should transition through combat states (CHASE→ATTACK). T-096 merged the old
+## SIEGE state into ATTACK, so attacking the castle is just ATTACK on a castle target.
 func _test_chase_to_attack_transition() -> void:
 	print("\n[Units enter combat states (ATTACK or SIEGE)]")
 	var sim := _create_sim()
@@ -290,9 +313,15 @@ func _test_chase_to_attack_transition() -> void:
 		Command.place_building(1, &"war_camp", 0, 0),
 	])
 
-	# Track state transitions
-	var ever_attacked: Dictionary = {}  # unit_id -> bool (ATTACK state = fighting unit/building)
-	var ever_sieged: Dictionary = {}    # unit_id -> bool (SIEGE state = fighting castle)
+	# Track state transitions.
+	# T-096: the SIEGE state (formerly 3) was removed — attacking the castle is now the
+	# same ATTACK state (2) used against units/buildings. So "reached combat" == entered
+	# ATTACK from CHASE. We still surface how many units attacked the castle specifically,
+	# but do not assert on it: in this contested 1v1, reaching the enemy castle within 800
+	# ticks is not guaranteed. Castle-siege capability is asserted deterministically in the
+	# single-team _test_units_attack_castle_when_in_range scenario instead.
+	var ever_attacked: Dictionary = {}   # unit_id -> bool (ATTACK state; unit, building OR castle)
+	var attacked_castle: Dictionary = {} # unit_id -> bool (ATTACK state while targeting the castle)
 	var ever_chased: Dictionary = {}
 
 	for i in 800:
@@ -305,18 +334,18 @@ func _test_chase_to_attack_transition() -> void:
 				ever_chased[e.id] = true
 			if state == 2:  # ATTACK
 				ever_attacked[e.id] = true
-			if state == 3:  # SIEGE
-				ever_sieged[e.id] = true
+				var tgt = sim._find_entity_by_id(e.target_id)
+				if tgt != null and tgt.type == "castle":
+					attacked_castle[e.id] = true
 
 	var chased_count: int = ever_chased.size()
 	var attacked_count: int = ever_attacked.size()
-	var sieged_count: int = ever_sieged.size()
+	var castle_attackers: int = attacked_castle.size()
 	var combat_count: int = 0
 	for uid in ever_chased:
-		if ever_attacked.has(uid) or ever_sieged.has(uid):
+		if ever_attacked.has(uid):
 			combat_count += 1
 
-	print("  %d chased, %d attacked units, %d sieged castle, %d reached combat" % [
-		chased_count, attacked_count, sieged_count, combat_count])
-	_assert(combat_count > 0, "units reached combat (ATTACK or SIEGE) from CHASE (%d)" % combat_count)
-	_assert(sieged_count > 0, "some units entered SIEGE state (%d)" % sieged_count)
+	print("  %d chased, %d entered ATTACK (unit/building/castle), %d attacked castle, %d reached combat" % [
+		chased_count, attacked_count, castle_attackers, combat_count])
+	_assert(combat_count > 0, "units reached combat (ATTACK) from CHASE (%d)" % combat_count)

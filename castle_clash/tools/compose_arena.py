@@ -7,11 +7,14 @@ the pixel spec → the game PORTS the LAYOUT tables below verbatim → parity
 detectors in tests/test_screen_layout.gd pin it.
 
 INVARIANTS (user feedback 2026-07-08):
-  * SYMMETRY BY CONSTRUCTION — decorations are authored for the LEFT side of
-    the ENEMY (top) half only. Right side = x-mirror (720-x, same y). Player
-    half = y-mirror about FLIP_PIVOT (1040-y). Multiplayer perspective flip
-    (sim_to_screen Y-reflection) therefore shows both players an identical
-    arena. Never hand-place an unmirrored decoration.
+  * SYMMETRY BY CONSTRUCTION, PERSPECTIVE-LOCKED — decorations are authored
+    for the LEFT side of the ENEMY (top) half only. Right side = x-mirror
+    (720-x, same y). Player half = y-mirror about FLIP_PIVOT (1040-y).
+    POSITIONS mirror; ORIENTATIONS never do: the 2.5D camera does not flip
+    with the layout, so elevation/cliff tiles keep their stone "bar" face
+    pointing SOUTH (screen-down) on BOTH halves, with only the thin rim line
+    on top denoting height (user feedback 2026-07-08, Tiny Swords reference).
+    Never flip_v a terrain or building tile.
   * Y-SORTED RENDERING — decorations paint back-to-front by ground-y exactly
     like the game's y-sorted DecorationLayer, so layering bugs (sheep floating
     on trees) are visible HERE before approval, not after the port.
@@ -92,11 +95,12 @@ FOAM = TER / "Water Foam.png"
 PLAT_X0, PLAT_X1 = 72, 648
 PLAT_Y0, PLAT_Y1 = 72, 968
 
-CASTLE_SCALE = 0.68                  # 0.296 * 720 / 312px content (measured)
+CASTLE_SCALE = 0.544                 # 0.68 measured mockup fraction x0.8 (user: placed buildings overlapped the castle)
 CASTLE_ANCHOR = (360, 120)           # sim anchor (enemy); player = y-mirror
 
 # Fortress dressing (enemy half; x already centered/paired where needed)
-WALL_Y = 126                         # wall row bottom (190) = castle base ✓
+WALL_Y_ENEMY = 112                   # stone bottom (176) = red castle base at 0.544
+WALL_Y_PLAYER = 912                  # stone bottom (976) = blue castle base — face STILL south
 WALL_X = (140, 580)
 TOWER_SCALE, TOWER_GY = 0.72, 268    # flanking towers at x=140 / 720-140
 HOUSE = ("House1.png", 122, 148, 0.62)   # corner house; mirrored 4x
@@ -149,14 +153,13 @@ def render(show_grid: bool = False) -> Image.Image:
                                 (PLAT_X0 + c * TS, PLAT_Y0 + r * TS))
 
     # Per-half fortress: stone wall row, then castle/towers/houses.
-    stone = tile_of(GRASS, 6, 4)
+    stone = tile_of(GRASS, 6, 4)  # stone face w/ rim line on top — NEVER flipped
     for team, flip in (("red", False), ("blue", True)):
         bdir = A / "buildings" / team
-        wy = WALL_Y if not flip else mirror_y(WALL_Y) - TS
-        wt = stone.transpose(Image.FLIP_TOP_BOTTOM) if flip else stone
+        wy = WALL_Y_ENEMY if not flip else WALL_Y_PLAYER
         x = WALL_X[0]
         while x < WALL_X[1]:
-            img.alpha_composite(wt, (x, round(wy)))
+            img.alpha_composite(stone, (x, round(wy)))
             x += TS
         cy = CASTLE_ANCHOR[1] if not flip else mirror_y(CASTLE_ANCHOR[1])
         blit(img, load(bdir / "Castle.png"), CASTLE_ANCHOR[0], cy,

@@ -209,3 +209,18 @@ flow." Forensic audit (wf_772ab315) confirmed it.
    Author one quadrant; generate mirrors; assert the invariant (platform spans mirror about
    FLIP_PIVOT_Y). Matters doubly here: the multiplayer perspective flip means asymmetry =
    different-looking arenas for the two players.
+
+---
+
+## Lesson (2026-07-08c) — 2.5D perspective orientation is not mirrorable
+
+**Context**: To mirror the player-half fortress wall I vertically flipped the stone cliff
+tile. User caught it: in Tiny Swords' fake-3D top-down perspective, the stone "bar" face of
+any elevation ALWAYS points SOUTH (screen-down) — you see cliff faces below plateaus, never
+above them; a plateau's top boundary is only a thin rim line. A flipped cliff tile is
+perspective-illegal and reads instantly wrong.
+
+**Rule — mirror positions, never orientations.** Layout symmetry = mirrored coordinates.
+Tile/sprite orientation is owned by the camera perspective, which does not flip with the
+layout. Never flip_v elevation, cliff, or building art. "The bar-like edge of the cliff at
+the bottom of the castle, wherever the player is."

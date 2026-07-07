@@ -75,6 +75,10 @@ the gap was never the assets — it was the workflow:
   (left side of the enemy half); the tool generates x/y mirrors and asserts the
   platform mirrors about the flip pivot. Multiplayer perspective flip then
   guarantees identical views for both players — hand-mirroring drifts.
+- **Mirror positions, never orientations (2.5D perspective lock).** The camera's
+  fake-3D does not flip with the layout: elevation/cliff stone faces always
+  point SOUTH, rim lines on top. Never flip_v terrain or building art when
+  mirroring — a flipped cliff is perspective-illegal (user caught this 2026-07-08).
 
 ## Tooling
 

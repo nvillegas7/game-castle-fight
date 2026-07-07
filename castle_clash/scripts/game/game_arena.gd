@@ -1446,29 +1446,28 @@ func _build_terrain_textures() -> void:
 	_add_water_foam()
 
 
-## Fortress WALL rows per half (design/arena_target.png): a solid stone wall row
-## (elevated stone-face tile, col6 row4) whose bottom edge (y=190) aligns with
-## the castle base at 0.68 scale — "the edges align" (user feedback 2026-07-08).
-## Towers/houses live in the y-sorted DecorationLayer (see
-## _setup_terrain_decorations) so sheep/trees layer correctly against them.
-## Enemy half as-authored; player half = exact mirror about FLIP_PIVOT_Y.
+## Fortress terrace/wall rows per half (design/arena_target.png).
+## PERSPECTIVE-LOCKED (user feedback 2026-07-08, Tiny Swords reference): the
+## 2.5D camera does not flip with the layout, so the stone "bar" face ALWAYS
+## points SOUTH (screen-down) with only the thin rim line on top denoting
+## height — on BOTH halves. Positions mirror; orientations NEVER flip.
+## Each stone row's bottom edge aligns with its castle's base ("the bar-like
+## edge of the cliff at the bottom of the castle, wherever the player is").
 func _add_fortress_dressing(parent: Node2D, tm: Texture2D, ts: float) -> void:
 	if tm == null:
 		return
 	var stone := AtlasTexture.new()
 	stone.atlas = tm
-	stone.region = Rect2(6 * 64, 4 * 64, 64, 64)  # solid stone face
-	# LAYOUT: WALL_Y=126 (row 126..190; castle base = 120+141/2 = 190), WALL_X=(140,580)
-	for spec in [[false], [true]]:
-		var flip: bool = spec[0]
-		var wy: float = 126.0 if not flip else 2.0 * FLIP_PIVOT_Y - 126.0 - ts
+	stone.region = Rect2(6 * 64, 4 * 64, 64, 64)  # stone face, rim line on top
+	# LAYOUT: WALL_Y_ENEMY=112 (bottom 176 = red castle base at 0.544),
+	# WALL_Y_PLAYER=912 (bottom 976 = blue castle base). WALL_X=(140,580).
+	for wy in [112.0, 912.0]:
 		var x: float = 140.0
 		while x < 580.0:
 			var spr := Sprite2D.new()
 			spr.texture = stone
 			spr.centered = false
 			spr.position = Vector2(x, wy)
-			spr.flip_v = flip
 			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			parent.add_child(spr)
 			x += ts

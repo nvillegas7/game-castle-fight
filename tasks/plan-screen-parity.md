@@ -105,8 +105,12 @@ KR production quality with pixel-measured findings. **PLAN ONLY — approved sco
 - The strengths the audits flagged: loading gradient/parallax, wooden progress bar,
   ribbon CTAs, tray wood texture, end-screen structure, active-tab treatment.
 
-## Open decisions for the user
-1. **P2 CTA shape**: demote PLAY ONLINE to secondary chip (recommended) vs fold into
-   game-mode selector (cleaner long-term, more UX work).
-2. **Sequencing**: P0→P1→P2→P3→P4→P5 by player impact (recommended), or menus-first?
-3. **Scope check**: all 5 packages (~5–6 focused work chunks), or cut P4/P5 for later?
+## Decisions — RESOLVED by user 2026-07-10
+1. **P2 CTA shape**: ✅ demote PLAY ONLINE to a ≥80px secondary chip clustered 24px under
+   the BATTLE ribbon (the "recommended" option). Do NOT fold into the mode selector.
+2. **Sequencing**: ✅ P0→P1→P2→P3→P4→P5 in order, by player impact.
+3. **Scope**: ✅ ALL packages P0–P5. Nothing cut.
+
+Execution model: fresh session per `/handoff`; one package = one branch → detector-first
+where feasible → `bash tests/run_all.sh` gate green → merge → `./build.sh` deploy → next
+package. Verify each screen's captures against the audit findings (wf_878bcc29) before merge.

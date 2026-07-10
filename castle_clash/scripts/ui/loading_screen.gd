@@ -557,17 +557,19 @@ func _build_plateau(parent: Control) -> void:
 	# (_, 128) gives clean top + dark bottom, so the two grass rows composite
 	# as ONE rectangle with outlines only at the outer edges.
 	#
-	# Use x=384 (interior) for every column — x=320/x=512 variants bake a side
-	# cliff column into the edge tile, which shows as an "extra border" on the
-	# outer columns (user feedback 2026-04-22: "separate column far right /
-	# extra left border"). Interior tiles give a clean straight grass block.
+	# Give the island a left/right cliff OUTLINE: the two END columns use the
+	# side-edge variants (x=320 = dark LEFT rim, x=512 = dark RIGHT rim); interior
+	# columns stay clean x=384. Edge tiles on ONLY the end columns is the outline the
+	# island needs — the 2026-04-22 "extra border" complaint was from using them on
+	# EVERY column. No flip: x=320/x=512 are distinct pre-made L/R tiles (perspective lock).
 	for col in range(cols):
+		var ax: int = 320 if col == 0 else (512 if col == cols - 1 else 384)
 		# Top row — dark top edge (grass outline), clean bottom
-		add_tile.call(col, top_y, 384, 0, -3)
+		add_tile.call(col, top_y, ax, 0, -3)
 		# Mid row — clean top (merges seamlessly with top row), dark bottom edge
-		add_tile.call(col, mid_y, 384, 128, -3)
+		add_tile.call(col, mid_y, ax, 128, -3)
 		# Cliff face
-		add_tile.call(col, cliff_y, 384, 256, -2)
+		add_tile.call(col, cliff_y, ax, 256, -2)
 
 	# Water Foam is a LOCALIZED wave-blob sprite (frame 0 opaque content at y=58..141
 	# in the 192×192 tile — everything else is transparent). Stretching it into a

@@ -81,6 +81,11 @@ func _init() -> void:
 	_check_gold_bar_has_fill()            # elixir fill meter present in the gold bar
 	_check_hud_fonts_quantized()          # hud.gd + card_hand.gd fonts in {16,32}
 	_check_hud_touch_targets()            # HP pill / card / ability / wrath sizes
+	# Screen-parity P2 — Menu shell + Battle tab (2026-07-10).
+	_check_menu_sky_not_flat_green()      # sky is a gradient, not a flat green wall
+	_check_tab_labels_legible()           # inactive tab labels cream, not 2.1:1 void
+	_check_trophy_not_shield()            # header trophy icon is a trophy, not a shield
+	_check_online_cta_demoted()           # PLAY ONLINE is a compact chip, not a rival CTA
 	_print_results()
 	quit(1 if _fail > 0 else 0)
 
@@ -1080,6 +1085,107 @@ func _grab_const_float(content: String, name: String) -> float:
 	rx.compile("const %s: float = ([0-9.]+)" % name)
 	var m := rx.search(content)
 	return float(m.get_string(1)) if m else 0.0
+
+
+# ============================ Screen-parity P2 (Menu shell) ===========================
+# Calibrated on menu_battle_000.png @ 504x896 — RED baseline verified 2026-07-10:
+# side sky (52,92,42) flat green; inactive tab labels peak (90,80,56); trophy=shield.
+
+const MENU_BATTLE_CAP: String = "menu_battle_000.png"
+
+
+## The menu "sky" must be the loading-screen blue→haze gradient, not a flat green wall
+## (clouds read as blobs on green; loading→menu flashed green). Sample the side sky band
+## between the tagline and logo where the sky shows clean.
+func _check_menu_sky_not_flat_green() -> void:
+	print("[Menu sky is a gradient, not flat green (P2)]")
+	var img := _load_capture(MENU_BATTLE_CAP)
+	if img == null:
+		return
+	var blue: int = 0
+	var total: int = 0
+	for y in [175, 200, 230]:
+		for x in [30, 70, 430, 470]:
+			var c: Color = img.get_pixel(x, y)
+			total += 1
+			if c.b > c.r + 0.05 and c.b > 0.45:  # sky blue/haze, not green
+				blue += 1
+	if blue >= 8:
+		_assert_pass("menu sky reads as blue gradient (%d/%d side samples blue)" % [blue, total])
+	else:
+		_assert_fail("menu sky still flat green (%d/%d blue) — port loading_screen's gradient" % [blue, total],
+			"main_menu.gd _build_scenic_background: GradientTexture2D sky")
+
+
+## Inactive bottom-tab labels must be legible cream (audit: 2.1:1 → ~8:1). Baseline the
+## brightest label pixel per inactive tab was (90,80,56); cream is ~(237,222,184).
+func _check_tab_labels_legible() -> void:
+	print("[Inactive tab labels legible (P2)]")
+	var img := _load_capture(MENU_BATTLE_CAP)
+	if img == null:
+		return
+	var dim: Array = []
+	for entry in [["Shop", 55], ["Army", 150], ["Social", 350], ["Settings", 450]]:
+		var xc: int = entry[1]
+		var best_r: float = 0.0
+		var best_sum: float = 0.0
+		for y in range(864, 888):
+			for x in range(xc - 40, xc + 40):
+				var c: Color = img.get_pixel(x, y)
+				var s: float = c.r + c.g + c.b
+				if s > best_sum:
+					best_sum = s
+					best_r = c.r
+		# cream text: bright and warm. Baseline dim label maxed at r=0.35, sum=0.89.
+		if best_r < 0.70 or best_sum < 1.8:
+			dim.append("%s(r=%.2f,sum=%.2f)" % [entry[0], best_r, best_sum])
+	if dim.is_empty():
+		_assert_pass("all 4 inactive tab labels render bright cream text")
+	else:
+		_assert_fail("%d inactive tab label(s) still dim: %s" % [dim.size(), ", ".join(dim)],
+			"_select_tab unselected branch: cream label + outline + icon 0.85")
+
+
+## Header trophy icon must be an actual trophy, not the army shield (Icon_06). Static.
+func _check_trophy_not_shield() -> void:
+	print("[Header trophy icon not a shield (P2)]")
+	var tscn := _read_file("res://scenes/ui/main_menu.tscn")
+	if tscn.is_empty():
+		_assert_pass("main_menu.tscn not present (skipped)")
+		return
+	# Find the TrophyIcon node block and check its texture reference.
+	var idx: int = tscn.find('name="TrophyIcon"')
+	var ok := false
+	if idx != -1:
+		var block: String = tscn.substr(idx, 260)
+		ok = block.contains('ExtResource("icon_trophy")') and not block.contains('ExtResource("icon_army")')
+	if ok and tscn.contains("res://assets/sprites/ui/trophy.png"):
+		_assert_pass("TrophyIcon uses trophy.png, not the army shield")
+	else:
+		_assert_fail("header trophy icon is still the shield (Icon_06)", "set TrophyIcon.texture to trophy.png")
+
+
+## PLAY ONLINE must be demoted to a compact secondary chip (single-CTA hierarchy). Static:
+## the online button width is < 300 (vs the ~440px BATTLE ribbon).
+func _check_online_cta_demoted() -> void:
+	print("[PLAY ONLINE demoted to a compact chip (P2)]")
+	var src := _read_file("res://scripts/ui/main_menu.gd")
+	var rxl := RegEx.new()
+	rxl.compile("online_btn.offset_left = (-?[0-9.]+)")
+	var rxr := RegEx.new()
+	rxr.compile("online_btn.offset_right = (-?[0-9.]+)")
+	var ml := rxl.search(src)
+	var mr := rxr.search(src)
+	if ml == null or mr == null:
+		_assert_fail("could not find online_btn offsets", "expected online_btn.offset_left/right in main_menu.gd")
+		return
+	var width: float = float(mr.get_string(1)) - float(ml.get_string(1))
+	var blue_chip: bool = src.contains("ribbon_blue.png")
+	if width < 300.0 and blue_chip:
+		_assert_pass("online CTA is a compact %.0fpx blue-ribbon chip" % width)
+	else:
+		_assert_fail("online CTA not demoted (width=%.0f, blue_chip=%s)" % [width, blue_chip],
+			"restyle online_btn as a <300px ribbon_blue chip")
 
 
 func _print_results() -> void:

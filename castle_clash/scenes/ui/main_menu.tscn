@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/sprites/ui/logo.png" id="3"]
@@ -8,6 +8,7 @@
 [ext_resource type="Texture2D" path="res://assets/sprites/ui/Icon_11.png" id="icon_social"]
 [ext_resource type="Texture2D" path="res://assets/sprites/ui/Icon_10.png" id="icon_settings"]
 [ext_resource type="Texture2D" path="res://assets/sprites/ui/Avatars_01.png" id="avatar"]
+[ext_resource type="Texture2D" path="res://assets/sprites/ui/trophy.png" id="icon_trophy"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -78,9 +79,9 @@ size_flags_horizontal = 3
 
 [node name="TrophyIcon" type="TextureRect" parent="Header/HeaderContent"]
 layout_mode = 2
-modulate = Color(1, 0.82, 0.28, 1)
+modulate = Color(1, 1, 1, 1)
 custom_minimum_size = Vector2(28, 28)
-texture = ExtResource("icon_army")
+texture = ExtResource("icon_trophy")
 expand_mode = 1
 stretch_mode = 5
 
@@ -690,7 +691,7 @@ offset_top = -30.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_colors/font_color = Color(0.7, 0.65, 0.55, 0.7)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 16
 text = "Shop"
 horizontal_alignment = 1
 
@@ -743,7 +744,7 @@ offset_top = -30.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_colors/font_color = Color(0.7, 0.65, 0.55, 0.7)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 16
 text = "Army"
 horizontal_alignment = 1
 
@@ -795,7 +796,7 @@ offset_top = -30.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_colors/font_color = Color(1, 0.9, 0.5, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 16
 text = "Battle"
 horizontal_alignment = 1
 
@@ -848,7 +849,7 @@ offset_top = -30.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_colors/font_color = Color(0.7, 0.65, 0.55, 0.7)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 16
 text = "Social"
 horizontal_alignment = 1
 
@@ -901,7 +902,7 @@ offset_top = -30.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_colors/font_color = Color(0.7, 0.65, 0.55, 0.7)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 16
 text = "Settings"
 horizontal_alignment = 1
 

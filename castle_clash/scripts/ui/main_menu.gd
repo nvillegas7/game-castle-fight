@@ -107,10 +107,12 @@ func _ready() -> void:
 		play_btn.offset_top = 705.0   # world y=795 (5px below grass top at 790)
 		play_btn.offset_bottom = 790.0  # world y=880 (6px above cliff top at 886)
 	if online_btn:
-		online_btn.offset_left = -160.0
-		online_btn.offset_right = 160.0
-		online_btn.offset_top = 980.0   # world y=1070 (below cliff+water)
-		online_btn.offset_bottom = 1050.0  # world y=1140
+		# Compact secondary chip (220x86) — subordinate to the 440px BATTLE ribbon,
+		# clustered just below the island so it reads as one battle cluster.
+		online_btn.offset_left = -110.0
+		online_btn.offset_right = 110.0
+		online_btn.offset_top = 900.0   # world y=990 (below cliff+foam)
+		online_btn.offset_bottom = 986.0  # 86px tall
 	play_btn.get_node("TouchArea").pressed.connect(_on_play)
 	online_btn.get_node("TouchArea").pressed.connect(_on_play_online)
 	_add_press_feedback(play_btn)
@@ -686,10 +688,30 @@ func _build_scenic_background() -> void:
 	# ONLINE button (y=820..890). Loading-bar + tip-strip are not ported — the
 	# BATTLE + ONLINE buttons occupy that vertical band.
 
-	# --- Sky (same green as loading, slightly saturated forest tone) ---
-	var sky := ColorRect.new()
-	sky.color = Color(0.25, 0.44, 0.20, 1)
+	# --- Sky: blue-zenith → haze → meadow gradient, ported from loading_screen.gd
+	# (the flat forest-green wall made clouds read as blobs and flashed green on the
+	# loading→menu transition; the final gradient stop equals the old flat color). ---
+	var sky_grad := Gradient.new()
+	sky_grad.offsets = PackedFloat32Array([0.0, 0.40, 0.47, 0.53, 1.0])
+	sky_grad.colors = PackedColorArray([
+		Color(0.45, 0.66, 0.90),   # zenith blue
+		Color(0.71, 0.84, 0.94),   # pale horizon haze
+		Color(0.60, 0.76, 0.58),   # haze→meadow feather
+		Color(0.40, 0.60, 0.31),   # sunlit meadow
+		Color(0.25, 0.44, 0.20),   # deep field green (matches old flat sky)
+	])
+	var sky_tex := GradientTexture2D.new()
+	sky_tex.gradient = sky_grad
+	sky_tex.fill_from = Vector2(0, 0)
+	sky_tex.fill_to = Vector2(0, 1)
+	sky_tex.width = 64
+	sky_tex.height = 1280
+	var sky := TextureRect.new()
+	sky.texture = sky_tex
+	sky.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	sky.stretch_mode = TextureRect.STRETCH_SCALE
 	sky.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sky.z_index = -10
 	scene.add_child(sky)
 
@@ -864,14 +886,15 @@ func _build_menu_plateau(parent: Control) -> void:
 
 	# Atlas: top row (y=0) = grass-top, dark top / clean bot;
 	# mid row (y=128) = grass-bottom, clean top / dark bot; cliff (y=256).
-	# Use x=384 (interior) for EVERY column — the x=320/x=512 side-cliff variants
-	# bake an extra cliff column into the leftmost/rightmost tile, which shows
-	# as "extra left border" / "separate column on the right" (user feedback
-	# 2026-04-22).
+	# Island outline: END columns use the side-edge cliff variants (x=320 dark LEFT
+	# rim, x=512 dark RIGHT rim); interior stays clean x=384. Edge tiles on ONLY the
+	# two end columns give the island its L/R outline — the 2026-04-22 "extra border"
+	# complaint was from using them on EVERY column. No flip (perspective lock).
 	for col in range(cols):
-		add_tile.call(col, top_y, 384, 0, -3)
-		add_tile.call(col, mid_y, 384, 128, -3)
-		add_tile.call(col, cliff_y, 384, 256, -2)
+		var ax: int = 320 if col == 0 else (512 if col == cols - 1 else 384)
+		add_tile.call(col, top_y, ax, 0, -3)
+		add_tile.call(col, mid_y, ax, 128, -3)
+		add_tile.call(col, cliff_y, ax, 256, -2)
 
 	# Continuous animated foam shoreline (same math as loading_screen round 10).
 	var foam_tex = load("res://assets/sprites/terrain/Water Foam.png")
@@ -1117,10 +1140,7 @@ func _style_all_ui() -> void:
 		hdr_bg.color = Color(0.14, 0.09, 0.04, 0.96)  # Dark wood, fully opaque
 	# Styled panel on top for the border/wood styling
 	var hdr_panel := Panel.new()
-	var hdr_style := _make_style(Color(0.18, 0.12, 0.06, 0.92), Color(0.5, 0.35, 0.15, 0.7), 0, 0)
-	hdr_style.border_width_bottom = 3
-	hdr_style.border_color = Color(0.6, 0.42, 0.15, 0.8)
-	hdr_panel.add_theme_stylebox_override("panel", hdr_style)
+	hdr_panel.add_theme_stylebox_override("panel", UIStyle.wood_panel())  # Tiny Swords wood beam
 	hdr_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hdr_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	$Header.add_child(hdr_panel)
@@ -1140,26 +1160,35 @@ func _style_all_ui() -> void:
 	if battle_label:
 		battle_label.offset_top = 8
 		battle_label.offset_bottom = -8
-		# CR gold-button convention: near-white text with a heavy dark-brown
-		# outline so BATTLE pops off the yellow ribbon (was beige-on-tan).
-		battle_label.add_theme_color_override("font_color", Color(1.0, 0.98, 0.92, 1.0))
-		battle_label.add_theme_color_override("font_outline_color", Color(0.3, 0.16, 0.03, 1.0))
-		battle_label.add_theme_constant_override("outline_size", 6)
+		# Tiny Swords ribbon convention: dark-brown text on the tan ribbon with a
+		# light cream outline (was washed near-white-on-tan at ~2:1).
+		battle_label.add_theme_color_override("font_color", Color(0.25, 0.13, 0.02, 1.0))
+		battle_label.add_theme_color_override("font_outline_color", Color(0.95, 0.9, 0.78, 1.0))
+		battle_label.add_theme_constant_override("outline_size", 4)
+		battle_label.add_theme_font_size_override("font_size", UIStyle.FONT_TITLE)  # 32, quantized
 
-	# PLAY ONLINE — wood/parchment theme via the shared button helper. The
-	# invisible TouchArea becomes the visible themed button (it already owns
-	# input + disabled state), replacing the tscn Bg/Label pair so the styling
-	# lives in one place and gets hover/pressed feedback for free.
+	# PLAY ONLINE — demoted to a COMPACT blue-ribbon chip (single-CTA hierarchy):
+	# BATTLE is the one primary CTA; online is a subordinate option. Mirror the
+	# BATTLE ribbon pattern (ribbon_blue 9-patch behind the frame + centered label),
+	# keeping the transparent TouchArea as the click/disabled target.
 	var online_bg = online_btn.get_node_or_null("Bg")
 	if online_bg:
 		online_bg.visible = false
-	var online_label = online_btn.get_node_or_null("Label")
+	_apply_texture_bg(online_btn, "res://assets/sprites/ui/ninepatch/ribbon_blue.png",
+		Color.WHITE, {"left": 97, "right": 97})
+	var online_label: Label = online_btn.get_node_or_null("Label")
 	if online_label:
-		online_label.visible = false
+		online_label.visible = true
+		online_label.text = "PLAY ONLINE"
+		online_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		online_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		online_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		online_label.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+		online_label.add_theme_color_override("font_color", UIStyle.TEXT_CREAM)
+		online_label.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+		online_label.add_theme_constant_override("outline_size", 2)
 	var online_touch: Button = online_btn.get_node("TouchArea")
-	online_touch.flat = false
-	online_touch.text = "PLAY ONLINE (1v1)"
-	_style_menu_button(online_touch, Color(0.32, 0.22, 0.11, 0.96), Color(0.65, 0.48, 0.2, 0.9), 20)
+	online_touch.flat = true
 
 	# Tab bar — dark wood
 	var tb_bg = $TabBar.get_node_or_null("TabBarBg")
@@ -1169,10 +1198,7 @@ func _style_all_ui() -> void:
 	if tb_line:
 		tb_line.visible = false
 	var tb_panel := Panel.new()
-	var tb_style := _make_style(Color(0.12, 0.08, 0.04, 0.95), Color(0.5, 0.35, 0.15, 0.6), 0, 0)
-	tb_style.border_width_top = 2
-	tb_style.border_color = Color(0.55, 0.4, 0.15, 0.7)
-	tb_panel.add_theme_stylebox_override("panel", tb_style)
+	tb_panel.add_theme_stylebox_override("panel", UIStyle.wood_panel())  # Tiny Swords wood beam
 	tb_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	tb_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	$TabBar.add_child(tb_panel)
@@ -1375,6 +1401,8 @@ func _select_tab(index: int) -> void:
 					Color(0.55, 0.42, 0.1, 0.95), Color(0.85, 0.7, 0.2, 0.85), 10, 2))
 			icon.modulate = Color(1, 1, 1, 1)
 			lbl.add_theme_color_override("font_color", Color(1, 0.9, 0.4, 1))
+			lbl.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+			lbl.add_theme_constant_override("outline_size", 2)
 			# T-047: Icon bounce on selection
 			if changed:
 				var bounce_tw := icon.create_tween()
@@ -1384,8 +1412,12 @@ func _select_tab(index: int) -> void:
 			if styled:
 				styled.add_theme_stylebox_override("panel", _make_style(
 					Color(0.2, 0.15, 0.08, 0.85), Color(0.45, 0.32, 0.15, 0.5), 10, 2))
-			icon.modulate = Color(1, 1, 1, 0.4)
-			lbl.add_theme_color_override("font_color", Color(0.6, 0.55, 0.4, 0.6))
+			# Inactive tabs were 2.1:1 contrast (60%/40% alpha) — the most-used
+			# navigation was nearly invisible. Cream label + outline + brighter icon.
+			icon.modulate = Color(1, 1, 1, 0.85)
+			lbl.add_theme_color_override("font_color", UIStyle.TEXT_CREAM)
+			lbl.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+			lbl.add_theme_constant_override("outline_size", 2)
 
 
 # --- Faction Selection ---

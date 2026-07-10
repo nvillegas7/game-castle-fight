@@ -58,12 +58,34 @@ def make_padlock(size=24):
     return img
 
 
+def make_trophy(size=28):
+    """Gold trophy cup (P2 header) — the Tiny Swords pack has no trophy icon."""
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    gold = (232, 184, 66, 255)
+    rim = (150, 102, 28, 255)
+    dark = (70, 48, 10, 255)
+    hi = (255, 226, 120, 255)
+    # Handles (behind the bowl).
+    d.arc((2, 5, 11, 16), start=90, end=270, fill=rim, width=2)    # left
+    d.arc((17, 5, 26, 16), start=270, end=90, fill=rim, width=2)   # right
+    # Bowl: trapezoid narrowing downward.
+    d.polygon([(6, 7), (22, 7), (18, 16), (10, 16)], fill=gold, outline=dark)
+    d.line([(7, 8), (21, 8)], fill=hi, width=1)                    # rim highlight
+    # Stem + tiered base.
+    d.rectangle((12, 16, 15, 20), fill=gold, outline=dark)
+    d.rectangle((9, 20, 18, 22), fill=rim, outline=dark)
+    d.rectangle((7, 22, 20, 25), fill=gold, outline=dark)
+    return img
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     outputs = {
         "star_gold.png": make_star(fill=(255, 205, 60, 255), outline=(92, 56, 14, 255)),
         "star_empty.png": make_star(fill=(74, 64, 48, 255), outline=(44, 36, 24, 255)),
         "padlock.png": make_padlock(),
+        "trophy.png": make_trophy(),
     }
     for name, img in outputs.items():
         p = os.path.abspath(os.path.join(OUT_DIR, name))

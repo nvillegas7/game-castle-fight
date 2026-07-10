@@ -10,10 +10,10 @@ extends Control
 # Control directly — NOT to the HBox: a Container discards manual
 # position/size on sort (project container rule). Panel children keep manual
 # rects because Panel is a plain Control, not a Container.
-const BAR_W: float = 150.0
-const BAR_H: float = 22.0
+const BAR_W: float = 176.0
+const BAR_H: float = 32.0
 const BAR_GAP: float = 8.0
-const BAR_INSET: float = 2.0
+const BAR_INSET: float = 3.0
 const HUD_W: float = 720.0  # Portrait viewport width (project-wide constant)
 const HUD_H: float = 48.0   # Top strip height (HUD offset_bottom in the scene)
 
@@ -29,9 +29,9 @@ var _last_en_hp: int = -1
 
 func _ready() -> void:
 	EventBus.castle_damaged.connect(_on_castle_damaged)
-	# Ensure HUD text is readable at 720x1280
-	gold_label.add_theme_font_size_override("font_size", 18)
-	wave_label.add_theme_font_size_override("font_size", 18)
+	# Ensure HUD text is readable at 720x1280 (16px = native pixel-font size)
+	gold_label.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+	wave_label.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
 	# Plain-text castle HP is replaced by the graphical bars below.
 	castle_label.visible = false
 	_build_hp_bars()
@@ -55,7 +55,7 @@ func _update_wave_timer() -> void:
 
 func _build_hp_bars() -> void:
 	var bar_y: float = (HUD_H - BAR_H) * 0.5
-	var en_x: float = HUD_W - 8.0 - BAR_W
+	var en_x: float = HUD_W - 24.0 - BAR_W
 	var my_x: float = en_x - BAR_GAP - BAR_W
 	var mine: Dictionary = _make_hp_bar(Vector2(my_x, bar_y),
 		Color(0.30, 0.72, 0.32), Color(0.16, 0.42, 0.18))
@@ -71,12 +71,9 @@ func _build_hp_bars() -> void:
 ## overlay Label (FULL_RECT preset inside the fixed-size trough).
 func _make_hp_bar(pos: Vector2, fill_color: Color, fill_border: Color) -> Dictionary:
 	var trough := Panel.new()
-	var trough_style := StyleBoxFlat.new()
-	trough_style.bg_color = Color(0.05, 0.04, 0.02, 0.9)
-	trough_style.border_color = Color(0.55, 0.4, 0.15, 0.8)
-	trough_style.set_border_width_all(1)
-	trough_style.set_corner_radius_all(5)
-	trough.add_theme_stylebox_override("panel", trough_style)
+	# Tiny Swords wood-bar trough (StyleBoxTexture) replaces the flat vector capsule
+	# that clashed with the hand-painted ribbon (audit: two rendering languages).
+	trough.add_theme_stylebox_override("panel", UIStyle.bar_bg())
 	trough.position = pos
 	trough.size = Vector2(BAR_W, BAR_H)
 	trough.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -87,7 +84,7 @@ func _make_hp_bar(pos: Vector2, fill_color: Color, fill_border: Color) -> Dictio
 	fill_style.bg_color = fill_color
 	fill_style.border_color = fill_border
 	fill_style.set_border_width_all(1)
-	fill_style.set_corner_radius_all(4)
+	fill_style.set_corner_radius_all(2)
 	fill.add_theme_stylebox_override("panel", fill_style)
 	fill.position = Vector2(BAR_INSET, BAR_INSET)
 	fill.size = Vector2(BAR_W - BAR_INSET * 2.0, BAR_H - BAR_INSET * 2.0)
@@ -98,10 +95,10 @@ func _make_hp_bar(pos: Vector2, fill_color: Color, fill_border: Color) -> Dictio
 	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
 	label.add_theme_color_override("font_color", Color(0.97, 0.95, 0.88))
 	label.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.02))
-	label.add_theme_constant_override("outline_size", 3)
+	label.add_theme_constant_override("outline_size", 2)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	trough.add_child(label)
 

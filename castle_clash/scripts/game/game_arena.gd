@@ -99,6 +99,10 @@ var _shake_intensity: float = 0.0
 var _shake_timer: float = 0.0
 var _original_position: Vector2 = Vector2.ZERO
 var _prev_gold: int = 0
+# Gold elixir-fill bar (backlog 3.3) — rebuilt in _polish_arena_visuals, driven by _update_gold_bar.
+var _gold_fill: Panel = null
+var _gold_fill_maxw: float = 0.0
+var _gold_marker: ColorRect = null
 
 
 func _ready() -> void:
@@ -798,7 +802,7 @@ func _show_perk_indicator() -> void:
 	indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	indicator.position = Vector2(250, 55)
 	indicator.size = Vector2(220, 20)
-	indicator.add_theme_font_size_override("font_size", 12)  # BUG-41 mobile readability
+	indicator.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)  # BUG-41 mobile readability
 	indicator.add_theme_color_override("font_color", Color(0.9, 0.8, 0.4, 0.8))
 	indicator.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.01, 0.7))
 	indicator.add_theme_constant_override("outline_size", 2)
@@ -829,6 +833,22 @@ func _update_gold_bar() -> void:
 			income = income * sim.mode_income_mult / 100
 
 	gold_bar_label.text = "%dg   (+%d/5s)" % [gold, income]
+
+	# Elixir fill: ratio of current gold toward affording ~2x the cheapest card,
+	# with a cream marker at the exact cheapest-card cost (backlog 3.3 glanceable meter).
+	if _gold_fill and _gold_fill_maxw > 0.0:
+		var cheapest: int = 0
+		if card_hand and card_hand.has_method("get_cheapest_cost"):
+			cheapest = card_hand.get_cheapest_cost()
+		var span: int = maxi(cheapest * 2, 100)
+		var ratio: float = clampf(float(gold) / float(span), 0.0, 1.0)
+		_gold_fill.size.x = _gold_fill_maxw * ratio
+		if _gold_marker:
+			if cheapest > 0 and cheapest < span:
+				_gold_marker.visible = true
+				_gold_marker.position.x = 4.0 + _gold_fill_maxw * (float(cheapest) / float(span))
+			else:
+				_gold_marker.visible = false
 
 	# Gold income popup
 	if gold > _prev_gold and _prev_gold > 0:
@@ -979,8 +999,8 @@ func _spawn_castle_wrath_button() -> void:
 	var btn := Button.new()
 	btn.name = "CastleWrathBtn"
 	btn.text = "CASTLE WRATH"
-	btn.custom_minimum_size = Vector2(150, 52)
-	btn.position = Vector2(560, 955)
+	btn.custom_minimum_size = Vector2(150, 88)
+	btn.position = Vector2(560, 896)  # 88px tall clears GoldBarBg at y=990
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.7, 0.08, 0.08, 0.92)
 	style.border_color = Color(1.0, 0.3, 0.15, 0.95)
@@ -996,7 +1016,7 @@ func _spawn_castle_wrath_button() -> void:
 	var pressed := style.duplicate()
 	pressed.bg_color = Color(0.5, 0.05, 0.05, 0.95)
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_font_size_override("font_size", 13)
+	btn.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
 	btn.add_theme_color_override("font_color", Color(1.0, 0.95, 0.85))
 	btn.add_theme_color_override("font_outline_color", Color(0.2, 0.02, 0.02))
 	btn.add_theme_constant_override("outline_size", 2)
@@ -1094,8 +1114,8 @@ class _AbilityButton extends Button:
 	var _was_ready: bool = false
 
 	func _init() -> void:
-		custom_minimum_size = Vector2(64, 38)
-		size = Vector2(64, 38)
+		custom_minimum_size = Vector2(88, 88)
+		size = Vector2(88, 88)
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		flat = true
 
@@ -1137,26 +1157,26 @@ class _AbilityButton extends Button:
 			border_color = Color(0.4, 0.8, 0.3, 0.8)
 		draw_rect(Rect2(0, 0, w, h), border_color, false, 2.0)
 
-		# Icon text (building name abbreviation)
+		# Icon text (building name abbreviation) — centered, 32px hero-power style
 		var icon_text: String = "WH" if building_type == &"war_horn" else "BT"
 		var icon_color := Color(0.3, 0.6, 1.0) if team == 0 else Color(1.0, 0.4, 0.3)
-		draw_string(ThemeDB.fallback_font, Vector2(6, 16), icon_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, icon_color)
+		draw_string(ThemeDB.fallback_font, Vector2(0, h * 0.5 + 8), icon_text, HORIZONTAL_ALIGNMENT_CENTER, w, 32, icon_color)
 
-		# Mana bar
-		var bar_y: float = h - 8
-		var bar_w: float = w - 8
-		draw_rect(Rect2(4, bar_y, bar_w, 5), Color(0.1, 0.08, 0.06, 0.8))
+		# Mana bar (bottom)
+		var bar_y: float = h - 12
+		var bar_w: float = w - 12
+		draw_rect(Rect2(6, bar_y, bar_w, 7), Color(0.1, 0.08, 0.06, 0.8))
 		if mana_ratio > 0:
 			var fill_color := Color(0.3, 0.6, 1.0) if not is_ready else Color(1.0, 0.85, 0.2)
 			if is_active:
 				fill_color = Color(0.4, 0.8, 0.3)
-			draw_rect(Rect2(4, bar_y, bar_w * mana_ratio, 5), fill_color)
+			draw_rect(Rect2(6, bar_y, bar_w * mana_ratio, 7), fill_color)
 
-		# Status text
+		# Status text (top-right)
 		if is_active:
-			draw_string(ThemeDB.fallback_font, Vector2(w - 30, 16), "ON", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.5, 1.0, 0.4))
+			draw_string(ThemeDB.fallback_font, Vector2(w - 40, 20), "ON", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 1.0, 0.4))
 		elif is_ready:
-			draw_string(ThemeDB.fallback_font, Vector2(w - 28, 16), "GO", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(1.0, 0.9, 0.3))
+			draw_string(ThemeDB.fallback_font, Vector2(w - 40, 20), "GO", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 0.9, 0.3))
 
 
 # --- Screen Shake ---
@@ -1308,11 +1328,50 @@ func _polish_arena_visuals() -> void:
 			gold_bg.add_child(gold_ribbon)
 			gold_bg.move_child(gold_ribbon, 0)
 
-	# Hide old fill/track ColorRects — no longer needed (gold is text-only now)
+	# Hide the old flat ColorRect fill/track/lines — replaced by the textured elixir bar below.
 	for old_name in ["GoldBarFill", "GoldBarTrack", "GoldBarTopLine", "GoldBarBottomLine"]:
 		var old_node := get_node_or_null("UILayer/GoldBarBg/" + old_name)
 		if old_node:
 			old_node.visible = false
+
+	# Elixir-style gold fill (backlog 3.3): wood trough + gold fill in the ribbon's RIGHT
+	# portion, glanceable affordability marker at the cheapest card cost. Gold text sits left.
+	var gold_bg_for_bar := get_node_or_null("UILayer/GoldBarBg")
+	if gold_bg_for_bar:
+		var bar_x: float = 340.0
+		var bar_w: float = 600.0 - bar_x  # ends inside ribbon_inset (720-115=605)
+		var bar_y: float = 13.0
+		var bar_h: float = 24.0
+		var trough := Panel.new()
+		trough.name = "GoldFillTrough"
+		trough.add_theme_stylebox_override("panel", UIStyle.bar_bg())
+		trough.position = Vector2(bar_x, bar_y)
+		trough.size = Vector2(bar_w, bar_h)
+		trough.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gold_bg_for_bar.add_child(trough)
+		var inset: float = 4.0
+		_gold_fill_maxw = bar_w - inset * 2.0
+		var fill := Panel.new()
+		fill.name = "GoldFill"
+		var fill_style := StyleBoxFlat.new()
+		fill_style.bg_color = Color(1.0, 0.85, 0.15, 1.0)
+		fill_style.border_color = Color(0.7, 0.5, 0.08, 0.9)
+		fill_style.set_border_width_all(1)
+		fill_style.set_corner_radius_all(2)
+		fill.add_theme_stylebox_override("panel", fill_style)
+		fill.position = Vector2(inset, inset)
+		fill.size = Vector2(0.0, bar_h - inset * 2.0)
+		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		trough.add_child(fill)
+		_gold_fill = fill
+		var marker := ColorRect.new()
+		marker.name = "GoldMarker"
+		marker.color = Color(0.97, 0.95, 0.85, 0.95)
+		marker.size = Vector2(2.0, bar_h - inset * 2.0)
+		marker.position = Vector2(inset, inset)
+		marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		trough.add_child(marker)
+		_gold_marker = marker
 
 	# Gold label — centered on ribbon, coin icon left of text
 	var gold_bg := get_node_or_null("UILayer/GoldBarBg")
@@ -1330,7 +1389,7 @@ func _polish_arena_visuals() -> void:
 	var gold_label := get_node_or_null("UILayer/GoldBarBg/GoldBarLabel")
 	if gold_label:
 		gold_label.offset_left = ribbon_inset + 30
-		gold_label.offset_right = 720.0 - ribbon_inset
+		gold_label.offset_right = 335.0  # stop left of the elixir fill bar (starts x=340)
 		# BUG-GOLD-COIN-GAP 2026-04-11: Left-align so gold text starts next to
 		# the coin icon instead of centering ~244px away.
 		# Vertical center the text so it aligns with the coin Sprite2D at y=25

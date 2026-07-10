@@ -9,9 +9,9 @@ var _current_faction: FactionData = null
 var _selected_index: int = -1
 var _hand: Array[BuildingData] = []  # All faction buildings visible at once
 
-const CARD_W: float = 84.0
+const CARD_W: float = 88.0
 const CARD_H: float = 130.0
-const CARD_GAP: float = 4.0
+const CARD_GAP: float = 6.0
 const CARD_CORNER: float = 10.0
 
 const ATTACK_NAMES := ["Phys", "Pierce", "Magic", "Siege"]
@@ -185,6 +185,8 @@ class _CardVisual extends Control:
 	var _hover: bool = false
 	var _building_icon: Texture2D = null
 	var _select_pulse_tween: Tween = null  # T-039: gold border pulse
+	var _star_tex: Texture2D = null        # pixel tier star (P0 asset)
+	var _padlock_tex: Texture2D = null     # locked-card padlock (P0 asset)
 
 	func _ready() -> void:
 		mouse_filter = MOUSE_FILTER_STOP
@@ -225,38 +227,23 @@ class _CardVisual extends Control:
 			modulate = Color.WHITE
 		queue_redraw()
 
-	var _card_style: StyleBoxFlat = null
-	var _card_style_selected: StyleBoxFlat = null
-	var _card_style_disabled: StyleBoxFlat = null
+	var _card_style: StyleBox = null      # Tiny Swords wood slot (StyleBoxTexture from UIStyle)
 	var _badge_style: StyleBoxFlat = null
 
 	func _create_styles() -> void:
-		_card_style = StyleBoxFlat.new()
-		_card_style.bg_color = Color(0.35, 0.28, 0.18)
-		_card_style.border_color = Color(0.55, 0.42, 0.25, 0.7)
-		_card_style.set_border_width_all(2)
-		_card_style.set_corner_radius_all(10)
-		_card_style.shadow_color = Color(0, 0, 0, 0.5)
-		_card_style.shadow_size = 4
-		_card_style.shadow_offset = Vector2(1, 2)
-
-		_card_style_selected = _card_style.duplicate()
-		_card_style_selected.bg_color = Color(0.45, 0.38, 0.22)
-		_card_style_selected.border_color = Color(1.0, 0.8, 0.2, 0.95)
-		_card_style_selected.set_border_width_all(3)
-		_card_style_selected.shadow_color = Color(0.8, 0.6, 0.1, 0.3)
-		_card_style_selected.shadow_size = 8
-
-		_card_style_disabled = _card_style.duplicate()
-		_card_style_disabled.bg_color = Color(0.2, 0.16, 0.12)
-		_card_style_disabled.border_color = Color(0.3, 0.25, 0.18, 0.4)
-		_card_style_disabled.shadow_size = 2
+		# Warm wood-slot card box (matches the tray) — replaces the flat programmer StyleBoxFlat.
+		# State (selected/hover/disabled) is drawn as overlays in _draw, since a StyleBoxTexture
+		# has no bg_color to recolor.
+		_card_style = UIStyle.slot_panel()
 
 		_badge_style = StyleBoxFlat.new()
 		_badge_style.bg_color = Color(0.9, 0.75, 0.15)
 		_badge_style.border_color = Color(0.65, 0.5, 0.08)
 		_badge_style.set_border_width_all(1)
 		_badge_style.set_corner_radius_all(6)
+
+		_star_tex = UIStyle.load_tex(UIStyle.UI + "star_gold.png")
+		_padlock_tex = UIStyle.load_tex(UIStyle.UI + "padlock.png")
 
 
 	func _draw() -> void:
@@ -270,28 +257,28 @@ class _CardVisual extends Control:
 		var enabled: bool = _can_afford and _has_prereq
 		var compact: bool = h < 60  # Compact mode for 4-row layout
 
-		# Card background (rounded)
-		var style: StyleBoxFlat
+		# Base wood-slot box, then a state overlay on top (StyleBoxTexture can't recolor).
+		draw_style_box(_card_style, Rect2(0, 0, w, h))
 		if not enabled:
-			style = _card_style_disabled
+			var dim := StyleBoxFlat.new()
+			dim.bg_color = Color(0.0, 0.0, 0.0, 0.28)
+			dim.set_corner_radius_all(8)
+			draw_style_box(dim, Rect2(0, 0, w, h))
 		elif _is_selected:
-			style = _card_style_selected
+			draw_rect(Rect2(1.5, 1.5, w - 3, h - 3), Color(1.0, 0.8, 0.2, 0.95), false, 3.0)
 		elif _hover:
-			var s := _card_style.duplicate()
-			s.bg_color = _card_style.bg_color.lightened(0.08)
-			s.border_color = Color(0.65, 0.5, 0.3, 0.8)
-			style = s
-		else:
-			style = _card_style
-		draw_style_box(style, Rect2(0, 0, w, h))
+			var hl := StyleBoxFlat.new()
+			hl.bg_color = Color(1.0, 1.0, 1.0, 0.07)
+			hl.set_corner_radius_all(8)
+			draw_style_box(hl, Rect2(0, 0, w, h))
 
 		if compact:
-			_draw_compact(w, h, enabled, style)
+			_draw_compact(w, h, enabled)
 		else:
-			_draw_full(w, h, enabled, style)
+			_draw_full(w, h, enabled)
 
 
-	func _draw_compact(w: float, h: float, enabled: bool, style: StyleBoxFlat) -> void:
+	func _draw_compact(w: float, h: float, enabled: bool) -> void:
 		# Compact card: icon left, name + cost right
 		var icon_area: float = h - 6  # Square icon area
 		var tint: Color = Color.WHITE if enabled else Color(0.5, 0.5, 0.5)
@@ -303,135 +290,120 @@ class _CardVisual extends Control:
 			var icon_scale: float = (icon_area - 4) / maxf(tex_w, tex_h)
 			draw_texture_rect(_building_icon, Rect2(4, 3, tex_w * icon_scale, tex_h * icon_scale), false, tint)
 
-		# Building name (right of icon, top) — 12px floor (mobile QA gate),
-		# ellipsized instead of shrunk when the name overflows the text area.
+		# Building name (right of icon, top) — 16px (native pixel-font), ellipsized on overflow.
 		var text_x: float = icon_area + 4
 		var text_w: float = w - text_x - 4
-		var name_text: String = _fit_text(bd.display_name, text_w, 12)
-		draw_string(ThemeDB.fallback_font, Vector2(text_x, 16), name_text, HORIZONTAL_ALIGNMENT_LEFT, text_w, 12, Color(0.95, 0.9, 0.75) if enabled else Color(0.5, 0.5, 0.5))
+		var name_text: String = _fit_text(bd.display_name, text_w, UIStyle.FONT_BODY)
+		draw_string(ThemeDB.fallback_font, Vector2(text_x, 18), name_text, HORIZONTAL_ALIGNMENT_LEFT, text_w, UIStyle.FONT_BODY, Color(0.95, 0.9, 0.75) if enabled else Color(0.5, 0.5, 0.5))
 
 		# Cost (right of icon, bottom)
-		draw_string(ThemeDB.fallback_font, Vector2(text_x, h - 5), "%dg" % bd.gold_cost, HORIZONTAL_ALIGNMENT_LEFT, text_w, 12, Color(1.0, 0.85, 0.2) if enabled else Color(0.5, 0.45, 0.2))
+		draw_string(ThemeDB.fallback_font, Vector2(text_x, h - 5), "%dg" % bd.gold_cost, HORIZONTAL_ALIGNMENT_LEFT, text_w, UIStyle.FONT_BODY, Color(1.0, 0.85, 0.2) if enabled else Color(0.5, 0.45, 0.2))
 
 
-	func _draw_full(w: float, h: float, enabled: bool, style: StyleBoxFlat) -> void:
-		# Inner parchment highlight
-		var inner := StyleBoxFlat.new()
-		inner.bg_color = style.bg_color.lightened(0.1)
-		inner.set_corner_radius_all(7)
-		draw_style_box(inner, Rect2(5, 5, w - 10, h - 10))
+	func _draw_full(w: float, h: float, enabled: bool) -> void:
+		var font := ThemeDB.fallback_font
+		var fs: int = UIStyle.FONT_BODY  # 16 — native pixel-font size
 
-		# Building icon (proportional to card width). Slightly smaller than the
-		# pre-BUG-41 52px so the 12px (possibly two-line) name below has room.
+		# Building icon — centered, slightly smaller so the 16px name has vertical room.
+		var icon_bottom: float = 6.0
 		if _building_icon:
-			var icon_size: float = minf(w * 0.6, 48.0)
+			var icon_size: float = minf(w * 0.52, 44.0)
 			var tex_w: float = _building_icon.get_width()
 			var tex_h: float = _building_icon.get_height()
 			var icon_scale: float = icon_size / maxf(tex_w, tex_h)
-			var icon_x: float = (w - tex_w * icon_scale) * 0.5
+			var iw: float = tex_w * icon_scale
+			var ih: float = tex_h * icon_scale
+			var icon_x: float = (w - iw) * 0.5
 			var icon_y: float = 6.0
-			draw_texture_rect(_building_icon, Rect2(icon_x, icon_y, tex_w * icon_scale, tex_h * icon_scale), false, Color.WHITE if enabled else Color(0.5, 0.5, 0.5))
+			# Locked/unaffordable icons desaturate toward gray.
+			var icon_tint: Color = Color.WHITE if enabled else Color(0.6, 0.6, 0.6)
+			draw_texture_rect(_building_icon, Rect2(icon_x, icon_y, iw, ih), false, icon_tint)
+			icon_bottom = icon_y + ih
 
-		# T-073: Gold cost badge — TOP-LEFT corner (Clash Royale style), not bottom
-		# This frees up the bottom area for name/type/stats without overlap.
-		# Widened for the 12px cost text (mobile QA gate: no sub-12px text).
-		var badge_w: float = minf(w * 0.5, 40.0)
-		var badge_h: float = 17.0
+		# Gold cost badge — TOP-LEFT corner (Clash Royale style), 16px.
+		var badge_w: float = minf(w * 0.52, 46.0)
+		var badge_h: float = 20.0
 		var badge_x: float = 3.0
 		var badge_y: float = 3.0
 		var badge := _badge_style.duplicate()
 		if not enabled:
-			# Darker bg + bright gold text for legibility (was unreadable
-			# dark-on-dark previously). Keep contrast even when disabled.
 			badge.bg_color = Color(0.15, 0.1, 0.04, 0.95)
 			badge.border_color = Color(0.65, 0.5, 0.1, 0.85)
 		draw_style_box(badge, Rect2(badge_x, badge_y, badge_w, badge_h))
-		# Cost text: dark on bright when affordable (matches bright gold badge),
-		# bright gold on dark when disabled (high contrast for legibility).
-		var cost_color: Color
-		if enabled:
-			cost_color = Color(0.15, 0.1, 0.0)
-		else:
-			cost_color = Color(1.0, 0.85, 0.25)
-		draw_string(ThemeDB.fallback_font, Vector2(badge_x, badge_y + 13), "%dg" % bd.gold_cost, HORIZONTAL_ALIGNMENT_CENTER, badge_w, 12, cost_color)
+		var cost_color: Color = Color(0.15, 0.1, 0.0) if enabled else Color(1.0, 0.85, 0.25)
+		draw_string(font, Vector2(badge_x, badge_y + 15), "%dg" % bd.gold_cost, HORIZONTAL_ALIGNMENT_CENTER, badge_w, fs, cost_color)
 
-		# BUG-45 / BUG-41 fix: LOCKED cards render JUST the LOCKED label + the
-		# requirements hint. Hiding name/type/stats prevents the 4-way label
-		# overlap (name + type + stats + LOCKED + hint all at same y). The
-		# icon already draws underneath at reduced tint.
+		# LOCKED cards: grayscale icon (drawn above) under a light overlay + a padlock
+		# glyph + "Need: <building>" — no red "LOCKED" text (backlog 3.3).
 		if not _has_prereq:
 			var lock_overlay := StyleBoxFlat.new()
-			lock_overlay.bg_color = Color(0, 0, 0, 0.55)
+			lock_overlay.bg_color = Color(0, 0, 0, 0.35)
 			lock_overlay.set_corner_radius_all(10)
 			draw_style_box(lock_overlay, Rect2(0, 0, w, h))
-			# BUG-41: "Need: %s" used to draw at 10px on one line and still
-			# clipped ("Need: Priest Temple" = 117px vs 76px area at 12px).
-			# Now 12px on TWO lines: "Need:" + the building name (ellipsized).
-			var lock_y: float = h * 0.5 - 12.0
-			draw_string(ThemeDB.fallback_font, Vector2(4, lock_y), "LOCKED", HORIZONTAL_ALIGNMENT_CENTER, w - 8, 14, Color(1.0, 0.35, 0.25))
+			if _padlock_tex:
+				var pw: float = 22.0
+				var ph: float = pw * float(_padlock_tex.get_height()) / float(_padlock_tex.get_width())
+				draw_texture_rect(_padlock_tex, Rect2((w - pw) * 0.5, h * 0.40 - ph, pw, ph), false, Color(1, 1, 1, 0.95))
 			if bd.requires_building != &"":
 				var req_name: String = _prettify_building_id(bd.requires_building)
-				draw_string(ThemeDB.fallback_font, Vector2(4, lock_y + 16), "Need:", HORIZONTAL_ALIGNMENT_CENTER, w - 8, 12, Color(0.85, 0.7, 0.55))
-				draw_string(ThemeDB.fallback_font, Vector2(2, lock_y + 30), _fit_text(req_name, w - 4.0, 12), HORIZONTAL_ALIGNMENT_CENTER, w - 4, 12, Color(0.85, 0.7, 0.55))
-			return  # Skip name/type/stats — they'd overlap the LOCKED pair
+				var need_y: float = h * 0.40 + 8.0
+				draw_string(font, Vector2(4, need_y), "Need:", HORIZONTAL_ALIGNMENT_CENTER, w - 8, fs, Color(0.88, 0.74, 0.58))
+				draw_string(font, Vector2(2, need_y + 18.0), _fit_text(req_name, w - 4.0, fs), HORIZONTAL_ALIGNMENT_CENTER, w - 4, fs, Color(0.88, 0.74, 0.58))
+			return  # Skip name/type/stats — the padlock pair owns the space
 
-		# Building name (centered, below icon). BUG-41 mobile readability pass:
-		# 12px floor everywhere (project QA gate). Long names wrap to two lines
-		# at a word boundary instead of shrinking the font; each line is
-		# ellipsized if a single word still overflows.
-		var font := ThemeDB.fallback_font
-		var name_top_y: float = 66.0 if _building_icon else 16.0
-		var name_lines: PackedStringArray = _wrap_two_lines(bd.display_name, w - 8.0, 12)
+		# Building name (centered below the icon), 16px, up to two wrapped lines.
+		var name_top_y: float = (icon_bottom + 4.0) if _building_icon else 18.0
+		var name_lines: PackedStringArray = _wrap_two_lines(bd.display_name, w - 8.0, fs)
 		for li in name_lines.size():
-			draw_string(font, Vector2(4, name_top_y + li * 13.0), name_lines[li], HORIZONTAL_ALIGNMENT_CENTER, w - 8, 12, Color(0.95, 0.9, 0.75))
-		# Baseline of the row below the name block (name lines + 15px gap).
-		var below_name_y: float = name_top_y + (name_lines.size() - 1) * 13.0 + 15.0
+			draw_string(font, Vector2(4, name_top_y + li * 18.0), name_lines[li], HORIZONTAL_ALIGNMENT_CENTER, w - 8, fs, Color(0.96, 0.91, 0.76))
+		var below_name_y: float = name_top_y + (name_lines.size() - 1) * 18.0 + 20.0
 
-		# Type indicator — only when it still fits inside the card (a two-line
-		# name on a 2-row-layout card uses up the type row's space).
+		# Type indicator — only when it still fits (a two-line name eats the row).
 		var type_text: String = ""
-		var type_col: Color = Color(0.7, 0.65, 0.55)
+		var type_col: Color = Color(0.75, 0.7, 0.6)
 		if bd.is_tower:
 			type_text = "Tower"
-			type_col = Color(0.8, 0.5, 0.45)
+			type_col = Color(1.0, 0.72, 0.62)   # audit: >=4.5:1 on inner panel
 		elif bd.income_bonus > 0:
 			type_text = "Income"
-			type_col = Color(0.85, 0.75, 0.35)
+			type_col = Color(0.9, 0.78, 0.4)
 		elif bd.spawns_unit:
 			type_text = "Spawner"
-			type_col = Color(0.55, 0.75, 0.5)
+			type_col = Color(0.65, 0.85, 0.58)  # audit: raise from 4.17:1
 		if type_text != "" and below_name_y <= h - 6.0:
-			draw_string(font, Vector2(4, below_name_y), type_text, HORIZONTAL_ALIGNMENT_CENTER, w - 8, 12, type_col)
+			draw_string(font, Vector2(4, below_name_y), type_text, HORIZONTAL_ALIGNMENT_CENTER, w - 8, fs, type_col)
 
-		# Stats line — only when card is tall enough (single-row layout).
-		# 12px floor: a stat string too wide for one line ("HP:620 Dmg:45" =
-		# 88px vs 76px) splits at its first space into two stacked lines
-		# instead of shrinking below 12px.
+		# Stats line — only on the tall single-row layout.
 		if h >= 110:
 			var stat_text: String = ""
-			var stat_col: Color = Color(0.75, 0.85, 0.6)
+			var stat_col: Color = Color(0.78, 0.88, 0.62)
 			if bd.spawns_unit:
 				var ud = bd.spawns_unit
-				stat_text = "HP:%d Dmg:%d" % [ud.max_hp, ud.attack_damage]
+				stat_text = "HP %d  Dmg %d" % [ud.max_hp, ud.attack_damage]
 			elif bd.is_tower:
-				stat_text = "Dmg:%d Rng:%d" % [bd.tower_damage, bd.tower_range]
-				stat_col = Color(0.85, 0.6, 0.55)
+				stat_text = "Dmg %d  Rng %d" % [bd.tower_damage, bd.tower_range]
+				stat_col = Color(0.88, 0.62, 0.56)
 			elif bd.income_bonus > 0:
-				stat_text = "+%d gold/tick" % bd.income_bonus
-				stat_col = Color(0.88, 0.75, 0.4)
+				stat_text = "+%d gold" % bd.income_bonus
+				stat_col = Color(0.9, 0.78, 0.42)
 			if stat_text != "":
-				if font.get_string_size(stat_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x <= w - 8.0:
-					draw_string(font, Vector2(4, h - 8), stat_text, HORIZONTAL_ALIGNMENT_CENTER, w - 8, 12, stat_col)
+				if font.get_string_size(stat_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x <= w - 8.0:
+					draw_string(font, Vector2(4, h - 8), stat_text, HORIZONTAL_ALIGNMENT_CENTER, w - 8, fs, stat_col)
 				else:
 					var parts: PackedStringArray = stat_text.split(" ", false, 1)
-					draw_string(font, Vector2(4, h - 21), _fit_text(parts[0], w - 8.0, 12), HORIZONTAL_ALIGNMENT_CENTER, w - 8, 12, stat_col)
+					draw_string(font, Vector2(4, h - 26), _fit_text(parts[0], w - 8.0, fs), HORIZONTAL_ALIGNMENT_CENTER, w - 8, fs, stat_col)
 					if parts.size() > 1:
-						draw_string(font, Vector2(4, h - 8), _fit_text(parts[1], w - 8.0, 12), HORIZONTAL_ALIGNMENT_CENTER, w - 8, 12, stat_col)
+						draw_string(font, Vector2(4, h - 8), _fit_text(parts[1], w - 8.0, fs), HORIZONTAL_ALIGNMENT_CENTER, w - 8, fs, stat_col)
 
-		# Tier stars (top-right — opposite corner from cost badge)
+		# Tier stars (top-right — opposite corner from the cost badge), pixel-art star.
 		if bd.tier > 1:
-			for s in bd.tier:
-				draw_circle(Vector2(w - 8 - s * 8, 11), 3, Color(1.0, 0.85, 0.2))
+			if _star_tex:
+				var sp: float = 12.0
+				for s in bd.tier:
+					draw_texture_rect(_star_tex, Rect2(w - 6.0 - (s + 1) * (sp + 2.0), 4.0, sp, sp), false, Color.WHITE)
+			else:
+				for s in bd.tier:
+					draw_circle(Vector2(w - 8 - s * 8, 11), 4, Color(1.0, 0.85, 0.2))
 
 
 	## Ellipsize text so it fits max_w at font_size ("Demolisher Wo…").

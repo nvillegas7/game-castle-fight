@@ -285,3 +285,10 @@ brown "combat" band (color4 olive tinted brown). All 3 mockups are ONE lush gree
 
 **Result: muddy 3-band arena → lush symmetric Tiny-Swords meadow (uniform grass, mirrored
 tree-lines, grazing sheep, gold clusters, wildflowers) + subtle castle ramparts. Live.**
+
+---
+
+## 2026-07-10 — Screen Parity Sweep (PLAN, awaiting user approval)
+Full-audit plan at `tasks/plan-screen-parity.md` (5 audit agents, pixel-measured findings).
+Packages: P0 ui_style.gd+asset kit → P1 Game HUD → P2 Menu shell/Battle → P3 End screen
+→ P4 Army/Shop → P5 Social/Settings. No implementation yet per user instruction.

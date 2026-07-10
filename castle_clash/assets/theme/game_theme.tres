@@ -1,6 +1,6 @@
 [gd_resource type="Theme" format=3]
 
-[ext_resource type="FontFile" path="res://assets/fonts/NinjaNormal.ttf" id="1_trfjm"]
+[ext_resource type="FontFile" path="res://assets/fonts/PixelOperatorBold.ttf" id="1_trfjm"]
 
 [resource]
 default_font = ExtResource("1_trfjm")

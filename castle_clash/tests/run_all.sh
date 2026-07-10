@@ -43,6 +43,7 @@ run_headless "Combat feel (walk cadence)"      tests/test_combat_feel.gd
 run_headless "Targeting diagnostics"           tests/test_targeting_diag.gd
 run_headless "Unit behavior scenarios"         tests/test_unit_behavior.gd
 run_headless "Multiplayer (checksum/config)"   tests/test_multiplayer.gd
+run_headless "UIStyle kit contract"            tests/test_ui_style.gd
 
 echo ""
 echo "### L0 — scene resource validation ###"

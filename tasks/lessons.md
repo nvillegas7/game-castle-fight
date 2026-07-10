@@ -224,3 +224,28 @@ perspective-illegal and reads instantly wrong.
 Tile/sprite orientation is owned by the camera perspective, which does not flip with the
 layout. Never flip_v elevation, cliff, or building art. "The bar-like edge of the cliff at
 the bottom of the castle, wherever the player is."
+
+---
+
+## Lesson (2026-07-10) — One frame-extraction path; never bypass the smart helper
+
+**Context**: "Cropped trees" = disembodied fir fragments floating in the water. Tree1/Tree2
+sheets are 8 frames of 192x256 (NON-square). The codebase already HAD a correct extractor
+(`_extract_sprite_frame` tries frame counts 8/6/16/4/12) — but the tree code bypassed it
+with a hand-rolled square `Rect2(0,0,fh,fh)` crop, which bled a 26px sliver of the NEXT
+animation frame into every tree sprite. The compositor's `frame_of` had the same square
+assumption, so the approved target contained the bug too.
+
+**Rules:**
+- **One extraction path.** If a smart helper exists (`_extract_sprite_frame`), route ALL
+  strip crops through it. A bypass is where the next asset bug lives.
+- **Non-square frames are normal** in Tiny Swords (192x256 trees). "frame = height x height"
+  is an assumption, not a fact — measure content-column runs (10 lines of PIL) per sheet.
+- **Gate what the eye keeps catching.** The user had to report cropped art AGAIN — now
+  `_check_arena_no_floating_foliage` fails the gate on any foliage beyond the island rim
+  band. When a class of visual bug recurs, it gets a detector, not another one-off fix.
+
+**Also learned (wf_d5ce1bda):** sim placement tests tolerate silent no-ops — place_building
+returns empty events on invalid coords, and several team-1 test placements were ALREADY
+silently failing under the old 5x2 footprint without any assertion noticing. Backlogged:
+placement tests must assert the building EXISTS after placing.

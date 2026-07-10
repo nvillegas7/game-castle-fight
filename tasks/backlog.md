@@ -37,6 +37,12 @@ before the fix, or the passing criterion.
 | 1D-5 | Offline AI uses Castle Wrath; fix test_multiplayer.gd to use a real ability id | A5 | 1D | test_multiplayer.gd references valid ability |
 | 1D-6 | Rally/Rage buff readability: brief tint or speed-lines on buffed units | A2 | 1D | buffed units visually distinct |
 
+## New (2026-07-10)
+
+| ID | Item | Domain | Phase | Detector / Acceptance |
+|----|------|--------|-------|-----------------------|
+| T-QA1 | Placement-test hygiene: place_building is a silent no-op on invalid coords — audit all test placements (several team-1 ones were already dead under the 5x2 footprint) and make placement tests assert the building EXISTS afterward | A4 | 2 | every place_building in tests followed by an existence assert |
+
 ## Phase 2 — Architecture enablers (sequential, shared files, no rewrite)
 
 | ID | Item | Domain | Phase | Detector / Acceptance |

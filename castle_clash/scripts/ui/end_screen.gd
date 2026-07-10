@@ -36,6 +36,14 @@ func _on_match_ended(winning_team: int) -> void:
 	visible = true
 	SFX.stop_ambient()  # T-030: Fade out battlefield ambient
 
+	# Takeover (backlog 3.5): hide the in-match chrome so it can't compete with the
+	# results panel. The 40% Overlay keeps the arena itself visible (T-100). Restart/
+	# menu reload the scene, which recreates these nodes visible again — no un-hide needed.
+	for n_name in ["HUD", "GoldBarBg", "CardHand"]:
+		var sib := get_parent().get_node_or_null(NodePath(n_name))
+		if sib:
+			sib.visible = false
+
 	var local_team: int = 0
 	var enemy_team: int = 1
 	var local_faction: StringName = &""
@@ -77,15 +85,8 @@ func _on_match_ended(winning_team: int) -> void:
 	_free_decor_node("ResultsBackdrop")
 	var backdrop := Panel.new()
 	backdrop.name = "ResultsBackdrop"
-	var backdrop_style := StyleBoxFlat.new()
-	backdrop_style.bg_color = Color(0.14, 0.10, 0.055, 0.96)
-	backdrop_style.border_color = Color(0.55, 0.42, 0.2, 0.9)
-	backdrop_style.set_border_width_all(3)
-	backdrop_style.set_corner_radius_all(16)
-	backdrop_style.shadow_color = Color(0, 0, 0, 0.5)
-	backdrop_style.shadow_size = 10
-	backdrop_style.shadow_offset = Vector2(0, 4)
-	backdrop.add_theme_stylebox_override("panel", backdrop_style)
+	# Warm Tiny Swords wood panel (was a flat near-black programmer box).
+	backdrop.add_theme_stylebox_override("panel", UIStyle.wood_panel())
 	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	backdrop.position = Vector2(92, 330)       # Estimate; refined after layout
 	backdrop.size = Vector2(720.0 - 92.0 * 2.0, 560)
@@ -113,7 +114,7 @@ func _on_match_ended(winning_team: int) -> void:
 		ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ribbon.position = Vector2(110, 400)    # Estimate; refined after layout
 		ribbon.size = Vector2(500, 103)
-		ribbon.modulate.a = 0.85
+		ribbon.modulate.a = 1.0  # full parchment (0.85 muddied VICTORY to 2.46:1)
 		add_child(ribbon)
 		move_child(ribbon, 2)  # Above backdrop, below VBox
 
@@ -121,9 +122,9 @@ func _on_match_ended(winning_team: int) -> void:
 	if won:
 		result_label.text = "VICTORY!"
 		result_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.3))
-		result_label.add_theme_color_override("font_outline_color", Color(0.6, 0.35, 0.05))
-		result_label.add_theme_constant_override("outline_size", 5)
-		result_label.add_theme_font_size_override("font_size", 46)
+		result_label.add_theme_color_override("font_outline_color", Color(0.22, 0.11, 0.02))
+		result_label.add_theme_constant_override("outline_size", 6)
+		result_label.add_theme_font_size_override("font_size", 48)  # integer 3x of 16
 		SFX.play_music("victory_fanfare", false)
 		SFX.play_victory()
 		# Scale punch animation
@@ -139,10 +140,11 @@ func _on_match_ended(winning_team: int) -> void:
 		_spawn_confetti()
 	else:
 		result_label.text = "DEFEAT"
-		result_label.add_theme_color_override("font_color", Color(0.6, 0.2, 0.15))
-		result_label.add_theme_color_override("font_outline_color", Color(0.15, 0.05, 0.03))
-		result_label.add_theme_constant_override("outline_size", 4)
-		result_label.add_theme_font_size_override("font_size", 40)
+		# Light fill + dark outline reads on the now-opaque red ribbon (dark-red-on-red was muddy).
+		result_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.85))
+		result_label.add_theme_color_override("font_outline_color", Color(0.22, 0.06, 0.04))
+		result_label.add_theme_constant_override("outline_size", 6)
+		result_label.add_theme_font_size_override("font_size", 48)
 		SFX.play_music("defeat_fanfare", false)
 		SFX.play_defeat()
 		# Subdued fade-in
@@ -314,8 +316,8 @@ func _add_share_button(won: bool, mins: int, secs: int, kills: int, buildings: i
 	var share_btn := Button.new()
 	share_btn.name = "ShareButton"
 	share_btn.text = "Share Result"
-	share_btn.custom_minimum_size = Vector2(180, 40)
-	share_btn.add_theme_font_size_override("font_size", 14)
+	share_btn.custom_minimum_size = Vector2(260, 80)  # HIG floor (was 180x40)
+	share_btn.add_theme_font_size_override("font_size", 16)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.25, 0.2, 0.15, 0.8)
 	style.border_color = Color(0.6, 0.5, 0.3, 0.6)
@@ -430,6 +432,14 @@ class _StarSlot extends Node2D:
 	var _bright_scale: float = 1.0
 	var _flash_alpha: float = 0.0
 	var _flash_radius: float = 0.0
+	var _tex_on: Texture2D = null    # P0 pixel star (replaces the AA vector polygon)
+	var _tex_off: Texture2D = null
+
+	func _ready() -> void:
+		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_tex_on = UIStyle.load_tex(UIStyle.UI + "star_gold.png")
+		_tex_off = UIStyle.load_tex(UIStyle.UI + "star_empty.png")
+		queue_redraw()
 
 	func set_bright_scale(s: float) -> void:
 		_bright_scale = s
@@ -448,29 +458,20 @@ class _StarSlot extends Node2D:
 		# Radial flash (behind star)
 		if _flash_alpha > 0.0:
 			draw_circle(Vector2.ZERO, _flash_radius, Color(1.0, 0.95, 0.65, _flash_alpha))
-		# Dim outline slot (always visible)
-		_draw_star(30.0, Color(0.25, 0.2, 0.1, 0.5))
-		# Bright star (on) — scaled by the pop animation
-		if star_on and _bright_scale > 0.01:
-			_draw_star(30.0 * _bright_scale, Color(1.0, 0.85, 0.25, 1.0))
+		var sz: float = 64.0
+		# Dim empty slot (always visible)
+		if _tex_off:
+			draw_texture_rect(_tex_off, Rect2(-sz * 0.5, -sz * 0.5, sz, sz), false, Color(1, 1, 1, 0.6))
+		# Bright star (on) — pixel star scaled by the pop animation
+		if star_on and _bright_scale > 0.01 and _tex_on:
+			var bs: float = sz * _bright_scale
+			draw_texture_rect(_tex_on, Rect2(-bs * 0.5, -bs * 0.5, bs, bs), false, Color.WHITE)
 		elif star_dim:
-			# Defeat: show dim crossed-out star
-			_draw_star(30.0, Color(0.45, 0.4, 0.3, 0.75))
+			# Defeat: dim star crossed out
+			if _tex_off:
+				draw_texture_rect(_tex_off, Rect2(-sz * 0.5, -sz * 0.5, sz, sz), false, Color(0.55, 0.5, 0.4, 0.85))
 			draw_line(Vector2(-20, -20), Vector2(20, 20), Color(0.15, 0.08, 0.04, 0.9), 3.0)
 			draw_line(Vector2(-20, 20), Vector2(20, -20), Color(0.15, 0.08, 0.04, 0.9), 3.0)
-
-	func _draw_star(r: float, col: Color) -> void:
-		# 5-point star via 10-vertex polygon.
-		var pts: PackedVector2Array = PackedVector2Array()
-		for i in 10:
-			var angle: float = -PI * 0.5 + (i * PI / 5.0)
-			var radius: float = r if (i % 2 == 0) else r * 0.45
-			pts.append(Vector2(cos(angle) * radius, sin(angle) * radius))
-		draw_colored_polygon(pts, col)
-		# Dark outline for legibility on parchment
-		var outline: PackedVector2Array = pts.duplicate()
-		outline.append(pts[0])
-		draw_polyline(outline, Color(0.1, 0.07, 0.03, 0.85), 2.0, true)
 
 
 ## T-048: Gold confetti particles on victory
@@ -483,11 +484,12 @@ func _spawn_confetti() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(Time.get_unix_time_from_system())
 
-	for i in 20:
+	for i in 40:
 		var particle := ColorRect.new()
-		var colors := [Color(1, 0.85, 0.2), Color(0.3, 0.8, 0.4), Color(0.4, 0.6, 1.0), Color(1.0, 0.4, 0.3)]
+		# Warm victory palette — golds/creams/orange (dropped the off-palette neon blue + green).
+		var colors := [Color(1, 0.85, 0.2), Color(1.0, 0.95, 0.72), Color(0.96, 0.7, 0.25), Color(1.0, 0.6, 0.2)]
 		particle.color = colors[rng.randi() % colors.size()]
-		particle.size = Vector2(rng.randf_range(4, 8), rng.randf_range(4, 8))
+		particle.size = Vector2(rng.randf_range(8, 16), rng.randf_range(8, 16))
 		var start_x: float = rng.randf_range(50, 670)
 		particle.position = Vector2(start_x, -20)
 		confetti_node.add_child(particle)
@@ -507,6 +509,15 @@ func _spawn_confetti() -> void:
 	var cleanup_tw := confetti_node.create_tween()
 	cleanup_tw.tween_interval(3.0)
 	cleanup_tw.tween_callback(confetti_node.queue_free)
+
+	# Keep the celebration alive: re-spawn a wave while the results screen is visible
+	# (each wave self-cleans after 3s, so nodes don't accumulate).
+	var loop_tw := create_tween()
+	loop_tw.tween_interval(1.2)
+	loop_tw.tween_callback(func():
+		if visible and is_inside_tree():
+			_spawn_confetti()
+	)
 
 
 ## VF-6: Style a button with Kingdom Rush parchment look
@@ -534,7 +545,8 @@ func _style_end_button(btn: Button, text: String, bg: Color, border: Color, font
 	btn.add_theme_color_override("font_color", Color(1, 0.95, 0.85))
 	btn.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02))
 	btn.add_theme_constant_override("outline_size", 2)
-	btn.add_theme_constant_override("outline_size", 2)
+	# HIG floor: end-screen buttons are combat-adjacent taps — never below 80px.
+	btn.custom_minimum_size.y = maxf(btn.custom_minimum_size.y, 80.0)
 
 
 ## VF-6: Build styled stat cards (parchment bg, gold border, staggered reveal)
@@ -570,7 +582,7 @@ func _build_stat_cards(won: bool, mins: int, secs: int, buildings: int,
 	for i in stats.size():
 		var card := Panel.new()
 		card.name = "StatCard%d" % i
-		card.custom_minimum_size = Vector2(0, 32)
+		card.custom_minimum_size = Vector2(0, 44)
 		var card_style := StyleBoxFlat.new()
 		card_style.bg_color = Color(0.28, 0.22, 0.14, 0.75)
 		card_style.border_color = Color(0.55, 0.42, 0.15, 0.6) if won else Color(0.35, 0.25, 0.12, 0.5)
@@ -586,7 +598,7 @@ func _build_stat_cards(won: bool, mins: int, secs: int, buildings: int,
 
 		var key_lbl := Label.new()
 		key_lbl.text = stats[i][0]
-		key_lbl.add_theme_font_size_override("font_size", 13)
+		key_lbl.add_theme_font_size_override("font_size", 16)
 		key_lbl.add_theme_color_override("font_color", Color(0.9, 0.75, 0.35))
 		key_lbl.custom_minimum_size = Vector2(80, 0)
 		hbox.add_child(key_lbl)
@@ -623,7 +635,7 @@ func _build_stat_cards(won: bool, mins: int, secs: int, buildings: int,
 
 		var val_lbl := Label.new()
 		val_lbl.text = stats[i][1]
-		val_lbl.add_theme_font_size_override("font_size", 13)
+		val_lbl.add_theme_font_size_override("font_size", 16)
 		val_lbl.add_theme_color_override("font_color", Color(0.85, 0.8, 0.65))
 		val_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hbox.add_child(val_lbl)

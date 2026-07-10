@@ -86,6 +86,10 @@ func _init() -> void:
 	_check_tab_labels_legible()           # inactive tab labels cream, not 2.1:1 void
 	_check_trophy_not_shield()            # header trophy icon is a trophy, not a shield
 	_check_online_cta_demoted()           # PLAY ONLINE is a compact chip, not a rival CTA
+	# Screen-parity P3 — End screen (2026-07-11).
+	_check_end_screen_takeover()          # in-match card tray hidden behind the results panel
+	_check_victory_ribbon_bright()        # VICTORY ribbon at full parchment opacity
+	_check_end_buttons_size()             # end-screen buttons >=80px
 	_print_results()
 	quit(1 if _fail > 0 else 0)
 
@@ -1186,6 +1190,85 @@ func _check_online_cta_demoted() -> void:
 	else:
 		_assert_fail("online CTA not demoted (width=%.0f, blue_chip=%s)" % [width, blue_chip],
 			"restyle online_btn as a <300px ribbon_blue chip")
+
+
+# ============================ Screen-parity P3 (End screen) ===========================
+# Calibrated on end_victory_000.png @ 504x896 — RED baseline verified 2026-07-11:
+# card-tray band 7965 wood px (HUD/cards bleed through); VICTORY ribbon muddy (158,145,61).
+
+const END_CAPTURE: String = "end_victory_000.png"
+
+
+## The results panel must take over: the in-match card tray / gold bar / HUD are hidden
+## (backlog 3.5). Detect the card-tray wood in the bottom band — baseline ~7965 px bleeds
+## through; after the takeover it drops to near zero (arena under the 40% overlay).
+func _check_end_screen_takeover() -> void:
+	print("[End screen takeover — no card-tray bleed-through (P3)]")
+	var img := _load_capture(END_CAPTURE)
+	if img == null:
+		return
+	var wood: int = 0
+	for y in range(745, 895):
+		for x in range(0, img.get_width()):
+			var c: Color = img.get_pixel(x, y)
+			# Tiny Swords card-tray wood (~139,98,66): warm mid-brown.
+			if absf(c.r - 139.0 / 255.0) < 0.16 and absf(c.g - 98.0 / 255.0) < 0.16 and c.b < 90.0 / 255.0:
+				wood += 1
+	if wood < 2500:
+		_assert_pass("card tray hidden behind results (%d wood px, was ~7965)" % wood)
+	else:
+		_assert_fail("in-match card tray bleeds through the results panel (%d wood px)" % wood,
+			"hide HUD/GoldBarBg/CardHand in _on_match_ended (backlog 3.5)")
+
+
+## VICTORY! ribbon must be full-opacity parchment (audit: 0.85 alpha muddied it to 2.46:1).
+## Count BRIGHT parchment pixels in the ribbon band (excludes the dark backdrop AND the
+## bright gold text). Baseline muddy parchment (158,145,61) scores ~0; full parchment (187,181,82) many.
+func _check_victory_ribbon_bright() -> void:
+	print("[VICTORY ribbon at full parchment opacity (P3)]")
+	var img := _load_capture(END_CAPTURE)
+	if img == null:
+		return
+	# Band covers the ribbon in both layouts (baseline ~y265, post-wood-backdrop ~y185);
+	# excludes the gold PLAY AGAIN button (y500+) so only the ribbon parchment counts.
+	var bright: int = 0
+	for y in range(150, 320):
+		for x in range(40, 445):
+			var c: Color = img.get_pixel(x, y)
+			# bright parchment yellow: 175<=R<=235, green high, blue low (not dark bg, not R>240 text)
+			if c.r >= 0.686 and c.r <= 0.921 and c.g >= 0.627 and c.b <= 0.431:
+				bright += 1
+	# The full-opacity ribbon fills ~11k px; muddy/low-opacity + gold-label noise stays well
+	# under 1500. Threshold sits in that wide gap so it can't false-pass on stat-label gold.
+	if bright >= 1500:
+		_assert_pass("VICTORY ribbon reads full parchment (%d bright px)" % bright)
+	else:
+		_assert_fail("VICTORY ribbon still muddy/low-opacity (%d bright parchment px)" % bright,
+			"set ribbon.modulate.a = 1.0 in end_screen.gd")
+
+
+## End-screen buttons meet the >=80px HIG floor (audit: ~43px). Static.
+func _check_end_buttons_size() -> void:
+	print("[End-screen buttons >=80px (P3)]")
+	var tscn := _read_file("res://scenes/game/game_arena.tscn")
+	var src := _read_file("res://scripts/ui/end_screen.gd")
+	var fails: Array = []
+	# RestartButton / MenuButton min-heights in the tscn block.
+	var ri: int = tscn.find('name="RestartButton"')
+	if ri == -1 or not tscn.substr(ri, 200).contains("Vector2(0, 96)"):
+		fails.append("RestartButton != 96")
+	var mi: int = tscn.find('name="MenuButton"')
+	if mi == -1 or not tscn.substr(mi, 200).contains("Vector2(0, 80)"):
+		fails.append("MenuButton != 80")
+	if not src.contains("Vector2(260, 80)"):
+		fails.append("ShareButton != 260x80")
+	# _style_end_button enforces a floor for the code-styled buttons.
+	if not src.contains("maxf(btn.custom_minimum_size.y, 80.0)"):
+		fails.append("no 80px floor in _style_end_button")
+	if fails.is_empty():
+		_assert_pass("all end-screen buttons meet the >=80px floor")
+	else:
+		_assert_fail("%d end-screen button(s) below floor: %s" % [fails.size(), ", ".join(fails)], "raise to >=80/96px")
 
 
 func _print_results() -> void:

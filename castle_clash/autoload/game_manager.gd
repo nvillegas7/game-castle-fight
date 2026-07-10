@@ -14,6 +14,17 @@ var local_player_id: int = 0
 ## True when this match was started via NetworkManager (not offline AI).
 var is_online_match: bool = false
 
+
+## The lockstep wait/stall machinery applies ONLY to a networked match.
+## BUG 2026-07-10 ("opponent left" in single player): gating on the GLOBAL
+## socket flag (NetworkManager.offline_mode) alone poisoned solo matches when
+## a Nakama socket was still alive from an earlier PLAY ONLINE attempt (cancel/
+## abort keeps the socket open by design) — the solo match waited for remote
+## ticks that never come, hit the stall timeout, and aborted with "Opponent
+## disconnected". Match TYPE and socket STATE are independent; lockstep needs both.
+func is_lockstep_match() -> bool:
+	return is_online_match and not NetworkManager.offline_mode
+
 ## Selected faction for the local player (set by main menu).
 var selected_faction: StringName = &"kingdom"
 
@@ -54,6 +65,9 @@ func _ready() -> void:
 ## Halt the sim immediately (mirroring the disconnect path) so we stop advancing
 ## a divergent match behind the error overlay instead of running two realities.
 func _on_desync_detected(_tick: int) -> void:
+	# Desync is meaningless offline (no remote checksums) — guard anyway (2026-07-10).
+	if not is_online_match:
+		return
 	if state == State.PLAYING or state == State.COUNTDOWN:
 		state = State.MATCH_OVER
 		set_process(false)
@@ -203,6 +217,9 @@ func reset_match() -> void:
 
 ## Handle mid-match disconnection.
 func _on_disconnected() -> void:
+	# A Nakama socket drop must never terminate an OFFLINE match (2026-07-10).
+	if not is_online_match:
+		return
 	if state == State.PLAYING or state == State.COUNTDOWN:
 		state = State.MATCH_OVER
 		set_process(false)
@@ -221,7 +238,7 @@ func _process(delta: float) -> void:
 		var next_tick: int = current_tick + 1
 
 		# Online lockstep: flush local commands and wait for remote
-		if not NetworkManager.offline_mode:
+		if is_lockstep_match():
 			NetworkManager.flush_commands_for_tick(next_tick)
 			if not NetworkManager.is_tick_ready(next_tick):
 				# Accumulate REAL elapsed time, not tick duration.
@@ -243,7 +260,7 @@ func _process(delta: float) -> void:
 		_tick_accumulator_msec -= TICK_DURATION_MSEC
 		# Commit local commands to buffer right before advancing — ensures
 		# commands placed during stalling frames are included (BUG-DESYNC1).
-		if not NetworkManager.offline_mode:
+		if is_lockstep_match():
 			NetworkManager.commit_tick_commands(current_tick + 1)
 		_advance_simulation_tick()
 

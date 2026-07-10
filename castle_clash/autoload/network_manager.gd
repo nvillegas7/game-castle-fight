@@ -99,7 +99,10 @@ func _ready() -> void:
 
 ## Send a command to the relay server (or apply locally in offline mode).
 func send_command(command: Dictionary) -> void:
-	if offline_mode:
+	# Route on the MATCH type, not just the socket: a live socket left over
+	# from matchmaking must not siphon solo-match commands into the online
+	# staging buffer (2026-07-10 "opponent left" bug).
+	if offline_mode or not GameManager.is_online_match:
 		GameManager.submit_command(command)
 		return
 	# Buffer 2 ticks ahead in online mode. This guarantees commands are staged
@@ -203,7 +206,7 @@ func is_tick_ready(tick: int) -> bool:
 ## also drives comparison of buffered remote checksums once the local sim
 ## catches up to the tick they were computed at.
 func send_checksum(tick: int, checksum: int) -> void:
-	if offline_mode or _socket == null:
+	if offline_mode or _socket == null or not GameManager.is_online_match:
 		return
 	_compare_buffered_checksums()
 	if tick % 50 != 0:

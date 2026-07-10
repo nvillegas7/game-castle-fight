@@ -42,6 +42,9 @@ func _run_tests() -> void:
 	_test_commands_null_buffer_guard()
 	_test_checksum_buffered_comparison()
 	_test_match_config_perks_deterministic()
+	_test_offline_match_survives_live_socket()
+	_test_offline_match_survives_socket_drop()
+	_test_offline_command_routing_with_live_socket()
 
 
 func _assert(condition: bool, name: String) -> void:
@@ -1031,3 +1034,75 @@ func _print_results() -> void:
 	if f:
 		f.store_string(json)
 		f.close()
+
+# --- BUG "opponent left" in single player (2026-07-10) ---
+# Root cause: lockstep wait + command routing keyed on the GLOBAL socket flag
+# (NetworkManager.offline_mode) instead of the per-match GameManager
+# .is_online_match. A live socket left over from PLAY ONLINE (cancel/abort
+# keeps it open by design) poisons the next SOLO match: it waits for remote
+# ticks that never come -> stall timeout -> "Opponent disconnected".
+
+func _test_offline_match_survives_live_socket() -> void:
+	print("[Offline match survives live socket (opponent-left bug)]")
+	var gm = root.get_node_or_null("GameManager")
+	var nm = root.get_node_or_null("NetworkManager")
+	if gm == null or nm == null:
+		_assert(false, "autoloads exist")
+		return
+	var saved_offline: bool = nm.offline_mode
+	# Poisoned state: socket "alive" (offline_mode=false), match is SOLO
+	nm.offline_mode = false
+	gm.is_online_match = false
+	# The lockstep gate must NOT engage for a solo match
+	var lockstep: bool = gm.is_lockstep_match() if gm.has_method("is_lockstep_match") else (not nm.offline_mode)
+	_assert(not lockstep, "solo match does not enter lockstep wait with live socket")
+	# And the stall-abort path must be unreachable: simulate the _process gate
+	nm.offline_mode = saved_offline
+	gm.is_online_match = false
+
+
+func _test_offline_match_survives_socket_drop() -> void:
+	print("[Offline match survives socket drop (Connection lost guard)]")
+	var gm = root.get_node_or_null("GameManager")
+	if gm == null:
+		_assert(false, "GameManager exists")
+		return
+	var eb = root.get_node_or_null("EventBus")
+	if eb == null:
+		_assert(false, "EventBus exists")
+		return
+	var saved_state = gm.state
+	var aborted: Array = []
+	var handler := func(reason: String) -> void: aborted.append(reason)
+	eb.match_aborted.connect(handler)
+	# Solo match in PLAYING state; a socket drop fires _on_disconnected
+	gm.is_online_match = false
+	gm.state = gm.State.PLAYING
+	gm._on_disconnected()
+	eb.match_aborted.disconnect(handler)
+	_assert(aborted.is_empty(), "socket drop does not abort a solo match (got %s)" % str(aborted))
+	_assert(gm.state == gm.State.PLAYING, "solo match still PLAYING after socket drop")
+	gm.state = saved_state
+	gm.set_process(false)
+
+
+func _test_offline_command_routing_with_live_socket() -> void:
+	print("[Offline command routing with live socket]")
+	var gm = root.get_node_or_null("GameManager")
+	var nm = root.get_node_or_null("NetworkManager")
+	if gm == null or nm == null:
+		_assert(false, "autoloads exist")
+		return
+	var saved_offline: bool = nm.offline_mode
+	var saved_state = gm.state
+	nm.offline_mode = false          # live socket
+	gm.is_online_match = false       # solo match
+	nm._local_commands_for_tick.clear()
+	# A solo-match command must be applied locally, NOT staged for the relay
+	nm.send_command({"type": "noop_test"})
+	_assert(nm._local_commands_for_tick.is_empty(),
+		"solo command not staged into the online buffer (staged: %s)" % str(nm._local_commands_for_tick))
+	nm._local_commands_for_tick.clear()
+	nm.offline_mode = saved_offline
+	gm.state = saved_state
+

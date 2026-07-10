@@ -509,10 +509,10 @@ func _audit_castle_wall() -> void:
 	for i in 2000:
 		sim.step([])
 
-	# T-096: Castle is 5×2. Castle 1 center Y=120 with hh=28 → hitbox top edge at 92,
-	# so "behind enemy castle" means team 0 unit at py < 92. Castle 0 center Y=920 with
-	# hh=28 → hitbox bottom edge at 948, so "behind player castle" means team 1 unit at
-	# py > 948.
+	# Castle is 7×4 (2026-07-10; was 5×2). Castle 1 center Y=120 with hh=56 → hitbox
+	# top edge at 64, so "behind enemy castle" means team 0 unit at py < 64. Castle 0
+	# center Y=920 with hh=56 → hitbox bottom edge at 976, so "behind player castle"
+	# means team 1 unit at py > 976.
 	var behind_castle_1: int = 0
 	var behind_castle_0: int = 0
 
@@ -520,32 +520,32 @@ func _audit_castle_wall() -> void:
 		if e.type != "unit" or FP.lte(e.hp, FP.ZERO):
 			continue
 		var py: int = FP.to_int(e.y)
-		if e.team == 0 and py < 92:  # Past enemy castle hitbox top (CASTLE_1_Y - hh = 120 - 28)
+		if e.team == 0 and py < 64:  # Past enemy castle hitbox top (CASTLE_1_Y - hh = 120 - 56)
 			behind_castle_1 += 1
-		if e.team == 1 and py > 948:  # Past player castle hitbox bottom (CASTLE_0_Y + hh = 920 + 28)
+		if e.team == 1 and py > 976:  # Past player castle hitbox bottom (CASTLE_0_Y + hh = 920 + 56)
 			behind_castle_0 += 1
 
 	_assert(behind_castle_1 == 0, "no team 0 units behind enemy castle (%d)" % behind_castle_1)
 	_assert(behind_castle_0 == 0, "no team 1 units behind player castle (%d)" % behind_castle_0)
 
-	# T-096: verify the 5×2 castle footprint cells are blocked in occupancy grid,
-	# while flanking cols (0-2, 8-10) on the same UNIT_GRID rows remain WALKABLE.
-	# Castle 0 footprint: build-zone rows 8-9, cols 3-7 → UNIT_GRID rows 30-32 cols 3-7
-	# Castle 1 footprint: build-zone rows 0-1, cols 3-7 → UNIT_GRID rows 0-2 cols 3-7
+	# Verify the 7×4 castle footprint cells are blocked in the occupancy grid,
+	# while flanking cols (0-1, 9-10) on the same UNIT_GRID rows remain WALKABLE.
+	# Castle 0 footprint: build-zone rows 6-9, cols 2-8 → UNIT_GRID rows 28-32 cols 2-8
+	# Castle 1 footprint: build-zone rows 0-3, cols 2-8 → UNIT_GRID rows 0-4 cols 2-8
 	var footprint_blocked: bool = true
 	var flanking_walkable: bool = true
-	for test_row in [0, 1, 2, 30, 31, 32]:
+	for test_row in [0, 1, 2, 3, 4, 28, 29, 30, 31, 32]:
 		if test_row < 0 or test_row >= 34:
 			continue
-		for c_castle in range(3, 8):
+		for c_castle in range(2, 9):
 			var idx_c: int = test_row * 11 + c_castle
 			if sim.unit_grid[idx_c].size() != 1 or sim.unit_grid[idx_c][0] != -2:
 				footprint_blocked = false
-		for c_flank in [0, 1, 2, 8, 9, 10]:
+		for c_flank in [0, 1, 9, 10]:
 			var idx_f: int = test_row * 11 + c_flank
 			var cell: Array = sim.unit_grid[idx_f]
 			if cell.size() == 1 and cell[0] == -2:
 				flanking_walkable = false
 
-	_assert(footprint_blocked, "castle 5×2 footprint cells blocked (cols 3-7 on castle UNIT_GRID rows)")
-	_assert(flanking_walkable, "castle flanking cells walkable (cols 0-2, 8-10 on castle UNIT_GRID rows)")
+	_assert(footprint_blocked, "castle 7×4 footprint cells blocked (cols 2-8 on castle UNIT_GRID rows)")
+	_assert(flanking_walkable, "castle flanking cells walkable (cols 0-1, 9-10 on castle UNIT_GRID rows)")

@@ -427,7 +427,7 @@ func _test_perk_iron_discipline() -> void:
 	# Place barracks for both
 	sim.step([
 		Command.place_building(0, &"barracks", 3, 3),
-		Command.place_building(1, &"barracks", 3, 3),
+		Command.place_building(1, &"barracks", 3, 4),  # gy>=4: rows 0-3 are castle (7x4)
 	])
 	for i in 200:
 		sim.step([])
@@ -510,7 +510,7 @@ func _test_game_mode_mirror() -> void:
 	# Both can place kingdom buildings
 	sim.step([
 		Command.place_building(0, &"barracks", 3, 3),
-		Command.place_building(1, &"barracks", 3, 3),
+		Command.place_building(1, &"barracks", 3, 4),  # gy>=4: rows 0-3 are castle (7x4)
 	])
 	var p0_blds := sim.entities.filter(func(e): return e.type == "building" and e.team == 0)
 	var p1_blds := sim.entities.filter(func(e): return e.type == "building" and e.team == 1)
@@ -1030,9 +1030,9 @@ func _test_siege_targeting_prefers_buildings() -> void:
 	# Castle occupies rows 0-1 cols 1-9 for team 1, so place at row 2+
 	sim.step([
 		Command.place_building(1, &"barracks", 0, 2),
-		Command.place_building(1, &"gold_mine", 2, 2),
-		Command.place_building(1, &"gold_mine", 4, 2),
-		Command.place_building(1, &"gold_mine", 6, 2),
+		Command.place_building(1, &"gold_mine", 2, 4),  # gy>=4: castle rows 0-3 (7x4)
+		Command.place_building(1, &"gold_mine", 4, 4),
+		Command.place_building(1, &"gold_mine", 6, 4),
 	])
 	# Run enough ticks for catapult to spawn and acquire a target
 	for i in 500:
@@ -1083,7 +1083,7 @@ func _test_anti_air_targeting() -> void:
 	for i in 10:
 		sim.step([])
 	# Place gryphon_roost (needs archer_range prereq)
-	sim.step([Command.place_building(1, &"gryphon_roost", 4, 2)])
+	sim.step([Command.place_building(1, &"gryphon_roost", 4, 4)])  # gy>=4: castle rows 0-3
 	# Run ticks for both unit types to spawn and engage.
 	# T-079: shortened from 500 → 200 because footmen now have Light armor (was Medium),
 	# so Pierce attacks (archer/gryphon) deal 150% — footmen die fast under combined fire.

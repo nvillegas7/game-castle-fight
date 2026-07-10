@@ -1459,9 +1459,9 @@ func _add_fortress_dressing(parent: Node2D, tm: Texture2D, ts: float) -> void:
 	var stone := AtlasTexture.new()
 	stone.atlas = tm
 	stone.region = Rect2(6 * 64, 4 * 64, 64, 64)  # stone face, rim line on top
-	# LAYOUT: WALL_Y_ENEMY=112 (bottom 176 = red castle base at 0.544),
-	# WALL_Y_PLAYER=912 (bottom 976 = blue castle base). WALL_X=(140,580).
-	for wy in [112.0, 912.0]:
+	# LAYOUT: WALL_Y_ENEMY=103 (bottom 167 = red castle block bottom, 7x4),
+	# WALL_Y_PLAYER=911 (bottom 975 = blue castle block bottom). WALL_X=(140,580).
+	for wy in [103.0, 911.0]:
 		var x: float = 140.0
 		while x < 580.0:
 			var spr := Sprite2D.new()
@@ -1631,14 +1631,18 @@ func _setup_terrain_decorations() -> void:
 		if ResourceLoader.exists(path):
 			tree_sheets.append(load(path))
 	if not tree_sheets.is_empty():
-		for cl in [[110.0, 428.0, 3], [110.0, 580.0, 2]]:
+		for cl in [[128.0, 428.0, 3], [128.0, 580.0, 2]]:
 			for k in int(cl[2]):
 				var sheet: Texture2D = tree_sheets[k % tree_sheets.size()]
 				var fh: int = int(sheet.get_height())
+				# Tree strips are 8 frames of 192px WIDTH (Tree1/2 are 192x256,
+				# NON-square) — the old square fh-wide crop bled a sliver of the
+				# next frame in: the "floating fir fragments" bug (2026-07-10).
+				var fw: int = sheet.get_width() / 8
 				var at := AtlasTexture.new()
 				at.atlas = sheet
-				at.region = Rect2(0, 0, fh, fh)
-				var dx: float = (k - cl[2] / 2.0) * 32.0 + 16.0
+				at.region = Rect2(0, 0, fw, fh)
+				var dx: float = (k - cl[2] / 2.0) * 26.0 + 13.0
 				var dy: float = (k % 2) * 26.0
 				for pos in all4.call(cl[0] + dx, cl[1] + dy):
 					var spr := Sprite2D.new()

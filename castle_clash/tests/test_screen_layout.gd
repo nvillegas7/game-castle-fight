@@ -72,9 +72,10 @@ func _init() -> void:
 	# pixel spec is design/arena_target.png; these detectors pin its four
 	# load-bearing properties so the port can't drift back.
 	_check_arena_water_native()           # native teal, no modulate tint
-	_check_arena_castle_scale()           # mockup-scale castle (≥160px capture)
+	_check_arena_castle_scale()           # calibrated castle scale band
 	_check_arena_fortress_towers()        # decorative towers flank each castle
 	_check_arena_coastline_platform()     # platform edge at design x=72
+	_check_arena_no_floating_foliage()    # no cropped/floating tree art in water
 	_print_results()
 	quit(1 if _fail > 0 else 0)
 
@@ -842,6 +843,48 @@ func _check_arena_coastline_platform() -> void:
 	else:
 		_assert_fail("platform edge off-spec — first grass x=%s per row (want 44..62)" % str(edges),
 			"grass platform must start at design x=72 with edge tiles, water outside")
+
+
+## No foliage floating in the water: green tree/bush pixels must stay within
+## a small overhang band of the island rim. Catches BOTH deep over-water
+## canopies AND disconnected sprite fragments (the Tree1/2 square-crop bug that
+## bled a sliver of the next animation frame — user-reported "cropped trees",
+## 2026-07-10). Rim at design x=72/648 → capture 50/453; allowance 17px.
+func _check_arena_no_floating_foliage() -> void:
+	print("[Arena no floating foliage (design-flow parity)]")
+	var img := _load_capture(ARENA_CAPTURE)
+	if img == null:
+		return
+	# Intentional water decor is exempt: LAYOUT water-rock spots (mossy green
+	# tops read as "foliage"). Capture-space centers of the 8 mirrored rocks.
+	var wrock_boxes: Array = []
+	for d in [[28, 210], [24, 329], [476, 210], [480, 329],
+			[28, 518], [24, 399], [476, 518], [480, 399]]:
+		wrock_boxes.append(Rect2i(d[0] - 14, d[1] - 14, 28, 28))
+	var bad_l: int = 0
+	var bad_r: int = 0
+	var worst := ""
+	for y in range(40, 680):
+		for x in range(0, 33):  # left water beyond 17px overhang (50-17=33)
+			if _arena_is_green(img.get_pixel(x, y)) and not _in_any_box(wrock_boxes, x, y):
+				bad_l += 1
+				worst = "(%d,%d)" % [x, y]
+		for x in range(471, 504):  # right water beyond overhang (453+17+1)
+			if _arena_is_green(img.get_pixel(x, y)) and not _in_any_box(wrock_boxes, x, y):
+				bad_r += 1
+				worst = "(%d,%d)" % [x, y]
+	if bad_l + bad_r <= 12:  # tolerate a few anti-aliased/foam-adjacent pixels
+		_assert_pass("no floating foliage in water (L=%d R=%d stray px)" % [bad_l, bad_r])
+	else:
+		_assert_fail("foliage floating in water — L=%d R=%d px beyond the rim band, e.g. %s" % [bad_l, bad_r, worst],
+			"tree canopies must stay within 17px of the island rim; check frame-crop bleed")
+
+
+func _in_any_box(boxes: Array, x: int, y: int) -> bool:
+	for b in boxes:
+		if b.has_point(Vector2i(x, y)):
+			return true
+	return false
 
 
 # --- Pixel-detector helpers ---

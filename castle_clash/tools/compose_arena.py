@@ -61,10 +61,16 @@ def tile_of(sheet: Path, col: int, row: int) -> Image.Image:
     return load(sheet).crop((col * TS, row * TS, (col + 1) * TS, (row + 1) * TS))
 
 
-def frame_of(sheet: Path, idx: int = 0) -> Image.Image:
+def frame_of(sheet: Path, idx: int = 0, fw: int = 0) -> Image.Image:
+    """Extract frame idx. fw = true frame width — NOT always the sheet height:
+    Tree1/Tree2 are 8 frames of 192x256 (non-square); the old square crop bled
+    a 26px sliver of the next frame in ("floating fir fragments" bug,
+    user-reported 2026-07-10). Default fw=height only when it divides evenly."""
     im = load(sheet)
     fh = im.size[1]
-    return im.crop((idx * fh, 0, (idx + 1) * fh, fh))
+    if fw <= 0:
+        fw = fh if im.size[0] % fh == 0 else im.size[0] // 8
+    return im.crop((idx * fw, 0, idx * fw + fw, fh))
 
 
 def blit(dst, src, cx, cy, scale=1.0, flip_h=False, flip_v=False, anchor="bottom"):
@@ -95,18 +101,21 @@ FOAM = TER / "Water Foam.png"
 PLAT_X0, PLAT_X1 = 72, 648
 PLAT_Y0, PLAT_Y1 = 72, 968
 
-CASTLE_SCALE = 0.544                 # 0.68 measured mockup fraction x0.8 (user: placed buildings overlapped the castle)
-CASTLE_ANCHOR = (360, 120)           # sim anchor (enemy); player = y-mirror
+CASTLE_SCALE = 0.538                 # content fits the 7x4-cell sim footprint (112px tall)
+# Castle visuals snap to their 7x4 grid-block CENTERS (enemy y[55,167]->111,
+# player y[863,975]->919), NOT mirror_y — the build grids sit symmetric about
+# 515 (legacy 10px zone quirk), while decorations mirror about the 520 pivot.
+CASTLE_CENTERS = {"red": (360, 111), "blue": (360, 919)}
 
 # Fortress dressing (enemy half; x already centered/paired where needed)
-WALL_Y_ENEMY = 112                   # stone bottom (176) = red castle base at 0.544
-WALL_Y_PLAYER = 912                  # stone bottom (976) = blue castle base — face STILL south
+WALL_Y_ENEMY = 103                   # stone bottom (167) = red castle block bottom
+WALL_Y_PLAYER = 911                  # stone bottom (975) = blue block bottom — face STILL south
 WALL_X = (140, 580)
 TOWER_SCALE, TOWER_GY = 0.72, 268    # flanking towers at x=140 / 720-140
 HOUSE = ("House1.png", 122, 148, 0.62)   # corner house; mirrored 4x
 
 # Decorations — LEFT side of ENEMY half only. (cx, ground_y, extra)
-TREES_L = [(110, 428, 3), (110, 580, 2)]     # (cx, gy, count)
+TREES_L = [(128, 428, 3), (128, 580, 2)]     # (cx, gy, count) — canopy+wind-sway stays inside the rim band
 SHEEP_L = [(190, 350), (190, 620)]           # graze spots, inboard of trees
 GOLD_L = [(188, 505)]                        # nugget cluster
 BUSH_L = [(170, 250, 1)]                     # (cx, gy, sprite idx)
@@ -161,9 +170,8 @@ def render(show_grid: bool = False) -> Image.Image:
         while x < WALL_X[1]:
             img.alpha_composite(stone, (x, round(wy)))
             x += TS
-        cy = CASTLE_ANCHOR[1] if not flip else mirror_y(CASTLE_ANCHOR[1])
-        blit(img, load(bdir / "Castle.png"), CASTLE_ANCHOR[0], cy,
-             CASTLE_SCALE, anchor="center")
+        ccx, ccy = CASTLE_CENTERS[team]
+        blit(img, load(bdir / "Castle.png"), ccx, ccy, CASTLE_SCALE, anchor="center")
         for tx in (140, mirror_x(140)):
             gy2 = TOWER_GY if not flip else mirror_y(TOWER_GY)
             blit(img, load(bdir / "Tower.png"), tx, gy2, TOWER_SCALE)
@@ -183,8 +191,9 @@ def render(show_grid: bool = False) -> Image.Image:
 
     for cx, gy, n in TREES_L:
         for k in range(n):
-            t = frame_of(TER / "Resources" / f"Tree{(k % 4) + 1}.png", 0)
-            dx = (k - n / 2) * 32 + 16
+            sheet = TER / "Resources" / f"Tree{(k % 4) + 1}.png"
+            t = frame_of(sheet, 0, fw=load(sheet).size[0] // 8)  # 8-frame strips
+            dx = (k - n / 2) * 26 + 13
             dy = (k % 2) * 26
             for px, py in all4(cx + dx, gy + dy):
                 jobs.append((py, lambda p=(px, py), s=t: blit(img, s, p[0], p[1], TREE_SCALE)))

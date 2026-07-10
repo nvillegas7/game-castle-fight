@@ -29,16 +29,20 @@ func _ready() -> void:
 		_sprite.texture = tex
 		_sprite.centered = true
 		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		# Design-flow port (design/arena_target.png): castle renders at 0.544x
-		# NATIVE scale = the measured mockup proportion (0.296 of playfield
-		# width = 0.68) x0.8 — user feedback 2026-07-08: at 0.68, buildings
-		# placed beside the castle visually overlapped its body. Still seated
-		# at the island rim on the sim anchor. The parent CastleVisual node
-		# carries scale 0.7 in the scene, so compensate here. Sim footprint/
-		# hitbox unchanged.
+		# Castle is confined to its 7x4-cell sim footprint (196x112px,
+		# user spec 2026-07-10): content scaled to the block height and the
+		# sprite SNAPPED to the block center, so 2x2 buildings placed on any
+		# neighboring cell can never overlap the castle art. Blocks: enemy
+		# x[262,458] y[55,167] center (360,111); player y[863,975] center
+		# (360,919). Sim anchors are (360,120)/(360,920) — the small visual
+		# offset is applied to the sprite, anchors/hitbox owned by the sim.
+		# The parent CastleVisual node carries scale 0.7 in the scene.
 		var parent_s: float = scale.x if scale.x > 0.0 else 1.0
-		var s: float = 0.544 / parent_s
+		var s: float = 0.538 / parent_s  # 112px block / 208px content height
 		_sprite.scale = Vector2(s, s)
+		var block_center_y: float = 111.0 if team == 1 else 919.0
+		var anchor_y: float = 120.0 if team == 1 else 920.0
+		_sprite.position.y = (block_center_y - anchor_y) / parent_s
 		_half_h = tex.get_height() * s * 0.5
 		_half_w = tex.get_width() * s * 0.5
 		add_child(_sprite)

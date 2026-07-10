@@ -96,8 +96,8 @@ const TEAM_1_ZONE_Y: int = 65     # Top edge of enemy build zone (symmetric mirr
 const TEAM_1_SPAWN_Y: int = 345   # Bottom edge of enemy build zone (65 + 10 * 28)
 const CASTLE_0_Y: int = 920       # Player castle center (symmetric: 2*520 - CASTLE_1_Y)
 const CASTLE_1_Y: int = 120       # Enemy castle center (T-096: was 70; now 2*520 - CASTLE_0_Y)
-const CASTLE_FOOTPRINT_W: int = 5 # 5 cells wide (was full 9 between cols 1-9)
-const CASTLE_FOOTPRINT_H: int = 2 # 2 cells tall (was 3 rows with ±1 from center)
+const CASTLE_FOOTPRINT_W: int = 7 # 7 cells wide — covers the castle sprite so 2x2
+const CASTLE_FOOTPRINT_H: int = 4 # buildings placed around it never overlap it (2026-07-10)
 const ARENA_LEFT: int = 60
 const ARENA_RIGHT: int = 660
 

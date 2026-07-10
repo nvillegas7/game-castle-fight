@@ -81,3 +81,4 @@ before the fix, or the passing criterion.
 | BUG-30 | Card bottom-text overlap in 2-row layout | A2 | 3 | MEDIUM; hide stats when card h<110 |
 | BUG-29 | Gold coin icon far from gold text in battle HUD | A2 | 3 | LOW; left-align gold label |
 | BUG-35 | MP command delivery unverified — no ACK/retransmit (P2 hardening, superseded by DESYNC1) | A1 | 1B | P2; overlaps 1B-6; explicit ACK + bounded retransmit |
+| BUG-51 | `test_unit_behavior.gd` 2 scenarios RED (pre-existing on 4937e6d, NOT screen-parity): `enemy_only_rush` (team-1 war_camp spawns 0 tracked units — matches 2026-07-10 lesson: team-1 placement silently rejected → tests must assert building EXISTS after place); `melee_with_healer` (`healing` check fails, 8 spawned/6 alive). Regressed by bf1954c (castle 7×4 footprint) after e338f61 fixed them. | A5 | sim | HIGH; assert placement success + re-validate healing expectation; NOT part of P0–P5 UI sweep |

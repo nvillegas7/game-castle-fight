@@ -99,10 +99,6 @@ var _shake_intensity: float = 0.0
 var _shake_timer: float = 0.0
 var _original_position: Vector2 = Vector2.ZERO
 var _prev_gold: int = 0
-# Gold elixir-fill bar (backlog 3.3) — rebuilt in _polish_arena_visuals, driven by _update_gold_bar.
-var _gold_fill: Panel = null
-var _gold_fill_maxw: float = 0.0
-var _gold_marker: ColorRect = null
 
 
 func _ready() -> void:
@@ -834,22 +830,6 @@ func _update_gold_bar() -> void:
 
 	gold_bar_label.text = "%dg   (+%d/5s)" % [gold, income]
 
-	# Elixir fill: ratio of current gold toward affording ~2x the cheapest card,
-	# with a cream marker at the exact cheapest-card cost (backlog 3.3 glanceable meter).
-	if _gold_fill and _gold_fill_maxw > 0.0:
-		var cheapest: int = 0
-		if card_hand and card_hand.has_method("get_cheapest_cost"):
-			cheapest = card_hand.get_cheapest_cost()
-		var span: int = maxi(cheapest * 2, 100)
-		var ratio: float = clampf(float(gold) / float(span), 0.0, 1.0)
-		_gold_fill.size.x = _gold_fill_maxw * ratio
-		if _gold_marker:
-			if cheapest > 0 and cheapest < span:
-				_gold_marker.visible = true
-				_gold_marker.position.x = 4.0 + _gold_fill_maxw * (float(cheapest) / float(span))
-			else:
-				_gold_marker.visible = false
-
 	# Gold income popup
 	if gold > _prev_gold and _prev_gold > 0:
 		var diff: int = gold - _prev_gold
@@ -1305,15 +1285,14 @@ func _polish_arena_visuals() -> void:
 		hp_bar0.offset_top = 882
 		hp_bar0.offset_bottom = 888
 
-	# Red ribbon for HUD + gold bar — NinePatchRect keeps pointed ends, tiles center
-	var ribbon_tex: Texture2D = _load_texture_safe("res://assets/sprites/ui/ninepatch/ribbon_red.png")
-	# Ribbon pointed ends: left=98px, right=97px of 259px total. At 720px → ~272px each side
-	# Inset for readable text: don't place text on the pointed ends
-	var ribbon_inset: float = 115.0
+	# Gold bar — YELLOW Tiny Swords ribbon (reference). The top HUD strip is now
+	# transparent (bars + TIME banner float over the arena), so there is no HUD ribbon.
+	var ribbon_tex: Texture2D = _load_texture_safe("res://assets/sprites/ui/ninepatch/ribbon_yellow.png")
 
 	if ribbon_tex:
 		var gold_bg := get_node_or_null("UILayer/GoldBarBg")
 		if gold_bg and gold_bg is ColorRect:
+			(gold_bg as ColorRect).color = Color(0, 0, 0, 0)  # ribbon carries the strip
 			var gold_ribbon := NinePatchRect.new()
 			gold_ribbon.texture = ribbon_tex
 			gold_ribbon.patch_margin_left = 98
@@ -1334,70 +1313,25 @@ func _polish_arena_visuals() -> void:
 		if old_node:
 			old_node.visible = false
 
-	# Elixir-style gold fill (backlog 3.3): wood trough + gold fill in the ribbon's RIGHT
-	# portion, glanceable affordability marker at the cheapest card cost. Gold text sits left.
-	var gold_bg_for_bar := get_node_or_null("UILayer/GoldBarBg")
-	if gold_bg_for_bar:
-		var bar_x: float = 340.0
-		var bar_w: float = 600.0 - bar_x  # ends inside ribbon_inset (720-115=605)
-		var bar_y: float = 13.0
-		var bar_h: float = 24.0
-		var trough := Panel.new()
-		trough.name = "GoldFillTrough"
-		trough.add_theme_stylebox_override("panel", UIStyle.bar_bg())
-		trough.position = Vector2(bar_x, bar_y)
-		trough.size = Vector2(bar_w, bar_h)
-		trough.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		gold_bg_for_bar.add_child(trough)
-		var inset: float = 4.0
-		_gold_fill_maxw = bar_w - inset * 2.0
-		var fill := Panel.new()
-		fill.name = "GoldFill"
-		var fill_style := StyleBoxFlat.new()
-		fill_style.bg_color = Color(1.0, 0.85, 0.15, 1.0)
-		fill_style.border_color = Color(0.7, 0.5, 0.08, 0.9)
-		fill_style.set_border_width_all(1)
-		fill_style.set_corner_radius_all(2)
-		fill.add_theme_stylebox_override("panel", fill_style)
-		fill.position = Vector2(inset, inset)
-		fill.size = Vector2(0.0, bar_h - inset * 2.0)
-		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		trough.add_child(fill)
-		_gold_fill = fill
-		var marker := ColorRect.new()
-		marker.name = "GoldMarker"
-		marker.color = Color(0.97, 0.95, 0.85, 0.95)
-		marker.size = Vector2(2.0, bar_h - inset * 2.0)
-		marker.position = Vector2(inset, inset)
-		marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		trough.add_child(marker)
-		_gold_marker = marker
-
-	# Gold label — centered on ribbon, coin icon left of text
+	# Coin + amount centered as a group on the ribbon (reference — no fill meter).
 	var gold_bg := get_node_or_null("UILayer/GoldBarBg")
+	var gold_label := get_node_or_null("UILayer/GoldBarBg/GoldBarLabel")
+	if gold_label and gold_label is Label:
+		var l := gold_label as Label
+		l.offset_left = 300.0   # centered group: coin sits just left of the text
+		l.offset_right = 680.0
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var coin_icon: Texture2D = SpriteRegistry.get_ui_texture(&"Icon_03")
 	if coin_icon and gold_bg:
 		var coin := Sprite2D.new()
 		coin.texture = coin_icon
 		coin.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		coin.centered = true
-		coin.scale = Vector2(22.0 / coin_icon.get_height(), 22.0 / coin_icon.get_height())
-		coin.position = Vector2(ribbon_inset + 16, 25)
+		coin.scale = Vector2(24.0 / coin_icon.get_height(), 24.0 / coin_icon.get_height())
+		coin.position = Vector2(285.0, 25.0)  # left of the amount text; tuned vs reference
 		coin.z_index = 3
 		gold_bg.add_child(coin)
-
-	var gold_label := get_node_or_null("UILayer/GoldBarBg/GoldBarLabel")
-	if gold_label:
-		gold_label.offset_left = ribbon_inset + 30
-		gold_label.offset_right = 335.0  # stop left of the elixir fill bar (starts x=340)
-		# BUG-GOLD-COIN-GAP 2026-04-11: Left-align so gold text starts next to
-		# the coin icon instead of centering ~244px away.
-		# Vertical center the text so it aligns with the coin Sprite2D at y=25
-		# (GoldBarBg is 50px tall, label rect spans y=4-46).
-		if gold_label is Label:
-			var l := gold_label as Label
-			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-			l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 	# Tiny Swords wood table on card hand — NinePatchRect
 	var wood_tex: Texture2D = _load_texture_safe("res://assets/sprites/ui/ninepatch/woodtable.png")
@@ -1417,29 +1351,9 @@ func _polish_arena_visuals() -> void:
 			wood.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			wood.set_anchors_preset(Control.PRESET_FULL_RECT)
 			card_bg.add_child(wood)
-	# Red ribbon on top HUD bar — NinePatchRect
-	if ribbon_tex:
-		var hud_bg := get_node_or_null("UILayer/HUD/HUDBg")
-		if hud_bg and hud_bg is ColorRect:
-			var hud_ribbon := NinePatchRect.new()
-			hud_ribbon.texture = ribbon_tex
-			hud_ribbon.patch_margin_left = 98
-			hud_ribbon.patch_margin_right = 97
-			hud_ribbon.patch_margin_top = 0
-			hud_ribbon.patch_margin_bottom = 0
-			hud_ribbon.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
-			hud_ribbon.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_STRETCH
-			hud_ribbon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			hud_ribbon.set_anchors_preset(Control.PRESET_FULL_RECT)
-			hud_ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			hud_bg.add_child(hud_ribbon)
-	# Inset HUD text from ribbon ripple edges
-	var hud_hbox := get_node_or_null("UILayer/HUD/HBox")
-	if hud_hbox:
-		hud_hbox.offset_left = ribbon_inset
-		hud_hbox.offset_right = -ribbon_inset
-		hud_hbox.offset_top = 8
-		hud_hbox.offset_bottom = -6
+	# Top HUD strip is transparent (reference): no ribbon here — hud.gd's wood-framed
+	# HP bars + the centered TIME banner float directly over the arena. HUDBg is set
+	# transparent in the scene; the hidden HBox text is left in place (inert).
 
 	# CombatLane hidden entirely — terrain tiles (T-060) handle the combat zone visual.
 	var combat_lane := get_node_or_null("CombatLane")

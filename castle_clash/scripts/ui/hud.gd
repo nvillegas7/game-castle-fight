@@ -10,10 +10,12 @@ extends Control
 # Control directly — NOT to the HBox: a Container discards manual
 # position/size on sort (project container rule). Panel children keep manual
 # rects because Panel is a plain Control, not a Container.
-const BAR_W: float = 176.0
-const BAR_H: float = 32.0
-const BAR_GAP: float = 8.0
-const BAR_INSET: float = 3.0
+# Reference (design/references/hud_target.png): YOU bar left, TIME banner center, FOE bar
+# right — wood-framed glossy bars floating over the arena (no HUD strip).
+const BAR_W: float = 200.0
+const BAR_H: float = 34.0
+const FILL_INSET_X: float = 14.0  # leave the bar_bg wood frame visible around the fill
+const FILL_INSET_Y: float = 7.0
 const HUD_W: float = 720.0  # Portrait viewport width (project-wide constant)
 const HUD_H: float = 48.0   # Top strip height (HUD offset_bottom in the scene)
 
@@ -25,6 +27,7 @@ var _my_fill_tween: Tween = null
 var _en_fill_tween: Tween = null
 var _last_my_hp: int = -1
 var _last_en_hp: int = -1
+var _time_label: Label = null  # value line of the centered TIME banner
 
 
 func _ready() -> void:
@@ -32,9 +35,13 @@ func _ready() -> void:
 	# Ensure HUD text is readable at 720x1280 (16px = native pixel-font size)
 	gold_label.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
 	wave_label.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
-	# Plain-text castle HP is replaced by the graphical bars below.
+	# Plain-text castle HP is replaced by the graphical bars below; the HBox time text
+	# is replaced by the centered TIME banner (reference).
 	castle_label.visible = false
+	wave_label.visible = false
+	gold_label.visible = false
 	_build_hp_bars()
+	_build_time_banner()
 
 
 func _process(_delta: float) -> void:
@@ -50,13 +57,14 @@ func _update_wave_timer() -> void:
 	var total_seconds: int = GameManager.current_tick / GameManager.TICK_RATE
 	var minutes: int = total_seconds / 60
 	var secs: int = total_seconds % 60
-	wave_label.text = "Time %d:%02d" % [minutes, secs]
+	if _time_label:
+		_time_label.text = "%d:%02d" % [minutes, secs]
 
 
 func _build_hp_bars() -> void:
 	var bar_y: float = (HUD_H - BAR_H) * 0.5
-	var en_x: float = HUD_W - 24.0 - BAR_W
-	var my_x: float = en_x - BAR_GAP - BAR_W
+	var my_x: float = 8.0                       # YOU on the left (reference)
+	var en_x: float = HUD_W - 8.0 - BAR_W        # FOE on the right
 	var mine: Dictionary = _make_hp_bar(Vector2(my_x, bar_y),
 		Color(0.30, 0.72, 0.32), Color(0.16, 0.42, 0.18))
 	_my_fill = mine.fill
@@ -65,6 +73,50 @@ func _build_hp_bars() -> void:
 		Color(0.82, 0.28, 0.22), Color(0.48, 0.14, 0.10))
 	_en_fill = foe.fill
 	_en_hp_label = foe.label
+
+
+## Centered blue-gray stone banner (ribbon_dark): "TIME" over the m:ss value.
+func _build_time_banner() -> void:
+	var banner_w: float = 150.0
+	var banner := Control.new()
+	banner.name = "TimeBanner"
+	banner.position = Vector2((HUD_W - banner_w) * 0.5, -4.0)
+	banner.size = Vector2(banner_w, 56.0)
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := NinePatchRect.new()
+	bg.texture = UIStyle.load_tex(UIStyle.NP + "ribbon_dark.png")
+	bg.patch_margin_left = 90
+	bg.patch_margin_right = 90
+	bg.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	bg.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_STRETCH
+	bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.add_child(bg)
+	var title := Label.new()
+	title.text = "TIME"
+	title.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	title.offset_top = 8.0
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+	title.add_theme_color_override("font_color", UIStyle.TEXT_CREAM)
+	title.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+	title.add_theme_constant_override("outline_size", 2)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.add_child(title)
+	var value := Label.new()
+	value.text = "0:00"
+	value.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	value.offset_top = 26.0
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+	value.add_theme_color_override("font_color", Color(1, 1, 1))
+	value.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+	value.add_theme_constant_override("outline_size", 2)
+	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.add_child(value)
+	add_child(banner)
+	_time_label = value
 
 
 ## One bar = trough Panel (dark, warm border) + fill Panel + centered numeric
@@ -86,10 +138,23 @@ func _make_hp_bar(pos: Vector2, fill_color: Color, fill_border: Color) -> Dictio
 	fill_style.set_border_width_all(1)
 	fill_style.set_corner_radius_all(2)
 	fill.add_theme_stylebox_override("panel", fill_style)
-	fill.position = Vector2(BAR_INSET, BAR_INSET)
-	fill.size = Vector2(BAR_W - BAR_INSET * 2.0, BAR_H - BAR_INSET * 2.0)
+	fill.position = Vector2(FILL_INSET_X, FILL_INSET_Y)
+	fill.size = Vector2(BAR_W - FILL_INSET_X * 2.0, BAR_H - FILL_INSET_Y * 2.0)
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	trough.add_child(fill)
+
+	# Glossy top highlight — lighter band on the top ~45% of the fill (follows the
+	# fill width via anchors as HP drains).
+	var gloss := Panel.new()
+	var gloss_style := StyleBoxFlat.new()
+	gloss_style.bg_color = fill_color.lightened(0.35)
+	gloss_style.bg_color.a = 0.55
+	gloss_style.set_corner_radius_all(2)
+	gloss.add_theme_stylebox_override("panel", gloss_style)
+	gloss.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	gloss.anchor_bottom = 0.45
+	gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fill.add_child(gloss)
 
 	var label := Label.new()
 	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -138,7 +203,7 @@ func _update_castle_hp() -> void:
 ## Smooth the fill width toward the new HP ratio with a short ease-out tween.
 func _tween_bar_fill(fill: Panel, tween: Tween, hp: int, max_hp: int, instant: bool) -> Tween:
 	var ratio: float = clampf(float(hp) / maxf(float(max_hp), 1.0), 0.0, 1.0)
-	var target_w: float = (BAR_W - BAR_INSET * 2.0) * ratio
+	var target_w: float = (BAR_W - FILL_INSET_X * 2.0) * ratio
 	if instant:
 		fill.size.x = target_w
 		return null

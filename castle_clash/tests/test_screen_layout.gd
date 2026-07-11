@@ -76,9 +76,11 @@ func _init() -> void:
 	_check_arena_fortress_towers()        # decorative towers flank each castle
 	_check_arena_coastline_platform()     # platform edge at design x=72
 	_check_arena_no_floating_foliage()    # no cropped/floating tree art in water
-	# Screen-parity P1 — Game HUD (2026-07-10). Pixel + static detectors.
-	_check_hud_bg_not_void()              # top-strip corners not near-black void
-	_check_gold_bar_has_fill()            # elixir fill meter present in the gold bar
+	# Screen-parity P1 + HUD-alignment (2026-07-11). Pixel + static detectors.
+	# (HUD realigned to design/references/hud_target.png: transparent strip, yellow gold
+	# ribbon w/ no fill, cream cards + slate locked — several P1 detectors re-targeted.)
+	_check_hud_strip_transparent()        # top strip transparent (arena shows), not a wood/red strip
+	_check_gold_bar_yellow()              # gold bar is a yellow ribbon, no red, no fill meter
 	_check_hud_fonts_quantized()          # hud.gd + card_hand.gd fonts in {16,32}
 	_check_hud_touch_targets()            # HP pill / card / ability / wrath sizes
 	# Screen-parity P2 — Menu shell + Battle tab (2026-07-10).
@@ -282,28 +284,27 @@ func _analyze_loop_body(path: String, line: int, body: Array, hits: Array) -> vo
 ## Detects card_hand.gd LOCKED-state pattern where multiple labels are added at
 ## the same position regardless of lock state (BUG-45).
 func _check_locked_card_overlap_pattern() -> void:
-	# P1 retarget (2026-07-10): the old red "LOCKED" text is gone — locked cards now
-	# render a grayscale icon + padlock glyph + "Need: X". Assert that treatment (a bare
-	# "no LOCKED found" would otherwise vacuous-pass and hide a regression).
-	print("[Locked card padlock treatment (P1)]")
+	# HUD-align retarget (2026-07-11): the reference locked card is a dark slate box with a
+	# red ✕ + "LOCKED" + "Need: X". Assert that treatment (reverses the P1 padlock).
+	print("[Locked card slate + red-X + LOCKED treatment (HUD-align)]")
 	var path: String = "res://scripts/ui/card_hand.gd"
 	var content := _read_file(path)
 	if content.is_empty():
 		_assert_pass("card_hand.gd not present (skipped)")
 		return
-	var lines := content.split("\n")
-	for i in lines.size():
-		var ln: String = lines[i]
-		if ln.contains("draw_string") and ln.contains("LOCKED"):
-			_assert_fail("card_hand still draws the \"LOCKED\" text (P1 replaced it with a padlock)",
-				"remove the LOCKED draw_string; use the padlock glyph + Need: line")
-			_record("MED", path, i + 1, "P1 — LOCKED draw_string still present")
-			return
-	if content.contains("_padlock_tex") and content.contains("draw_texture_rect(_padlock_tex"):
-		_assert_pass("locked cards use the padlock glyph (no LOCKED text)")
+	var has_locked_text: bool = false
+	for ln in content.split("\n"):
+		if ln.contains("draw_string") and ln.contains('"LOCKED"'):
+			has_locked_text = true
+			break
+	var has_slate: bool = content.contains("_slate_style")
+	var has_x: bool = content.contains("_x_tex") and content.contains("draw_texture_rect(_x_tex")
+	if has_locked_text and has_slate and has_x:
+		_assert_pass("locked cards use slate box + red ✕ + LOCKED (reference)")
 	else:
-		_assert_fail("locked-card padlock treatment missing", "draw padlock_tex on the not-_has_prereq branch")
-		_record("MED", path, 1, "P1 — padlock glyph not drawn on locked cards")
+		_assert_fail("locked-card reference treatment missing (LOCKED=%s slate=%s X=%s)" % [has_locked_text, has_slate, has_x],
+			"draw slate box + _x_tex + \"LOCKED\" on the not-_has_prereq branch")
+		_record("MED", path, 1, "HUD-align — locked-card slate/X/LOCKED treatment incomplete")
 
 
 ## Detects progress bar construction that adds wood-plank textures multiple times
@@ -978,58 +979,53 @@ func _indent_level(line: String) -> int:
 # Calibrated against game_*.png at 504x896 (0.7x design) — RED baseline verified 2026-07-10:
 # HUD corners (34,32,23) void; zero gold-fill pixels in the right bar band.
 
-## Top HUD-strip corners must read as wood (HUDBg 0.24,0.17,0.10), not the near-black
-## (34,32,23) void the audit flagged.
-func _check_hud_bg_not_void() -> void:
-	print("[HUD top-strip not a near-black void (P1)]")
+## HUD-alignment: the top strip is transparent (bars + TIME banner float over the arena),
+## NOT the P1 warm-wood HUDBg. The corners must read as arena (green/teal), not the wood
+## (~61,50,32) strip. Calibrated on P1 baseline: corners (61,50,32) wood.
+func _check_hud_strip_transparent() -> void:
+	print("[HUD top strip transparent — arena shows through (HUD-align)]")
 	var img := _load_capture(ARENA_CAPTURE)
 	if img == null:
 		return
 	var w: int = img.get_width()
-	var samples := [Vector2i(5, 6), Vector2i(w - 6, 6), Vector2i(5, 24), Vector2i(w - 6, 24)]
+	var samples := [Vector2i(5, 8), Vector2i(w - 6, 8), Vector2i(5, 30), Vector2i(w - 6, 30)]
+	var wood_hits: int = 0
 	var worst := ""
-	var void_hits: int = 0
 	for p in samples:
 		var c: Color = img.get_pixel(p.x, p.y)
-		# void signature: all channels dark AND red not lifted toward wood.
-		if c.r < 0.19 and c.g < 0.17 and c.b < 0.14:
-			void_hits += 1
+		# P1 wood HUDBg signature (~61,50,32): warm brown, r>g>b, none of it green/teal.
+		var arena_ish: bool = (c.g > c.r + 0.04) or (c.b > c.r + 0.04)  # grass or water
+		if not arena_ish:
+			wood_hits += 1
 			worst = "(%d,%d)=(%d,%d,%d)" % [p.x, p.y, c.r8, c.g8, c.b8]
-	if void_hits == 0:
-		_assert_pass("HUD corners read as wood beam, not void")
+	if wood_hits == 0:
+		_assert_pass("HUD corners show the arena (transparent strip)")
 	else:
-		_assert_fail("HUD top strip still shows the near-black void at %d/4 corners, e.g. %s" % [void_hits, worst],
-			"set HUDBg to warm wood (0.24,0.17,0.10) — game_arena.tscn HUDBg")
+		_assert_fail("HUD strip not transparent — %d/4 corners still a wood/ribbon strip, e.g. %s" % [wood_hits, worst],
+			"set HUDBg alpha 0 + remove the top HUD ribbon (game_arena.gd)")
 
 
-## The gold bar must show an elixir-style fill meter in its RIGHT portion (design x340-600 →
-## capture 238-420), not text-only. Scans all game captures; passes if ANY shows the fill
-## (fill width scales with runtime gold, so at least one mid/late capture must have it).
-func _check_gold_bar_has_fill() -> void:
-	print("[Gold bar has an elixir fill meter (P1)]")
-	var best: int = 0
-	var checked: bool = false
-	for i in range(0, 12):
-		var img := _load_capture("game_%03d.png" % i)
-		if img == null:
-			continue
-		checked = true
-		for y in range(700, 723):
-			var run: int = 0
-			for x in range(238, 421):
-				var c: Color = img.get_pixel(x, y)
-				if c.r > 0.78 and c.g > 0.58 and c.b < 0.40:  # gold fill (255,217,38)
-					run += 1
-					best = maxi(best, run)
-				else:
-					run = 0
-	if not checked:
-		return  # _load_capture already recorded the missing-capture failure
-	if best >= 20:
-		_assert_pass("gold fill meter present (longest gold run %dpx in the bar band)" % best)
+## HUD-alignment: the gold bar is a YELLOW ribbon (reference) — no red ribbon, no fill meter.
+## Calibrated on P1 baseline: gold band red_px ~10184 >> yellow_px ~407.
+func _check_gold_bar_yellow() -> void:
+	print("[Gold bar is a yellow ribbon (HUD-align)]")
+	var img := _load_capture(ARENA_CAPTURE)
+	if img == null:
+		return
+	var yellow: int = 0
+	var red: int = 0
+	for y in range(695, 726):  # design y990-1040 -> capture band
+		for x in range(0, img.get_width()):
+			var c: Color = img.get_pixel(x, y)
+			if c.r > 0.58 and c.g > 0.55 and c.b < 0.47:            # ribbon_yellow (~187,181,82)
+				yellow += 1
+			elif c.r > 0.55 and c.r > c.g + 0.16 and c.b < 0.43:     # ribbon_red (~166,72,54)
+				red += 1
+	if yellow > 1500 and yellow > red:
+		_assert_pass("gold bar reads as a yellow ribbon (yellow=%d, red=%d)" % [yellow, red])
 	else:
-		_assert_fail("gold bar is text-only — no fill meter (longest gold run %dpx < 20 in x238-420)" % best,
-			"rebuild the elixir fill in _polish_arena_visuals + drive it in _update_gold_bar")
+		_assert_fail("gold bar not yellow (yellow=%d, red=%d)" % [yellow, red],
+			"use ribbon_yellow.png for the gold bar (game_arena.gd)")
 
 
 ## hud.gd + card_hand.gd font sizes must be quantized to {16,32} (Pixel Operator Bold is

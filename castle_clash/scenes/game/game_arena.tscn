@@ -176,7 +176,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.24, 0.17, 0.1, 0.95)
+color = Color(0.24, 0.17, 0.1, 0)
 
 [node name="HUDBottomLine" type="ColorRect" parent="UILayer/HUD"]
 layout_mode = 1
@@ -187,7 +187,7 @@ anchor_bottom = 1.0
 offset_top = -2.0
 grow_horizontal = 2
 grow_vertical = 0
-color = Color(0.55, 0.4, 0.15, 0.6)
+color = Color(0.55, 0.4, 0.15, 0)
 
 [node name="HBox" type="HBoxContainer" parent="UILayer/HUD"]
 layout_mode = 1

@@ -249,3 +249,39 @@ assumption, so the approved target contained the bug too.
 returns empty events on invalid coords, and several team-1 test placements were ALREADY
 silently failing under the old 5x2 footprint without any assertion noticing. Backlogged:
 placement tests must assert the building EXISTS after placing.
+
+---
+
+## Lesson (2026-07-14) — The compositor's castle Y is NOT where the game renders it
+
+**Context**: CASTLE-CLIFF. Composed an integrated stone cliff base under each castle,
+approved the target, ported the LAYOUT verbatim (cliff edge = compositor castle foot − 4).
+In-game the cliff floated with a grass gap below the castle — the exact "detached floating
+strip" failure we'd sworn off. Root cause: `compose_arena.py` blits `Castle.png` at
+`CASTLE_CENTERS` (red foot design 167), but the GAME places the castle via
+`castle_visual.gd` (sprite parented to a `CastleArea` ColorRect + a `CastleVisual` node at
+scale 0.7 with a sim-anchor offset). The two DISAGREE: measured game red content-foot ≈
+design **147**, ~20px higher than the compositor assumes. So "port the compositor LAYOUT
+verbatim" put the cliff 20px too low.
+
+**Rules:**
+- **The compositor mirrors the game for TERRAIN it fully owns, not for elements another
+  system positions.** Castles/units are placed by their own visual scripts, so the
+  compositor's `CASTLE_CENTERS` is a design approximation, not ground truth. Anything that
+  must ATTACH to such an element (a cliff under a castle, a shadow, a banner) must be
+  aligned to the element's ACTUAL rendered position — measured from a capture — not to the
+  compositor's assumed coordinate.
+- **Measure the attach point in the real capture before porting.** cap = 0.7 × design
+  (720×1280 → 504×896; verify via the platform edge: design x72 → cap x50). Find the
+  element's rendered foot by the first grass row below its blob (or by its unique color —
+  cream wall vs cool cliff stone), NOT by transform arithmetic (I got the transform wrong
+  twice).
+- **Hide the tile's coastal-foam fringe.** Tiny Swords elevation face tiles (col6 row4)
+  carry a grass fringe on top + a bright foam rim on the bottom. Put the cliff top ABOVE
+  the castle foot so the castle body hides the fringe and the stone emerges merged with the
+  castle's own stone foundation — otherwise a thin grass line shows between them.
+- **Calibrate the detector window on a clean baseline, not near the element.** First window
+  (just under the foot) caught the castle's own foundation stone → 433 px on the no-cliff
+  build, a thin RED margin. Moving it a few px lower (clear of the foundation) gave a pure-
+  grass 0-px baseline vs 760-px cliff — a real RED→GREEN. Get the no-cliff baseline by
+  `git stash push -- <the one render file>` → capture, then pop → capture.

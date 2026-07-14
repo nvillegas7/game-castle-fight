@@ -73,6 +73,7 @@ func _init() -> void:
 	# load-bearing properties so the port can't drift back.
 	_check_arena_water_native()           # native teal, no modulate tint
 	_check_arena_castle_scale()           # calibrated castle scale band
+	_check_arena_castle_cliff()           # integrated stone cliff band under the castle
 	_check_arena_fortress_towers()        # decorative towers flank each castle
 	_check_arena_coastline_platform()     # platform edge at design x=72
 	_check_arena_no_floating_foliage()    # no cropped/floating tree art in water
@@ -730,6 +731,16 @@ func _arena_is_teal(c: Color) -> bool:
 	return c.b > 0.45 and absf(c.g - c.b) < 0.12 and c.g > c.r + 0.15
 
 
+## Tiny Swords cliff/elevation STONE: cool blue-gray, R≈G≈B in the low-mid band,
+## blue not below red, and clearly not grass. (matches Tilemap_color1 cols 5-8
+## rows 4-5, the stone cliff face.)
+func _arena_is_stone(c: Color) -> bool:
+	var avg: float = (c.r + c.g + c.b) / 3.0
+	return absf(c.r - c.g) < 0.12 and absf(c.g - c.b) < 0.18 \
+		and avg > 0.24 and avg < 0.71 and c.b >= c.r - 0.05 \
+		and not (c.g > c.r + 0.09 and c.g > c.b + 0.06)
+
+
 ## Water must be the NATIVE pack teal — no modulate tint. The old build multiplied
 ## (71,171,169) by (0.4,0.5,0.55) → (28,85,93), a murky near-black gutter.
 func _check_arena_water_native() -> void:
@@ -794,6 +805,54 @@ func _check_arena_castle_scale() -> void:
 	else:
 		_assert_fail("enemy castle off calibrated scale — red-roof run %dpx outside 105..135" % best_run,
 			"spec 0.296x0.8 of playfield width = ~119px capture (design/arena_target.png)")
+
+
+## CASTLE-CLIFF (user-flagged 2026-07-11, ref design/references/v1.png red castle):
+## each castle must sit on an INTEGRATED stone cliff band directly under its south
+## front (compose_arena.py cliff_base → game_arena.gd _add_fortress_dressing). The
+## detector window is the enemy castle's cliff FACE, clear of the castle's own gray
+## foundation (which ends ~cap y115) so the no-cliff baseline is pure grass — capture
+## x[188,316] y[116,138] (calibrated 2026-07-14 by scanning game_000/002.png @504x896).
+## Pre-cliff build: 0 stone px (grass). With the cliff: substantial stone (~600+, run
+## full-width). Assert a SUBSTANTIAL + CONTINUOUS band so a stray rock can't false-pass.
+## NB: the cliff sits ~31px higher than the compositor target because castle_visual.gd
+## renders the castle above compose_arena.py's CASTLE_CENTERS (see game_arena.gd
+## _add_fortress_dressing) — this window tracks the GAME render, not the target.
+func _check_arena_castle_cliff() -> void:
+	print("[Arena castle cliff base (design-flow parity)]")
+	var img := _load_capture(ARENA_CAPTURE)
+	if img == null:
+		return
+	var wx0: int = 188
+	var wx1: int = 316
+	var wy0: int = 116
+	var wy1: int = 138
+	var total: int = 0
+	var best_run: int = 0
+	for y in range(wy0, wy1):
+		var run: int = 0
+		var gap: int = 99
+		var cur: int = 0
+		for x in range(wx0, wx1):
+			if _arena_is_stone(img.get_pixel(x, y)):
+				total += 1
+				cur = cur + 1 + mini(gap, 6) if cur > 0 else 1
+				gap = 0
+			else:
+				gap += 1
+				if gap > 6:
+					cur = 0
+			run = maxi(run, cur)
+		best_run = maxi(best_run, run)
+	# Calibrated on the real captures (2026-07-14): pre-cliff build total=0 (grass, RED);
+	# cliff build total≈600+ run full-width (GREEN). The stone px count is the load-
+	# bearing signal (a stray rock is <200px here); the run asserts lateral extent.
+	# Bar = 400 px / 60 px run — clean separation from the 0 baseline.
+	if total >= 400 and best_run >= 60:
+		_assert_pass("integrated cliff band under enemy castle (stone px=%d, run=%dpx)" % [total, best_run])
+	else:
+		_assert_fail("no integrated cliff band under enemy castle — stone px=%d run=%dpx (need ≥400 & ≥60px)" % [total, best_run],
+			"stone cliff FACE directly under the castle foot per design/arena_target.png (cliff_base)")
 
 
 ## Decorative fortress towers must flank the castle at design (140,268)/(580,268)

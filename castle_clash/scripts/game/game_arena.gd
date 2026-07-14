@@ -1419,31 +1419,44 @@ func _build_terrain_textures() -> void:
 	_add_water_foam()
 
 
-## Fortress terrace/wall rows per half (design/arena_target.png).
-## PERSPECTIVE-LOCKED (user feedback 2026-07-08, Tiny Swords reference): the
-## 2.5D camera does not flip with the layout, so the stone "bar" face ALWAYS
-## points SOUTH (screen-down) with only the thin rim line on top denoting
-## height — on BOTH halves. Positions mirror; orientations NEVER flip.
-## Each stone row's bottom edge aligns with its castle's base ("the bar-like
-## edge of the cliff at the bottom of the castle, wherever the player is").
+## Integrated castle cliff base (design/arena_target.png; CASTLE-CLIFF 2026-07-14).
+## PORT of compose_arena.py cliff_base: a continuous castle-width stone cliff band
+## directly under each castle's SOUTH foot — a grass rim lip (tile col6,row3) caps
+## the top, a stone FACE (tile col6,row4) drops one tile below. The castle (drawn on
+## a higher layer) sits ON the band so its own stone foot merges into the cliff and
+## the two read as one raised mound (replaces the old waist-height full-width fence).
+## PERSPECTIVE-LOCKED (user feedback 2026-07-08): the face points SOUTH on BOTH halves
+## and is NEVER flipped. LAYOUT: cx=360; 3 tiles wide (x0 = cx - 96); stone top edge
+## red=132 / blue=958 (see the castle_visual-offset note on the loop below); blue is a
+## short sea-cliff, mostly under the card-hand HUD.
 func _add_fortress_dressing(parent: Node2D, tm: Texture2D, ts: float) -> void:
 	if tm == null:
 		return
+	var lip := AtlasTexture.new()
+	lip.atlas = tm
+	lip.region = Rect2(6 * 64, 3 * 64, 64, 64)   # grass-edge rim tile (col6,row3)
 	var stone := AtlasTexture.new()
 	stone.atlas = tm
-	stone.region = Rect2(6 * 64, 4 * 64, 64, 64)  # stone face, rim line on top
-	# LAYOUT: WALL_Y_ENEMY=103 (bottom 167 = red castle block bottom, 7x4),
-	# WALL_Y_PLAYER=911 (bottom 975 = blue castle block bottom). WALL_X=(140,580).
-	for wy in [103.0, 911.0]:
-		var x: float = 140.0
-		while x < 580.0:
-			var spr := Sprite2D.new()
-			spr.texture = stone
-			spr.centered = false
-			spr.position = Vector2(x, wy)
-			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			parent.add_child(spr)
-			x += ts
+	stone.region = Rect2(6 * 64, 4 * 64, 64, 64)  # stone cliff face tile (col6,row4)
+	var n: int = 3
+	# Game edges differ from the compositor's (red 163 / blue 967) by the castle_visual
+	# offset: castle_visual.gd renders the castle ~20px HIGHER than compose_arena.py's
+	# CASTLE_CENTERS assume (measured game red content-foot = design ~147 vs compositor
+	# 167). The cliff top must sit ABOVE the foot so the castle hides the tile's grass
+	# fringe and the stone emerges merged with the castle's own stone foundation — hence
+	# red edge=132 (stone body ~140 overlaps the ~147 foot); blue=958 (its south face is
+	# under the card-hand HUD, perspective-locked, so mostly occluded).
+	for edge in [132.0, 958.0]:
+		var x0: float = 360.0 - n * ts / 2.0
+		for i in n:
+			var x: float = x0 + i * ts
+			for pair in [[lip, edge - ts], [stone, edge]]:
+				var spr := Sprite2D.new()
+				spr.texture = pair[0]
+				spr.centered = false
+				spr.position = Vector2(x, pair[1])
+				spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				parent.add_child(spr)
 
 
 ## Build a tiled zone using flat ground tiles (cols 0-3) with proper edges

@@ -107,10 +107,19 @@ CASTLE_SCALE = 0.538                 # content fits the 7x4-cell sim footprint (
 # 515 (legacy 10px zone quirk), while decorations mirror about the 520 pivot.
 CASTLE_CENTERS = {"red": (360, 111), "blue": (360, 919)}
 
-# Fortress dressing (enemy half; x already centered/paired where needed)
-WALL_Y_ENEMY = 103                   # stone bottom (167) = red castle block bottom
-WALL_Y_PLAYER = 911                  # stone bottom (975) = blue block bottom — face STILL south
-WALL_X = (140, 580)
+# Castle cliff base (integrated mound) — replaces the old waist-height wall row.
+# The castle's stone foot merges into a stone cliff FACE on its SOUTH front, grass
+# rim curling over the top (row-3 grass-edge tile), stone face below (rows 4/5).
+# PERSPECTIVE-LOCKED: face always points SOUTH on both halves; NEVER flipped.
+# Reference v3: cliff ≈ 128px tall (2 tiles), castle-body-width. cx=360 both.
+CLIFF_W_TILES = 3                    # band width in 64px tiles (~192px; body=168 + turret overhang)
+CLIFF_EDGE_Y = {"red": 163, "blue": 967}   # stone top; meets this tool's castle foot (167/975)
+CLIFF_FACE_PX = {"red": 64, "blue": 64}     # one-tile stone band (matches ref v3 proportion)
+# PORT NOTE: game_arena.gd._add_fortress_dressing uses edge = red 132 / blue 958, NOT
+# these. castle_visual.gd renders the in-game castle ~20px HIGHER than CASTLE_CENTERS
+# here (measured game red content-foot = design ~147 vs 167), so the cliff must rise to
+# stay merged with the castle foot. Same LOOK, different absolute Y — keep both in sync
+# by the RELATION "cliff stone body just under the castle's rendered content-foot".
 TOWER_SCALE, TOWER_GY = 0.72, 268    # flanking towers at x=140 / 720-140
 HOUSE = ("House1.png", 122, 148, 0.62)   # corner house; mirrored 4x
 
@@ -132,6 +141,27 @@ def mirror_x(x: float) -> float:
 
 def mirror_y(y: float) -> float:
     return 2.0 * PIVOT - y
+
+
+def cliff_base(img: Image.Image, cx: float, edge_y: float, face_px: int) -> None:
+    """Integrated stone cliff band under a castle (design/references v3 red): a
+    continuous castle-width stone rampart FACE whose top (edge_y) meets the castle's
+    own stone foot, so the two read as one raised mound. Grass-edge rim tile (col,3)
+    caps the top (the grass lip, mostly behind the castle); stone face (col,4) drops
+    SOUTH one tile; a lower course (col,5) is added, overlap-hiding the seam, only for
+    face_px>64. Middle stone cols 6/7 (subtle variation, NOT the grass-cornered 5/8).
+    NEVER flipped — south-lock. Painted before the castle."""
+    n = CLIFF_W_TILES
+    x0 = round(cx - n * TS / 2)
+    edge = round(edge_y)
+    col = 6  # full-width (0..63) middle stone tile; tiles seamlessly (col7 has a
+             # 3px transparent right edge that leaves grass slivers between tiles)
+    for i in range(n):
+        x = x0 + i * TS
+        img.alpha_composite(tile_of(GRASS, col, 3), (x, edge - TS))   # grass rim lip
+        img.alpha_composite(tile_of(GRASS, col, 4), (x, edge))         # stone face
+        if face_px > TS:                                              # taller: lower course
+            img.alpha_composite(tile_of(GRASS, col, 5), (x, edge + face_px - TS))
 
 
 # ------------------------------------------------------------------ render --
@@ -161,15 +191,12 @@ def render(show_grid: bool = False) -> Image.Image:
             img.alpha_composite(tile_of(GRASS, gx, gy),
                                 (PLAT_X0 + c * TS, PLAT_Y0 + r * TS))
 
-    # Per-half fortress: stone wall row, then castle/towers/houses.
-    stone = tile_of(GRASS, 6, 4)  # stone face w/ rim line on top — NEVER flipped
+    # Per-half fortress: integrated cliff base UNDER the castle, then castle/towers.
+    # cliff_base paints the mound FIRST (behind), castle sits ON it (drawn after) so
+    # the castle's stone foot merges into the cliff top. Face never flips (south-lock).
     for team, flip in (("red", False), ("blue", True)):
         bdir = A / "buildings" / team
-        wy = WALL_Y_ENEMY if not flip else WALL_Y_PLAYER
-        x = WALL_X[0]
-        while x < WALL_X[1]:
-            img.alpha_composite(stone, (x, round(wy)))
-            x += TS
+        cliff_base(img, CASTLE_CENTERS[team][0], CLIFF_EDGE_Y[team], CLIFF_FACE_PX[team])
         ccx, ccy = CASTLE_CENTERS[team]
         blit(img, load(bdir / "Castle.png"), ccx, ccy, CASTLE_SCALE, anchor="center")
         for tx in (140, mirror_x(140)):

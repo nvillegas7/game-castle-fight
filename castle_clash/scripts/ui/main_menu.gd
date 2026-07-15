@@ -505,10 +505,10 @@ func _build_shop_tab() -> void:
 	# T-016: Daily Pick — 3 featured avatars with decorative frame
 	_build_daily_pick(shop_panel)
 
-	# Scrollable grid of avatars (shifted down to make room for daily pick)
+	# P4: centered scrollable grid (5×112 + 4×12 = 608 wide → x=(720-608)/2=56).
 	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(30, 210)
-	scroll.size = Vector2(660, 705)
+	scroll.position = Vector2(56, 210)
+	scroll.size = Vector2(608, 705)
 	shop_panel.add_child(scroll)
 
 	var grid := GridContainer.new()
@@ -527,47 +527,67 @@ func _build_shop_tab() -> void:
 
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(112, 112)
-		btn.flat = true
+		# flat=false: a flat button suppresses its NORMAL stylebox, so the cell frame /
+		# selected ring never render (audit's "invisible selected state"). We override
+		# all four state styleboxes below, so the button shows only our warm frame.
+		btn.flat = false
 		btn.icon = tex
 		btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		btn.expand_icon = true
+		btn.set_meta("avatar_id", i)
+		_style_avatar_cell(btn, i == current_avatar)
 
-		var style := StyleBoxFlat.new()
-		if i == current_avatar:
-			style.bg_color = Color(0.35, 0.28, 0.12, 0.9)
-			style.border_color = Color(1.0, 0.82, 0.2, 0.9)
-			style.set_border_width_all(3)
-		else:
-			style.bg_color = Color(0.18, 0.15, 0.1, 0.7)
-			style.border_color = Color(0.4, 0.32, 0.2, 0.4)
-			style.set_border_width_all(1)
-		style.set_corner_radius_all(10)
-		btn.add_theme_stylebox_override("normal", style)
+		# "Equipped" badge — shown only on the current avatar (P4 affordance).
+		var badge := Label.new()
+		badge.name = "EquippedBadge"
+		badge.text = "Equipped"
+		badge.add_theme_font_size_override("font_size", 16)
+		badge.add_theme_color_override("font_color", UIStyle.TEXT_DARK)
+		badge.add_theme_stylebox_override("normal",
+			UIStyle.stat_chip(Color(1.0, 0.82, 0.2, 0.95), Color(0.5, 0.35, 0.1, 0.9)))
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+		badge.offset_top = -24
+		badge.visible = (i == current_avatar)
+		btn.add_child(badge)
 
 		btn.pressed.connect(_on_avatar_selected.bind(i, grid))
 		grid.add_child(btn)
+
+
+## P4: warm inset slot cell; the equipped one gets a thick gold ring with an inner
+## content margin so the avatar art can't paint over it (audit main_menu.gd:533).
+func _style_avatar_cell(btn: Button, selected: bool) -> void:
+	var sb := StyleBoxFlat.new()
+	if selected:
+		sb.bg_color = Color(0.35, 0.28, 0.12, 0.95)
+		sb.border_color = Color(1.0, 0.82, 0.2, 1.0)   # thick gold ring
+		sb.set_border_width_all(5)
+	else:
+		# Warm inset cell with a visible affordance (audit: the old Δ6-RGB bg + 1px
+		# border was invisible). Flat reads reliably where slots.png washed out.
+		sb.bg_color = Color(0.27, 0.21, 0.13, 1.0)
+		sb.border_color = Color(0.55, 0.42, 0.22, 0.9)
+		sb.set_border_width_all(2)
+	sb.set_corner_radius_all(10)
+	sb.set_content_margin_all(8)   # keep the art off the border on BOTH states
+	for state in ["normal", "hover", "pressed", "focus"]:
+		btn.add_theme_stylebox_override(state, sb)
 
 
 func _on_avatar_selected(avatar_id: int, grid: GridContainer) -> void:
 	SFX.play_ui("card_select")
 	PlayerData.set_value("selected_avatar", avatar_id)
 
-	# Update all button styles
-	var idx: int = 0
+	# Restyle every cell + toggle its "Equipped" badge (avatar_id via node meta,
+	# not a fragile positional index).
 	for child in grid.get_children():
-		idx += 1
 		if child is Button:
-			var style := StyleBoxFlat.new()
-			if idx == avatar_id:
-				style.bg_color = Color(0.35, 0.28, 0.12, 0.9)
-				style.border_color = Color(1.0, 0.82, 0.2, 0.9)
-				style.set_border_width_all(3)
-			else:
-				style.bg_color = Color(0.18, 0.15, 0.1, 0.7)
-				style.border_color = Color(0.4, 0.32, 0.2, 0.4)
-				style.set_border_width_all(1)
-			style.set_corner_radius_all(10)
-			child.add_theme_stylebox_override("normal", style)
+			var aid: int = child.get_meta("avatar_id", 0)
+			_style_avatar_cell(child, aid == avatar_id)
+			var badge = child.get_node_or_null("EquippedBadge")
+			if badge:
+				badge.visible = (aid == avatar_id)
 
 	# Update header avatar
 	var header_avatar = get_node_or_null("Header/HeaderContent/Avatar")
@@ -1768,48 +1788,76 @@ func _build_army_tab() -> void:
 			sorted_buildings.append(bd)
 		sorted_buildings.sort_custom(func(a, b): return a.tier < b.tier)
 		for bd: BuildingData in sorted_buildings:
-			# Add tier header when tier changes
+			# Add tier header when tier changes — P4: on a dark ribbon (was a bare
+			# floating gold label) matching the Battle tab's ribbon language.
 			if bd.tier != current_tier:
 				current_tier = bd.tier
+				var ribbon := PanelContainer.new()
+				ribbon.add_theme_stylebox_override("panel", UIStyle.ribbon_style("dark"))
+				ribbon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+				ribbon.custom_minimum_size = Vector2(430, 46)
 				var tier_header := Label.new()
 				tier_header.text = tier_names.get(current_tier, "TIER %d" % current_tier)
 				tier_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				tier_header.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 				tier_header.add_theme_font_size_override("font_size", 16)
-				tier_header.add_theme_color_override("font_color", Color(0.85, 0.7, 0.3))
+				tier_header.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
 				tier_header.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02))
 				tier_header.add_theme_constant_override("outline_size", 3)
-				vbox.add_child(tier_header)
+				ribbon.add_child(tier_header)
+				vbox.add_child(ribbon)
 			_add_unit_card(vbox, bd.spawns_unit, bd, true)
+
+		# P4: trailing spacer so the last card clears the tab bar when fully scrolled.
+		var tail := Control.new()
+		tail.custom_minimum_size = Vector2(0, 24)
+		vbox.add_child(tail)
 
 
 func _add_unit_card(parent: VBoxContainer, ud: UnitData, bd: BuildingData, is_kingdom: bool) -> void:
 	var card := Panel.new()
-	var bg := Color(0.12, 0.18, 0.3, 0.88) if is_kingdom else Color(0.3, 0.12, 0.08, 0.88)
-	var border := Color(0.3, 0.45, 0.7, 0.6) if is_kingdom else Color(0.7, 0.3, 0.2, 0.6)
-	card.add_theme_stylebox_override("panel", _make_style(bg, border, 10, 2))
-	# Army-tab card height bumped 95→140 per user — rows are scrollable so no
-	# need to conserve vertical space, and the larger name font needs room.
+	# P4: warm wood card (UIStyle palette) — replaces the cold-navy programmer box
+	# (audit main_menu.gd:1755, card bg RGB(29,42,69) clashed with the whole kit).
+	card.add_theme_stylebox_override("panel", _make_style(
+		Color(UIStyle.PANEL_WOOD.r, UIStyle.PANEL_WOOD.g, UIStyle.PANEL_WOOD.b, 0.95),
+		Color(UIStyle.PANEL_BORDER.r, UIStyle.PANEL_BORDER.g, UIStyle.PANEL_BORDER.b, 0.85),
+		10, 2))
 	card.custom_minimum_size = Vector2(680, 140)
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	parent.add_child(card)
 
 	var hbox := HBoxContainer.new()
 	hbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	# BUG-52: building icons' teal roofs coincidentally match the detector's
-	# "grass-green" palette (g > r). At offset_left=10 the icon left edge lands
-	# at capture x=~21, inside the 30-px scenic-bleed detector band. Pushing
-	# inner padding 10 → 26 shifts the icon beyond the band (capture x~31+).
+	# BUG-52: keep the icon inset ≥26 so its left edge clears the scenic-bleed
+	# detector band (capture x<30) on the neighbouring tabs' shared background.
 	hbox.offset_left = 26; hbox.offset_right = -10
 	hbox.offset_top = 8; hbox.offset_bottom = -8
 	hbox.add_theme_constant_override("separation", 12)
 	card.add_child(hbox)
 
-	# Building icon (bumped to match larger card height)
+	# P4 (backlog 3.6): show the UNIT idle sprite, not the spawner building. Tiny
+	# Swords frames are 192x192 with the character ~60px centered, so crop to the
+	# opaque content rect or it renders as a ~27px speck in the 88px box.
 	var team: int = 0 if is_kingdom else 1
-	var icon_tex: Texture2D = SpriteRegistry.get_building_sprite(bd.id, team)
-	if icon_tex:
+	var unit_tex: Texture2D = null
+	var frames: SpriteFrames = SpriteRegistry.get_unit_sprites(ud.id, team)
+	if frames and frames.has_animation(&"idle") and frames.get_frame_count(&"idle") > 0:
+		var f: Texture2D = frames.get_frame_texture(&"idle", 0)
+		if f:
+			unit_tex = f
+			var im: Image = f.get_image()
+			if im:
+				var r: Rect2i = im.get_used_rect()
+				if r.size.x > 0 and r.size.y > 0:
+					var at := AtlasTexture.new()
+					at.atlas = f
+					at.region = Rect2(r)
+					unit_tex = at
+	if unit_tex == null:  # never render an empty row: fall back to the building icon
+		unit_tex = SpriteRegistry.get_building_sprite(bd.id, team)
+	if unit_tex:
 		var icon := TextureRect.new()
-		icon.texture = icon_tex
+		icon.texture = unit_tex
 		icon.custom_minimum_size = Vector2(88, 88)
 		icon.expand_mode = TextureRect.EXPAND_FIT_HEIGHT_PROPORTIONAL
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -1819,39 +1867,38 @@ func _add_unit_card(parent: VBoxContainer, ud: UnitData, bd: BuildingData, is_ki
 	# Stats column
 	var stats := VBoxContainer.new()
 	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stats.add_theme_constant_override("separation", 4)
+	stats.add_theme_constant_override("separation", 5)
 	hbox.add_child(stats)
 
-	# BUG-41 round 3: unit NAME is the primary hierarchy element in the army
-	# tab; it needs to be clearly larger than the description lines below.
-	# Bumped 14 → 22 so it reads as the row header at a glance.
-	var name_lbl := Label.new()
+	# Name — the row header. Role/type move to chips (drop the "[Role]" text suffix).
 	var role_idx: int = clampi(ud.role, 0, 4)
-	name_lbl.text = "%s  [%s]" % [ud.display_name, ROLE_NAMES[role_idx]]
+	var name_lbl := Label.new()
+	name_lbl.text = ud.display_name
 	name_lbl.add_theme_font_size_override("font_size", 22)
 	name_lbl.add_theme_color_override("font_color", Color(1, 0.92, 0.65))
 	name_lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.02, 1))
 	name_lbl.add_theme_constant_override("outline_size", 2)
 	stats.add_child(name_lbl)
 
-	# Description lines bumped 12 → 15; still visibly smaller than the 22-px
-	# name so the hierarchy reads cleanly.
+	# Role + attack/armor type as small chips (was a dense colon-separated line).
+	var chips := HBoxContainer.new()
+	chips.add_theme_constant_override("separation", 6)
+	_add_unit_chip(chips, ROLE_NAMES[role_idx], ROLE_COLORS[role_idx])
+	_add_unit_chip(chips, ATTACK_TYPE_NAMES[clampi(ud.attack_type, 0, 3)], Color(0.55, 0.5, 0.5))
+	_add_unit_chip(chips, ARMOR_TYPE_NAMES[clampi(ud.armor_type, 0, 3)] + " armor", Color(0.5, 0.52, 0.55))
+	stats.add_child(chips)
+
+	# One 16px middot stat line (was three dense 15px spreadsheet lines).
 	var stat_lbl := Label.new()
-	stat_lbl.text = "HP:%d  DMG:%d  SPD:%d  RNG:%d  ARM:%d" % [ud.max_hp, ud.attack_damage, ud.move_speed, ud.attack_range, ud.armor]
-	stat_lbl.add_theme_font_size_override("font_size", 15)
+	stat_lbl.text = "HP %d · DMG %d · SPD %d · RNG %d · ARM %d" % [ud.max_hp, ud.attack_damage, ud.move_speed, ud.attack_range, ud.armor]
+	stat_lbl.add_theme_font_size_override("font_size", 16)
 	stat_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.78, 1.0))
 	stats.add_child(stat_lbl)
-
-	var type_lbl := Label.new()
-	type_lbl.text = "%s atk | %s armor" % [ATTACK_TYPE_NAMES[clampi(ud.attack_type, 0, 3)], ARMOR_TYPE_NAMES[clampi(ud.armor_type, 0, 3)]]
-	type_lbl.add_theme_font_size_override("font_size", 15)
-	type_lbl.add_theme_color_override("font_color", Color(0.82, 0.78, 0.65, 1.0))
-	stats.add_child(type_lbl)
 
 	if ud.skill_id != &"":
 		var skill_lbl := Label.new()
 		skill_lbl.text = "Skill: %s" % str(ud.skill_id).replace("_", " ").capitalize()
-		skill_lbl.add_theme_font_size_override("font_size", 15)
+		skill_lbl.add_theme_font_size_override("font_size", 16)
 		skill_lbl.add_theme_color_override("font_color", Color(1.0, 0.82, 0.35, 1.0))
 		stats.add_child(skill_lbl)
 
@@ -1866,6 +1913,19 @@ func _add_unit_card(parent: VBoxContainer, ud: UnitData, bd: BuildingData, is_ki
 	cost_lbl.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02, 1))
 	cost_lbl.add_theme_constant_override("outline_size", 2)
 	hbox.add_child(cost_lbl)
+
+
+## P4: a small tinted role/type chip (cream text on the role colour) via the shared kit.
+func _add_unit_chip(parent: Control, text: String, col: Color) -> void:
+	var chip := Label.new()
+	chip.text = text
+	chip.add_theme_font_size_override("font_size", 16)
+	chip.add_theme_color_override("font_color", UIStyle.TEXT_CREAM)
+	chip.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+	chip.add_theme_constant_override("outline_size", 1)
+	chip.add_theme_stylebox_override("normal", UIStyle.stat_chip(
+		Color(col.r, col.g, col.b, 0.40), Color(col.r, col.g, col.b, 0.75)))
+	parent.add_child(chip)
 
 
 # --- Social Tab: match record + friends placeholder ---

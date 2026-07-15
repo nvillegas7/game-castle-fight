@@ -93,6 +93,9 @@ func _init() -> void:
 	_check_end_screen_takeover()          # in-match card tray hidden behind the results panel
 	_check_victory_ribbon_bright()        # VICTORY ribbon at full parchment opacity
 	_check_end_buttons_size()             # end-screen buttons >=80px
+	# Screen-parity P4 — Army + Avatars tabs (2026-07-15).
+	_check_army_cards_not_navy()          # army cards warm wood/paper, not cold-navy boxes
+	_check_avatars_selected_ring()        # equipped avatar shows a visible gold ring
 	_print_results()
 	quit(1 if _fail > 0 else 0)
 
@@ -1324,6 +1327,57 @@ func _check_end_buttons_size() -> void:
 		_assert_pass("all end-screen buttons meet the >=80px floor")
 	else:
 		_assert_fail("%d end-screen button(s) below floor: %s" % [fails.size(), ", ".join(fails)], "raise to >=80/96px")
+
+
+## P4 (2026-07-15): Army cards must be warm wood/paper, not the cold-navy programmer
+## boxes (audit main_menu.gd:1755, measured card bg RGB(29,42,69)). Scans the army-card
+## column (menu_army_000.png @504x896, cards at capture x[10,494] y[115,762]) for cold-
+## navy pixels: pre-P4 = 264k (RED); warm cards = ~0 (GREEN). Threshold 3000 tolerates a
+## few dark-blue Kingdom-armor shadows on the new unit sprites.
+func _check_army_cards_not_navy() -> void:
+	print("[Army cards warm, not cold-navy (P4 parity)]")
+	var img := _load_capture("menu_army_000.png")
+	if img == null:
+		return
+	var navy: int = 0
+	for y in range(115, 762, 2):
+		for x in range(10, 494, 2):
+			var c: Color = img.get_pixel(x, y)
+			# NARROW band around the exact card bg (29,42,69)=(0.114,0.165,0.271) so the
+			# new unit sprites' varied/brighter armor blues don't false-trip it.
+			if absf(c.r - 0.114) < 0.06 and absf(c.g - 0.165) < 0.06 \
+					and absf(c.b - 0.271) < 0.07 and c.b > c.r:
+				navy += 1
+	# sampled every 2px both axes (~1/4 of full). pre-P4 ~61k; warm ~0.
+	if navy < 3000:
+		_assert_pass("army cards warm, not cold-navy (navy px=%d, sampled)" % navy)
+	else:
+		_assert_fail("army cards still cold-navy — navy px=%d (need <3000)" % navy,
+			"warm UIStyle wood/paper cards per audit main_menu.gd:1755")
+
+
+## P4 (2026-07-15): the equipped avatar must show a VISIBLE gold ring (audit found ZERO
+## gold-border px today — Δ6 RGB bg + a ring that doesn't render at capture scale, HIGH,
+## main_menu.gd:533). Window = the top-left selected cell (avatar 1, default), a box
+## generous enough to survive the grid-centering shift: menu_shop_000.png @504x896,
+## capture x[16,134] y[214,298]. Pre-P4 = 0 gold (RED); strong ring = hundreds (GREEN).
+## The daily-pick gold frames sit above (y<205), outside the window.
+func _check_avatars_selected_ring() -> void:
+	print("[Avatars equipped ring visible (P4 parity)]")
+	var img := _load_capture("menu_shop_000.png")
+	if img == null:
+		return
+	var gold: int = 0
+	for y in range(214, 298):
+		for x in range(16, 134):
+			var c: Color = img.get_pixel(x, y)
+			if c.r > 0.72 and c.g > 0.53 and c.g < 0.83 and c.b < 0.46 and c.r > c.b + 0.28:
+				gold += 1
+	if gold > 40:
+		_assert_pass("equipped avatar shows a visible gold ring (gold px=%d)" % gold)
+	else:
+		_assert_fail("equipped avatar ring invisible — gold px=%d (need >40)" % gold,
+			"strong gold ring on the selected/equipped cell per audit main_menu.gd:533")
 
 
 func _print_results() -> void:

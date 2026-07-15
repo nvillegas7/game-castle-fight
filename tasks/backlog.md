@@ -63,8 +63,8 @@ before the fix, or the passing criterion.
 | 3.3b | **Battlefield terrain ART overhaul** (user-flagged, HIGH visible impact): replace the 3 flat tinted bands with a richly-composited arena — defined road/path down the lanes, textured/varied grass, trees + rocks + environmental detail along edges, matching the loading-screen's terrain quality. KR proves static+small-units works IF the terrain art carries it. Sequenced after 2.2 (extract arena_terrain.gd). | A2/A6 | 3 | side-by-side vs KR ref + loading screen; golden |
 | 3.4 | Mobile hardening: ability/wrath buttons ≥88px, safe-area insets on header/tab bar, tap-and-hold replaces hover | A2 | 3 | layout assertion: touch targets ≥88px |
 | 3.5 | End screen takeover: hide HUD/gold bar/card hand behind results; restore on replay | A2 | 3 | golden: results screen has no bleed-through |
-| 3.6 | Army tab: real unit sprites (not spawner buildings), tappable detail popup, de-spreadsheet rows | A2/A6 | 3 | golden + tap scenario |
-| 3.7 | Shop→Avatars rename + Social "Coming Soon!" empty state (Decision 1) | A2 | 3 | polished empty state, no economy work |
+| 3.6 | Army tab: **tappable unit detail popup** (unit sprites + de-spreadsheet + warm cards DONE in P4) | A2 | 3 | tap scenario opens a detail popup |
+| 3.7 | Social "Coming Soon!" empty state (Decision 1; **Shop→Avatars rename DONE in P4**) — belongs with P5 Social tab | A2 | 3/P5 | polished empty state, no economy work |
 | 3.8 | Theme rollout: migrate remaining screens to Theme/ui_style; delete per-label overrides | A2 | 3 | per-screen golden after migration |
 
 ## Open bugs (qa-bug-tracker.md) — fold into the phase above they belong to

@@ -1643,9 +1643,9 @@ func _perk_bounty(base_bounty: int, killer_player_index: int) -> int:
 # --- Castle Grid Helpers ---
 
 ## Returns [row_min, row_max, col_min, col_max] for a team's castle grid footprint.
-## T-096: symmetric 5-wide × 2-tall footprint at the back of each team's build zone.
-## Team 0 castle occupies the last 2 rows (8-9); team 1 castle occupies the first 2 rows (0-1).
-## Both use the middle 5 columns (3-7), leaving cols 0-2 and 8-10 buildable on castle rows
+## Symmetric CASTLE_FOOTPRINT_W×CASTLE_FOOTPRINT_H (currently 7×4) at the back of each
+## team's build zone. Team 0 occupies the last 4 rows (6-9); team 1 the first 4 rows (0-3).
+## Both use the middle 7 columns (2-8), leaving cols 0-1 and 9-10 buildable on castle rows
 ## for "flanking" defensive placement — per the "castle is a regular building" design.
 func _castle_grid_footprint(team: int) -> Array:
 	var col_min: int = (GRID_COLS - CASTLE_FOOTPRINT_W) / 2   # (11-5)/2 = 3

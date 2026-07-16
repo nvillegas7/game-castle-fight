@@ -12,26 +12,32 @@ const OUT_DIR: String = "/tmp/castle_clash_behavior"
 
 # --- Scenario Definitions ---
 # Each scenario: buildings per team, unit cap, what we're testing
+## Placement note (BUG-51, 2026-07-16): the castle occupies a 7×4 footprint at the BACK
+## of each build zone (simulation.gd CASTLE_FOOTPRINT_W/H) — team-0 rows 6–9, team-1
+## rows 0–3, both cols 2–8. So team-1 spawners must sit at rows 4–9 (or the flanking
+## cols 0–1 / 9–10); a team-1 building at rows 0–3 is silently rejected. Team-1 rows here
+## MIRROR the team-0 rows about the grid centre (a 2×2 at team-0 row r → team-1 row 8-r).
+## The post-placement guard in _run_scenario asserts every building actually placed.
 var SCENARIOS: Dictionary = {
 	# === Category 1: Symmetric combat ===
 	"melee_3v3": {
 		"desc": "3 footmen vs 3 grunts — basic melee engagement",
 		"p0": [["barracks", 5, 3]],
-		"p1": [["war_camp", 5, 3]],
+		"p1": [["war_camp", 5, 5]],
 		"cap": 3,
 		"checks": ["engagement", "targeting", "zigzag"],
 	},
 	"ranged_3v3": {
 		"desc": "3 archers vs 3 axe throwers — ranged standoff",
 		"p0": [["archer_range", 5, 3]],
-		"p1": [["axe_range", 5, 3]],
+		"p1": [["axe_range", 5, 5]],
 		"cap": 3,
 		"checks": ["engagement", "positioning"],
 	},
 	"mixed_2v2": {
 		"desc": "1 footman + 1 archer vs 1 grunt + 1 axe — mixed comp",
 		"p0": [["barracks", 3, 2], ["archer_range", 7, 2]],
-		"p1": [["war_camp", 3, 2], ["axe_range", 7, 2]],
+		"p1": [["war_camp", 3, 6], ["axe_range", 7, 6]],
 		"cap": 2,
 		"checks": ["engagement", "targeting", "role_separation"],
 	},
@@ -54,7 +60,7 @@ var SCENARIOS: Dictionary = {
 	"enemy_only_rush": {
 		"desc": "3 grunts attack player castle — defense test",
 		"p0": [],
-		"p1": [["war_camp", 5, 3]],
+		"p1": [["war_camp", 5, 5]],
 		"cap": 3,
 		"checks": ["castle_attack", "stuck"],
 	},
@@ -70,7 +76,7 @@ var SCENARIOS: Dictionary = {
 	"double_vs_single": {
 		"desc": "2 barracks vs 1 war_camp — numerical advantage",
 		"p0": [["barracks", 3, 2], ["barracks", 7, 4]],
-		"p1": [["war_camp", 5, 3]],
+		"p1": [["war_camp", 5, 5]],
 		"cap": 3,
 		"checks": ["engagement", "target_spread"],
 	},
@@ -79,7 +85,7 @@ var SCENARIOS: Dictionary = {
 	"melee_with_healer": {
 		"desc": "2 footmen + 1 priest vs 3 grunts — healing effectiveness",
 		"p0": [["barracks", 3, 2], ["priest_temple", 7, 2]],
-		"p1": [["war_camp", 5, 3]],
+		"p1": [["war_camp", 5, 5]],
 		"cap": 3,
 		"checks": ["engagement", "healing"],
 	},
@@ -101,7 +107,7 @@ var SCENARIOS: Dictionary = {
 	"flying_3v3": {
 		"desc": "3 gryphons vs 3 wyverns — flying combat",
 		"p0": [["archer_range", 3, 1], ["gryphon_roost", 6, 1]],
-		"p1": [["axe_range", 3, 1], ["wyvern_nest", 6, 1]],
+		"p1": [["axe_range", 3, 7], ["wyvern_nest", 6, 7]],
 		"cap": 3,
 		"checks": ["engagement", "flying"],
 	},
@@ -174,6 +180,15 @@ func _run_scenario(name: String) -> void:
 		cmds.append(Command.place_building(1, StringName(bld_spec[0]), bld_spec[1], bld_spec[2]))
 	if cmds.size() > 0:
 		sim.step(cmds)
+
+	# BUG-51 guard: a building placed on the castle footprint is silently rejected.
+	# Count spawners right after placement (before combat can destroy any) so a stale
+	# invalid cell FAILS loudly instead of running a vacuous one-sided scenario.
+	var expected_buildings: int = scenario.get("p0", []).size() + scenario.get("p1", []).size()
+	var placed_buildings: int = 0
+	for e in sim.entities:
+		if e.type == "building":
+			placed_buildings += 1
 
 	var cap: int = scenario.get("cap", 3)
 	var spawn_capped: bool = false
@@ -276,7 +291,7 @@ func _run_scenario(name: String) -> void:
 			break
 
 	# Analyze results
-	var result := _analyze_scenario(name, scenario, sim, first_attack_tick, first_castle_dmg_tick)
+	var result := _analyze_scenario(name, scenario, sim, first_attack_tick, first_castle_dmg_tick, expected_buildings, placed_buildings)
 	_scenario_results.append(result)
 
 	# Print events
@@ -291,9 +306,16 @@ func _run_scenario(name: String) -> void:
 
 
 func _analyze_scenario(name: String, scenario: Dictionary, sim: Simulation,
-		first_atk: int, first_castle_dmg: int) -> Dictionary:
+		first_atk: int, first_castle_dmg: int, expected_buildings: int = 0,
+		placed_buildings: int = 0) -> Dictionary:
 	var checks: Array = scenario.get("checks", [])
 	var issues: Array = []
+
+	# BUG-51: every placed building must exist — a cell on the castle footprint (or a
+	# missing requires_building prereq) is silently rejected, which would otherwise run
+	# a vacuous one-sided matchup that passes on team-0-only checks.
+	if placed_buildings < expected_buildings:
+		issues.append("PLACEMENT REJECTED: only %d/%d buildings placed (invalid cell — on the castle footprint?)" % [placed_buildings, expected_buildings])
 	var c0: int = FP.to_int(sim.castles[0].hp)
 	var c1: int = FP.to_int(sim.castles[1].hp)
 

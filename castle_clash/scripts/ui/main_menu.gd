@@ -1928,6 +1928,46 @@ func _add_unit_chip(parent: Control, text: String, col: Color) -> void:
 	parent.add_child(chip)
 
 
+# --- P5 shared tab helpers ---
+
+## Unified tab title (top spacer + 32px gold via UIStyle) — replaces the
+## inconsistent SOCIAL-24 / SETTINGS-28 hand-styling (audit main_menu.gd:1865).
+func _add_tab_title(vbox: VBoxContainer, text: String) -> void:
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 14)
+	vbox.add_child(spacer)
+	var title := Label.new()
+	UIStyle.apply_tab_title(title, text)
+	vbox.add_child(title)
+
+
+## A warm titled section panel (kills the cold-navy/void look). Cream-on-wood, auto-
+## sizing to its content. Returns the body VBox to fill. Header omitted when "".
+func _section_panel(parent: Control, header: String) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	var sb := _make_style(
+		Color(UIStyle.PANEL_WOOD.r, UIStyle.PANEL_WOOD.g, UIStyle.PANEL_WOOD.b, 0.95),
+		Color(UIStyle.PANEL_BORDER.r, UIStyle.PANEL_BORDER.g, UIStyle.PANEL_BORDER.b, 0.85),
+		12, 2)
+	sb.set_content_margin_all(16)
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.custom_minimum_size = Vector2(620, 0)
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	parent.add_child(panel)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	panel.add_child(body)
+	if header != "":
+		var hdr := Label.new()
+		hdr.text = header
+		hdr.add_theme_font_size_override("font_size", 16)
+		hdr.add_theme_color_override("font_color", UIStyle.TEXT_GOLD)
+		hdr.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+		hdr.add_theme_constant_override("outline_size", 2)
+		body.add_child(hdr)
+	return body
+
+
 # --- Social Tab: match record + friends placeholder ---
 
 func _build_social_tab() -> void:
@@ -1944,88 +1984,92 @@ func _build_social_tab() -> void:
 	var vbox := VBoxContainer.new()
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.custom_minimum_size = Vector2(700, 0)
-	vbox.add_theme_constant_override("separation", 12)
+	vbox.add_theme_constant_override("separation", 16)
 	scroll.add_child(vbox)
 
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 12)
-	vbox.add_child(spacer)
+	_add_tab_title(vbox, "SOCIAL")
 
-	var title := Label.new()
-	title.text = "SOCIAL"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 24)
-	title.add_theme_color_override("font_color", Color(1, 0.88, 0.35, 1))
-	title.add_theme_color_override("font_outline_color", Color(0.15, 0.08, 0.02, 1))
-	title.add_theme_constant_override("outline_size", 4)
-	vbox.add_child(title)
-
-	# Match record card — styled like the Army tab unit cards.
-	var record := Panel.new()
-	record.add_theme_stylebox_override("panel", _make_style(Color(0.12, 0.18, 0.3, 0.88), Color(0.3, 0.45, 0.7, 0.6), 10, 2))
-	record.custom_minimum_size = Vector2(680, 150)
-	record.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	vbox.add_child(record)
-
-	var rec_v := VBoxContainer.new()
-	rec_v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	rec_v.offset_left = 26
-	rec_v.offset_right = -26
-	rec_v.offset_top = 12
-	rec_v.offset_bottom = -12
-	rec_v.add_theme_constant_override("separation", 8)
-	record.add_child(rec_v)
-
-	var rec_title := Label.new()
-	rec_title.text = "MATCH RECORD"
-	rec_title.add_theme_font_size_override("font_size", 22)
-	rec_title.add_theme_color_override("font_color", Color(1, 0.92, 0.65))
-	rec_title.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.02, 1))
-	rec_title.add_theme_constant_override("outline_size", 2)
-	rec_v.add_child(rec_title)
-
+	# MATCH RECORD — three KR-style stat chips instead of a text dump (warm panel).
+	var rec := _section_panel(vbox, "MATCH RECORD")
 	var losses: int = PlayerData.games_played - PlayerData.games_won
-	var rec_stats := Label.new()
-	rec_stats.text = "Wins: %d   Losses: %d   Games: %d" % [PlayerData.games_won, losses, PlayerData.games_played]
-	rec_stats.add_theme_font_size_override("font_size", 15)
-	rec_stats.add_theme_color_override("font_color", Color(0.95, 0.9, 0.78, 1.0))
-	rec_v.add_child(rec_stats)
+	var chip_row := HBoxContainer.new()
+	chip_row.add_theme_constant_override("separation", 12)
+	chip_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	chip_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_add_stat_chip(chip_row, "Wins", str(PlayerData.games_won), Color(0.45, 0.72, 0.42))
+	_add_stat_chip(chip_row, "Losses", str(losses), Color(0.72, 0.42, 0.35))
+	_add_stat_chip(chip_row, "Trophies", str(PlayerData.trophies), Color(0.85, 0.7, 0.3))
+	rec.add_child(chip_row)
+	var rank_lbl := Label.new()
+	rank_lbl.text = "Rank: %s" % PlayerData.get_rank_name()
+	rank_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rank_lbl.add_theme_font_size_override("font_size", 16)
+	rank_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
+	rank_lbl.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02))
+	rank_lbl.add_theme_constant_override("outline_size", 2)
+	rec.add_child(rank_lbl)
 
-	var rec_trophies := Label.new()
-	rec_trophies.text = "Trophies: %d   Rank: %s" % [PlayerData.trophies, PlayerData.get_rank_name()]
-	rec_trophies.add_theme_font_size_override("font_size", 15)
-	rec_trophies.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3, 1.0))
-	rec_v.add_child(rec_trophies)
-
-	# Friends card — placeholder until multiplayer social features land.
-	var friends := Panel.new()
-	friends.add_theme_stylebox_override("panel", _make_style(Color(0.12, 0.18, 0.3, 0.88), Color(0.3, 0.45, 0.7, 0.6), 10, 2))
-	friends.custom_minimum_size = Vector2(680, 110)
-	friends.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	vbox.add_child(friends)
-
-	var fr_v := VBoxContainer.new()
-	fr_v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	fr_v.offset_left = 26
-	fr_v.offset_right = -26
-	fr_v.offset_top = 12
-	fr_v.offset_bottom = -12
-	fr_v.add_theme_constant_override("separation", 8)
-	friends.add_child(fr_v)
-
-	var fr_title := Label.new()
-	fr_title.text = "FRIENDS"
-	fr_title.add_theme_font_size_override("font_size", 22)
-	fr_title.add_theme_color_override("font_color", Color(1, 0.92, 0.65))
-	fr_title.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.02, 1))
-	fr_title.add_theme_constant_override("outline_size", 2)
-	fr_v.add_child(fr_title)
-
+	# FRIENDS — a designed empty state (desaturated avatars + disabled CTA), not a stub.
+	var fr := _section_panel(vbox, "FRIENDS")
+	var av_row := HBoxContainer.new()
+	av_row.add_theme_constant_override("separation", 10)
+	av_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	av_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for i in [3, 7, 12, 18]:
+		var t: Texture2D = SpriteRegistry.get_ui_texture(StringName("Avatars_%02d" % i))
+		if t:
+			var av := TextureRect.new()
+			av.texture = t
+			av.custom_minimum_size = Vector2(56, 56)
+			av.expand_mode = TextureRect.EXPAND_FIT_HEIGHT_PROPORTIONAL
+			av.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			av.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			av.modulate = Color(0.65, 0.62, 0.55, 0.7)  # desaturated placeholder
+			av_row.add_child(av)
+	fr.add_child(av_row)
 	var fr_note := Label.new()
-	fr_note.text = "Coming soon — challenge your friends to a duel!"
-	fr_note.add_theme_font_size_override("font_size", 15)
-	fr_note.add_theme_color_override("font_color", Color(0.82, 0.78, 0.65, 1.0))
-	fr_v.add_child(fr_note)
+	fr_note.text = "Coming Soon! Challenge your friends to a duel."
+	fr_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fr_note.add_theme_font_size_override("font_size", 16)
+	fr_note.add_theme_color_override("font_color", Color(0.85, 0.8, 0.68, 1.0))
+	fr.add_child(fr_note)
+	var invite := Button.new()
+	invite.text = "Invite Friends"
+	invite.custom_minimum_size = Vector2(320, 56)
+	invite.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	invite.disabled = true
+	_style_menu_button(invite, Color(0.28, 0.2, 0.11, 0.96), Color(0.55, 0.4, 0.18, 0.85), 16)
+	fr.add_child(invite)
+
+	var tail := Control.new()
+	tail.custom_minimum_size = Vector2(0, 24)
+	vbox.add_child(tail)
+
+
+## P5: a KR-style stat card (big value over a small label) on a tinted chip.
+func _add_stat_chip(parent: Control, name_txt: String, value_txt: String, col: Color) -> void:
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", UIStyle.stat_chip(
+		Color(col.r, col.g, col.b, 0.30), Color(col.r, col.g, col.b, 0.7)))
+	pc.custom_minimum_size = Vector2(120, 0)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 0)
+	pc.add_child(v)
+	var val := Label.new()
+	val.text = value_txt
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	val.add_theme_font_size_override("font_size", 32)
+	val.add_theme_color_override("font_color", UIStyle.TEXT_CREAM)
+	val.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+	val.add_theme_constant_override("outline_size", 2)
+	v.add_child(val)
+	var nm := Label.new()
+	nm.text = name_txt
+	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nm.add_theme_font_size_override("font_size", 16)
+	nm.add_theme_color_override("font_color", UIStyle.TEXT_CREAM)
+	v.add_child(nm)
+	parent.add_child(pc)
 
 
 # --- T-014: Settings Tab ---
@@ -2062,87 +2106,80 @@ func _build_settings_tab() -> void:
 	vbox.add_theme_constant_override("separation", 16)
 	scroll.add_child(vbox)
 
-	# Spacer
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 20)
-	vbox.add_child(spacer)
+	_add_tab_title(vbox, "SETTINGS")
 
-	# Title
-	var title := Label.new()
-	title.text = "SETTINGS"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 28)
-	title.add_theme_color_override("font_color", Color(1, 0.88, 0.35, 1))
-	title.add_theme_color_override("font_outline_color", Color(0.15, 0.08, 0.02, 1))
-	title.add_theme_constant_override("outline_size", 4)
-	vbox.add_child(title)
+	# AUDIO — themed sliders (UIStyle bar assets, ≥80px rows) grouped in a warm panel.
+	var audio := _section_panel(vbox, "AUDIO")
+	_add_volume_slider(audio, "Music", PlayerData.music_volume, _on_music_volume)
+	_add_volume_slider(audio, "SFX", PlayerData.sfx_volume, _on_sfx_volume)
+	_add_volume_slider(audio, "UI", PlayerData.ui_volume, _on_ui_volume)
 
-	# Volume sliders
-	_add_volume_slider(vbox, "Music Volume", PlayerData.music_volume, _on_music_volume)
-	_add_volume_slider(vbox, "SFX Volume", PlayerData.sfx_volume, _on_sfx_volume)
-	_add_volume_slider(vbox, "UI Volume", PlayerData.ui_volume, _on_ui_volume)
-
-	# Divider
-	var div1 := ColorRect.new()
-	div1.custom_minimum_size = Vector2(600, 2)
-	div1.color = Color(0.5, 0.38, 0.15, 0.4)
-	div1.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	vbox.add_child(div1)
-
-	# Replay Tutorial button — DISABLED: the tutorial system is globally off
-	# (game_manager.gd hard-forces tutorial_mode = false and game_arena's
-	# _show_tutorial() call is commented out), so "replaying" just launched a
-	# normal match. Keep the button visible but inert until it returns.
+	# GAME — the (disabled) tutorial secondary. Re-enabling is backlog 3.1; kept
+	# inert but styled so it isn't a bare gray box (game_manager forces tutorial off).
+	var game := _section_panel(vbox, "GAME")
 	var tutorial_btn := Button.new()
 	tutorial_btn.text = "Replay Tutorial (coming soon)"
-	tutorial_btn.custom_minimum_size = Vector2(400, 50)
+	tutorial_btn.custom_minimum_size = Vector2(400, 80)
 	tutorial_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	tutorial_btn.disabled = true
-	_style_menu_button(tutorial_btn, Color(0.25, 0.18, 0.1, 0.96), Color(0.55, 0.4, 0.18, 0.85), 16)
-	vbox.add_child(tutorial_btn)
+	_style_menu_button(tutorial_btn, Color(0.28, 0.2, 0.11, 0.96), Color(0.55, 0.4, 0.18, 0.85), 16)
+	game.add_child(tutorial_btn)
 
-	# Reset Progress button
-	var reset_btn := Button.new()
-	reset_btn.text = "Reset All Progress"
-	reset_btn.custom_minimum_size = Vector2(400, 50)
-	reset_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_style_menu_button(reset_btn, Color(0.45, 0.13, 0.08, 0.96), Color(0.85, 0.3, 0.15, 0.85), 16)
-	reset_btn.pressed.connect(_on_reset_progress)
-	vbox.add_child(reset_btn)
-
-	# Divider
-	var div2 := ColorRect.new()
-	div2.custom_minimum_size = Vector2(600, 2)
-	div2.color = Color(0.5, 0.38, 0.15, 0.4)
-	div2.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	vbox.add_child(div2)
-
-	# Credits
+	# ABOUT — credits at the 16px baseline (was 13).
+	var about := _section_panel(vbox, "ABOUT")
 	var credits := Label.new()
-	credits.text = "Made with Godot 4\nArt: Tiny Swords by Pixel Frog\n\nv0.1 — Castle Fight"
+	credits.text = "Made with Godot 4\nArt: Tiny Swords by Pixel Frog\nv0.1 — Castle Fight"
 	credits.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	credits.add_theme_font_size_override("font_size", 13)
-	credits.add_theme_color_override("font_color", Color(0.88, 0.82, 0.66, 1.0))  # BUG-41: opaque, readable
+	credits.add_theme_font_size_override("font_size", 16)
+	credits.add_theme_color_override("font_color", Color(0.88, 0.82, 0.66, 1.0))
 	credits.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.03, 1.0))
 	credits.add_theme_constant_override("outline_size", 1)
 	credits.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vbox.add_child(credits)
+	about.add_child(credits)
+
+	# Reset — DEMOTED to a low-emphasis outline at the bottom (was the brightest
+	# element; destructive actions must not be the visual primary). Confirm flow kept.
+	var reset_btn := Button.new()
+	reset_btn.text = "Reset All Progress"
+	reset_btn.custom_minimum_size = Vector2(320, 64)
+	reset_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_style_outline_button(reset_btn, Color(0.62, 0.26, 0.16), 16)
+	reset_btn.pressed.connect(_on_reset_progress)
+	vbox.add_child(reset_btn)
+
+	var tail := Control.new()
+	tail.custom_minimum_size = Vector2(0, 24)
+	vbox.add_child(tail)
 
 
-func _add_volume_slider(parent: VBoxContainer, label_text: String, initial_value: float, callback: Callable) -> void:
+## P5: low-emphasis outline button (transparent fill, thin coloured border + text) —
+## for demoting a destructive action so it can't be the visual primary.
+func _style_outline_button(btn: Button, col: Color, font_size: int = 16) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(col.r, col.g, col.b, 0.0)
+	sb.border_color = col
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(8)
+	sb.set_content_margin_all(10)
+	var down := sb.duplicate()
+	down.bg_color = Color(col.r, col.g, col.b, 0.22)
+	for state in ["normal", "hover", "focus", "disabled"]:
+		btn.add_theme_stylebox_override(state, sb)
+	btn.add_theme_stylebox_override("pressed", down)
+	btn.add_theme_font_size_override("font_size", font_size)
+	btn.add_theme_color_override("font_color", Color(0.85, 0.45, 0.35))
+	btn.add_theme_color_override("font_outline_color", Color(0.1, 0.05, 0.02))
+	btn.add_theme_constant_override("outline_size", 1)
+
+
+func _add_volume_slider(parent: Control, label_text: String, initial_value: float, callback: Callable) -> void:
 	var row := HBoxContainer.new()
-	row.custom_minimum_size = Vector2(0, 40)
-	row.add_theme_constant_override("separation", 12)
+	row.custom_minimum_size = Vector2(0, 80)   # P5: HIG touch row (was 40)
+	row.add_theme_constant_override("separation", 14)
 
-	# Left padding
-	var pad := Control.new()
-	pad.custom_minimum_size = Vector2(30, 0)
-	row.add_child(pad)
-
-	# Label
 	var lbl := Label.new()
 	lbl.text = label_text
-	lbl.custom_minimum_size = Vector2(180, 0)
+	lbl.custom_minimum_size = Vector2(90, 0)
 	lbl.add_theme_font_size_override("font_size", 16)
 	lbl.add_theme_color_override("font_color", Color(0.9, 0.85, 0.65, 1))
 	lbl.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02, 1))
@@ -2150,35 +2187,29 @@ func _add_volume_slider(parent: VBoxContainer, label_text: String, initial_value
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(lbl)
 
-	# Slider
+	# P5: themed slider (bar-asset track + round grabber) — kills the raw Godot gray.
 	var slider := HSlider.new()
 	slider.min_value = 0.0
 	slider.max_value = 1.0
 	slider.step = 0.05
 	slider.value = initial_value
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	slider.custom_minimum_size = Vector2(250, 0)
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	slider.custom_minimum_size = Vector2(200, 40)
+	UIStyle.theme_slider(slider, 48)
 	slider.value_changed.connect(callback)
 	row.add_child(slider)
 
-	# Percentage label
 	var pct := Label.new()
 	pct.text = "%d%%" % int(initial_value * 100)
-	pct.custom_minimum_size = Vector2(50, 0)
-	pct.add_theme_font_size_override("font_size", 14)
+	pct.custom_minimum_size = Vector2(60, 0)
+	pct.add_theme_font_size_override("font_size", 16)
 	pct.add_theme_color_override("font_color", Color(1, 0.85, 0.3, 1))
 	pct.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	pct.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(pct)
 
-	# Right padding
-	var pad2 := Control.new()
-	pad2.custom_minimum_size = Vector2(30, 0)
-	row.add_child(pad2)
-
-	# Store reference to update pct label when slider changes
 	slider.set_meta("pct_label", pct)
-
 	parent.add_child(row)
 
 
@@ -2210,19 +2241,21 @@ func _on_ui_volume(value: float) -> void:
 
 
 func _find_slider_by_callback(panel: Control, index: int) -> HSlider:
+	# P5: recursive — sliders now nest inside the AUDIO section panel, deeper than
+	# the old fixed scroll>vbox>row depth. DFS collects them in music/sfx/ui order.
 	var sliders: Array[HSlider] = []
-	for child in panel.get_children():
-		if child is ScrollContainer:
-			for sc_child in child.get_children():
-				if sc_child is VBoxContainer:
-					for row in sc_child.get_children():
-						if row is HBoxContainer:
-							for widget in row.get_children():
-								if widget is HSlider:
-									sliders.append(widget)
+	_collect_sliders(panel, sliders)
 	if index < sliders.size():
 		return sliders[index]
 	return null
+
+
+func _collect_sliders(node: Node, out: Array[HSlider]) -> void:
+	for child in node.get_children():
+		if child is HSlider:
+			out.append(child)
+		else:
+			_collect_sliders(child, out)
 
 
 func _on_reset_progress() -> void:

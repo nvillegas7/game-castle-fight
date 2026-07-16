@@ -96,6 +96,10 @@ func _init() -> void:
 	# Screen-parity P4 — Army + Avatars tabs (2026-07-15).
 	_check_army_cards_not_navy()          # army cards warm wood/paper, not cold-navy boxes
 	_check_avatars_selected_ring()        # equipped avatar shows a visible gold ring
+	# Screen-parity P5 — Social + Settings tabs (2026-07-16).
+	_check_social_not_navy()              # social cards warm paper, not cold-navy boxes
+	_check_settings_sliders_themed()      # volume sliders themed, not raw Godot gray
+	_check_reset_demoted()                # Reset All Progress is an outline, not a filled primary
 	_print_results()
 	quit(1 if _fail > 0 else 0)
 
@@ -1378,6 +1382,74 @@ func _check_avatars_selected_ring() -> void:
 	else:
 		_assert_fail("equipped avatar ring invisible — gold px=%d (need >40)" % gold,
 			"strong gold ring on the selected/equipped cell per audit main_menu.gd:533")
+
+
+## P5 (2026-07-16): Social MATCH RECORD / FRIENDS cards must be warm paper, not the
+## cold-navy programmer panels (audit main_menu.gd:1873, _make_style RGB 29,42,69).
+## Whole-tab scan (menu_social_000.png @504x896, y[70,800]) so it survives the cards
+## moving when the void is filled: pre-P5 = 20,420 navy px (sampled, RED); paper = ~0.
+func _check_social_not_navy() -> void:
+	print("[Social cards warm paper, not cold-navy (P5 parity)]")
+	var img := _load_capture("menu_social_000.png")
+	if img == null:
+		return
+	var navy: int = 0
+	for y in range(70, 800, 2):
+		for x in range(8, 496, 2):
+			var c: Color = img.get_pixel(x, y)
+			if absf(c.r - 0.114) < 0.06 and absf(c.g - 0.165) < 0.06 \
+					and absf(c.b - 0.271) < 0.07 and c.b > c.r:
+				navy += 1
+	if navy < 1000:
+		_assert_pass("social cards warm paper, not cold-navy (navy px=%d, sampled)" % navy)
+	else:
+		_assert_fail("social cards still cold-navy — navy px=%d (need <1000)" % navy,
+			"warm paper panels per audit main_menu.gd:1873")
+
+
+## P5: volume sliders must be themed (bar-asset track), not the raw Godot-default neutral-
+## gray HSlider (audit main_menu.gd:2062, track RGB 121,118,116). Whole-tab scan for FLAT
+## NEUTRAL gray (r≈g≈b, mid value) — the warm bar-asset stone is tinted, not neutral, so it
+## won't match. Pre-P5 = 849 gray px (sampled, RED); themed = ~0.
+func _check_settings_sliders_themed() -> void:
+	print("[Settings sliders themed, not raw gray (P5 parity)]")
+	var img := _load_capture("menu_settings_000.png")
+	if img == null:
+		return
+	var gray: int = 0
+	for y in range(70, 800, 2):
+		for x in range(8, 496, 2):
+			var c: Color = img.get_pixel(x, y)
+			var avg: float = (c.r + c.g + c.b) / 3.0
+			if absf(c.r - c.g) < 0.05 and absf(c.g - c.b) < 0.05 and avg > 0.37 and avg < 0.69:
+				gray += 1
+	if gray < 250:
+		_assert_pass("volume sliders themed (raw neutral-gray px=%d, sampled)" % gray)
+	else:
+		_assert_fail("volume sliders still raw Godot gray — gray px=%d (need <250)" % gray,
+			"UIStyle.theme_slider per audit main_menu.gd:2062")
+
+
+## P5: "Reset All Progress" must NOT be the brightest/primary — restyled as a low-emphasis
+## outline (audit main_menu.gd:2013, currently the sole saturated fill RGB~111,32,20).
+## Whole-tab saturated-red-FILL scan (robust to the button moving to the bottom): pre-P5 =
+## 9683 filled px (RED); outline-only = a thin border (<2500).
+func _check_reset_demoted() -> void:
+	print("[Settings Reset demoted, not a filled primary (P5 parity)]")
+	var img := _load_capture("menu_settings_000.png")
+	if img == null:
+		return
+	var red: int = 0
+	for y in range(70, 800):
+		for x in range(8, 496):
+			var c: Color = img.get_pixel(x, y)
+			if c.r > 0.35 and c.r > c.g * 2.0 and c.r > c.b * 2.0 and c.g < 0.32:
+				red += 1
+	if red < 2500:
+		_assert_pass("Reset is a low-emphasis outline (saturated-red-fill px=%d)" % red)
+	else:
+		_assert_fail("Reset All Progress still a filled primary — red-fill px=%d (need <2500)" % red,
+			"restyle as an outline button at the bottom per audit main_menu.gd:2013")
 
 
 func _print_results() -> void:

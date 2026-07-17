@@ -48,8 +48,6 @@ before the fix, or the passing criterion.
 
 | ID | Item | Domain | Phase | Detector / Acceptance |
 |----|------|--------|-------|-----------------------|
-| 2.1 | Extract opponent AI → `arena_ai.gd` (ends game_arena.gd SHARED contention; balance suite then tests the REAL AI) | A5 | 2 | balance suite green against extracted AI |
-| 2.2 | Extract terrain/decoration builder → `arena_terrain.gd` (~670 one-shot lines) | A2 | 2 | pixel-identical autotest captures (golden diff) |
 | 2.3 | ⏳ PARTIAL: project Theme via gui/theme/custom ✓; default font = Pixel Operator Bold (e0e35b4, replaced NinjaNormal for readability — user-flagged; CC0, crisp import flags). TODO: MorkDungeon title-font variation for headings; shared `ui_style.gd` for StyleBoxes | A2 | 2 | readable global font ✓ |
 | 2.4 | Shared `scenic_background.gd` (delete the 250-line verbatim copy) | A2 | 2 | one source, both callers use it |
 | 2.5 | Sim read facade (O(1) get_entity, castle_ratio, player_gold) + `z_layers.gd` constants | A5/A1 | 2 | removes 80+ private reads / per-frame O(n²) scans |

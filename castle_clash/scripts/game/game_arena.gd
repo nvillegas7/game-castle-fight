@@ -1226,9 +1226,13 @@ func _update_wave_announcement(delta: float) -> void:
 		wave_label.modulate.a = _wave_announce_timer
 
 
-# --- Smart AI Opponent ---
+# --- Smart AI Opponent (Phase 2.1: decision logic extracted → ArenaAI) ---
+# game_arena keeps only the SCENE-side concerns: the think timer, the
+# ai_disabled / online / tutorial gates, and submitting what think() returns.
+# All build-order/counter-play/placement logic lives in scripts/game/arena_ai.gd
+# (headless-testable: test_arena_ai.gd + test_balance.gd Mode B run the REAL AI).
 
-var _ai_strategy: int = -1  # 0=balanced, 1=rush, 2=tech
+var _arena_ai: ArenaAI = null
 
 func _update_ai(delta: float) -> void:
 	if ai_disabled or GameManager.is_online_match:
@@ -1242,190 +1246,21 @@ func _update_ai(delta: float) -> void:
 	_ai_timer = AI_THINK_INTERVAL * (2.0 if GameManager.tutorial_mode and GameManager.tutorial_step == 2 else 1.0)
 
 	var sim: Simulation = GameManager.simulation
-	var ai_index: int = sim.get_player_index(AI_PLAYER_ID)
-	if ai_index == -1:
+	if sim == null:
 		return
 	var faction: FactionData = GameManager.get_player_faction(AI_PLAYER_ID)
 	if faction == null:
 		return
-
-	# Pick strategy once per match
-	if _ai_strategy == -1:
-		_ai_strategy = randi() % 3
-
-	var gold: int = GameManager.get_player_gold(AI_PLAYER_ID)
-	var match_time: int = GameManager.current_tick
-
-	# Activate special building abilities when ready
-	_ai_try_activate(sim, ai_index)
-
-	# Scan AI's buildings
-	var ai_bld_count: int = 0
-	var has_income: bool = false
-	var has_t1: bool = false
-	var has_upgrade: bool = false
-	var has_special: bool = false
-	var wall_count: int = 0
-	for entity in sim.entities:
-		if entity.type == "building" and entity.player_index == ai_index:
-			ai_bld_count += 1
-			var bt: StringName = entity.building_type
-			var bd_c = sim.building_registry.get(bt)
-			if bd_c and bd_c.income_bonus > 0: has_income = true
-			if bd_c and bd_c.spawns_unit and bd_c.tier == 1: has_t1 = true
-			if bt in [&"armory", &"blood_altar"]: has_upgrade = true
-			if bt in [&"war_horn", &"blood_totem"]: has_special = true
-			if bt in [&"wall", &"palisade"]: wall_count += 1
-
-	# Affordable buildings (exclude walls from main selection)
-	var affordable: Array[BuildingData] = []
-	for bd: BuildingData in faction.buildings:
-		if bd.gold_cost > gold:
-			continue
-		if bd.grid_size == Vector2i(1, 1) and not bd.spawns_unit and not bd.is_tower and bd.income_bonus == 0:
-			continue  # Skip walls
-		if bd.requires_building != &"" and not sim.player_has_building(ai_index, bd.requires_building):
-			continue
-		affordable.append(bd)
-
-	# Scout player composition
-	var p_melee: int = 0
-	var p_ranged: int = 0
-	var p_siege: int = 0
-	for entity in sim.entities:
-		if entity.type == "unit" and entity.team != AI_PLAYER_ID:
-			match entity.role:
-				0: p_melee += 1
-				1: p_ranged += 1
-				4: p_siege += 1
-
-	var chosen: BuildingData = null
-
-	# Strategy-based build order
-	match _ai_strategy:
-		0:  # Balanced
-			if not has_income and ai_bld_count < 2:
-				chosen = _ai_pick(affordable, &"income")
-			if chosen == null and ai_bld_count < 5:
-				chosen = _ai_pick(affordable, &"t1")
-			if chosen == null and match_time > 350 and not has_upgrade:
-				chosen = _ai_pick(affordable, &"upgrade")
-		1:  # Rush — spam T1 combat, no economy
-			if ai_bld_count < 6:
-				chosen = _ai_pick(affordable, &"t1")
-			if chosen == null and match_time > 400:
-				chosen = _ai_pick(affordable, &"t2")
-		2:  # Tech — double income then T2
-			if ai_bld_count < 2:
-				chosen = _ai_pick(affordable, &"income")
-			if chosen == null and ai_bld_count < 4:
-				chosen = _ai_pick(affordable, &"t1")
-			if chosen == null and match_time > 250:
-				chosen = _ai_pick(affordable, &"t2")
-			if chosen == null and match_time > 400 and not has_special:
-				chosen = _ai_pick(affordable, &"special")
-
-	# Counter-play (all strategies)
-	if chosen == null and match_time > 200:
-		if p_melee > p_ranged + 3:
-			chosen = _ai_pick(affordable, &"ranged")
-			if chosen == null:
-				chosen = _ai_pick(affordable, &"tower")
-		elif p_ranged > p_melee + 3:
-			chosen = _ai_pick(affordable, &"t2")
-		elif p_siege > 1:
-			chosen = _ai_pick(affordable, &"t1")
-
-	# Upgrade buildings when ahead on economy
-	if chosen == null and match_time > 500 and gold > 150:
-		if not has_upgrade:
-			chosen = _ai_pick(affordable, &"upgrade")
-		elif not has_special:
-			chosen = _ai_pick(affordable, &"special")
-
-	# Fallback: random combat building
-	if chosen == null:
-		var combat: Array[BuildingData] = []
-		for bd: BuildingData in affordable:
-			if bd.spawns_unit or bd.is_tower:
-				combat.append(bd)
-		if not combat.is_empty():
-			chosen = combat[randi() % combat.size()]
-		elif not affordable.is_empty():
-			chosen = affordable[randi() % affordable.size()]
-		else:
-			return
-
-	_ai_place(sim, chosen)
-
-	# Place maze walls periodically
-	if wall_count < 4 and ai_bld_count > 3 and match_time > 300 and gold > 30:
-		_ai_place_wall(sim, ai_index, faction)
-
-
-func _ai_pick(list: Array[BuildingData], cat: StringName) -> BuildingData:
-	for bd: BuildingData in list:
-		match cat:
-			&"income":
-				if bd.income_bonus > 0: return bd
-			&"t1":
-				if bd.spawns_unit and bd.tier == 1: return bd
-			&"t2":
-				if bd.spawns_unit and bd.tier == 2: return bd
-			&"ranged":
-				if bd.spawns_unit and bd.spawns_unit.role == 1: return bd
-			&"tower":
-				if bd.is_tower: return bd
-			&"upgrade":
-				if bd.id in [&"armory", &"blood_altar"]: return bd
-			&"special":
-				if bd.id in [&"war_horn", &"blood_totem"]: return bd
-	return null
-
-
-func _ai_try_activate(sim: Simulation, ai_index: int) -> void:
-	for entity in sim.entities:
-		if entity.type != "building" or entity.player_index != ai_index:
-			continue
-		var max_mana: int = entity.get("ability_max_mana", 0)
-		if max_mana > 0 and entity.get("ability_mana", 0) >= max_mana:
-			if entity.get("ability_active_ticks", 0) <= 0:
-				GameManager.submit_command(Command.activate_building(AI_PLAYER_ID, entity.id))
-				return
-
-
-func _ai_place_wall(sim: Simulation, ai_index: int, faction: FactionData) -> void:
-	var wall_bd: BuildingData = null
-	for bd: BuildingData in faction.buildings:
-		if bd.grid_size == Vector2i(1, 1) and not bd.spawns_unit and not bd.is_tower and bd.income_bonus == 0:
-			wall_bd = bd
-			break
-	if wall_bd == null or GameManager.get_player_gold(AI_PLAYER_ID) < wall_bd.gold_cost:
-		return
-	# Zigzag walls: rows 2 and 5, alternating columns
-	var positions := [[2,0],[2,1],[2,2],[2,3],[2,4],[2,5],[2,6],[2,7],[2,8],
-		[5,2],[5,3],[5,4],[5,5],[5,6],[5,7],[5,8],[5,9],[5,10]]
-	for pos in positions:
-		if sim.can_place_building(AI_PLAYER_ID, wall_bd.id, pos[1], pos[0]):
-			GameManager.submit_command(Command.place_building(AI_PLAYER_ID, wall_bd.id, pos[1], pos[0]))
-			return
-
-
-func _ai_place(sim: Simulation, chosen: BuildingData) -> void:
-	var prefer_front: bool = chosen.is_tower or chosen.spawns_unit != null
-	var prefer_back: bool = chosen.income_bonus > 0
-	for _attempt in 25:
-		var gx: int
-		if prefer_front:
-			gx = (GRID_COLS - chosen.grid_size.x) / 2 + randi() % maxi(1, (GRID_COLS - chosen.grid_size.x + 2) / 2)
-		elif prefer_back:
-			gx = randi() % maxi(1, (GRID_COLS - chosen.grid_size.x + 2) / 2)
-		else:
-			gx = randi() % maxi(1, GRID_COLS - chosen.grid_size.x + 1)
-		var gy: int = randi() % maxi(1, GRID_ROWS - chosen.grid_size.y + 1)
-		if sim.can_place_building(AI_PLAYER_ID, chosen.id, gx, gy):
-			GameManager.submit_command(Command.place_building(AI_PLAYER_ID, chosen.id, gx, gy))
-			return
+	if _arena_ai == null:
+		# Fresh randomized RNG per match (the scene is re-instanced per match) —
+		# same distribution as the global randi() the pre-extraction code used.
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		_arena_ai = ArenaAI.new(AI_PLAYER_ID, rng)
+	var cmds: Array = _arena_ai.think(sim, faction,
+		GameManager.get_player_gold(AI_PLAYER_ID), GameManager.current_tick)
+	for cmd in cmds:
+		GameManager.submit_command(cmd)
 
 
 # --- CR-Standard: Mid-match error overlays ---

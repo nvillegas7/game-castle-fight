@@ -1,5 +1,9 @@
-## Balance test: 100 headless AI-vs-AI matches.
-## Verifies Kingdom vs Horde win rate is 45-55% and matches end in 2-5 min.
+## Balance test: 2x100 headless AI-vs-AI matches, two modes.
+##   Mode A (mirror): both teams play the same scripted build order — a pure
+##     SIM-SYMMETRY test (T-067/T-079); any drift from ~50% is a sim bug.
+##   Mode B (real AI, Phase 2.1): two ArenaAI instances (the SHIPPING opponent
+##     AI, seeded per match) play kingdom vs horde — a FACTION-BALANCE probe.
+##     Its win rate is design signal; only crashes gate the exit code.
 ## Run: godot --headless --path castle_clash -s tests/test_balance.gd
 extends SceneTree
 
@@ -27,11 +31,16 @@ var _building_costs: Dictionary = {}
 func _init() -> void:
 	await process_frame
 	_load_buildings()
-	var results := _run_all_matches()
-	_print_report(results)
-	_save_json(results)
+	var results := _run_all_matches(false)
+	_print_report(results, "Mode A — scripted mirror (sim symmetry)")
+	var results_ai := _run_all_matches(true)
+	_print_report(results_ai, "Mode B — real ArenaAI, kingdom vs horde (faction balance)")
+	_save_json({"mirror": results, "real_ai": results_ai})
 	var win_rate: float = results.kingdom_wins * 100.0 / NUM_MATCHES
-	var pass_val: bool = win_rate >= 40.0 and win_rate <= 60.0 and results.crashes == 0
+	# Gate: mirror symmetry band + zero crashes in either mode. Mode B's win
+	# rate is REPORTED (faction-balance signal for A0/A5), not gated here.
+	var pass_val: bool = win_rate >= 40.0 and win_rate <= 60.0 \
+		and results.crashes == 0 and results_ai.crashes == 0
 	quit(0 if pass_val else 1)
 
 
@@ -50,7 +59,7 @@ func _load_buildings() -> void:
 		fname = dir.get_next()
 
 
-func _run_all_matches() -> Dictionary:
+func _run_all_matches(real_ai: bool) -> Dictionary:
 	var kingdom_wins: int = 0
 	var horde_wins: int = 0
 	var draws: int = 0
@@ -59,12 +68,13 @@ func _run_all_matches() -> Dictionary:
 	var match_lengths: Array[int] = []
 	var match_details: Array = []
 
-	print("\n=== Castle Fight Balance Test: %d Matches ===" % NUM_MATCHES)
+	print("\n=== Castle Fight Balance Test: %d Matches (%s) ===" % [
+		NUM_MATCHES, "real ArenaAI" if real_ai else "scripted mirror"])
 	print("Kingdom (team 0) vs Horde (team 1)\n")
 
 	for i in NUM_MATCHES:
 		var seed_val: int = BASE_SEED + i
-		var result := _run_match(seed_val, i)
+		var result := _run_match_ai(seed_val, i) if real_ai else _run_match(seed_val, i)
 		match_details.append(result)
 		match_lengths.append(result.ticks)
 		total_ticks += result.ticks
@@ -98,6 +108,65 @@ func _run_all_matches() -> Dictionary:
 		"min_ticks": match_lengths[0] if match_lengths.size() > 0 else 0,
 		"max_ticks": match_lengths[-1] if match_lengths.size() > 0 else 0,
 		"matches": match_details,
+	}
+
+
+## Mode B (Phase 2.1): the REAL opponent AI on both sides. Seeded RNG per AI →
+## reproducible; sim-default starting gold (real match conditions, unlike the
+## zeroed-gold scripted mode); think() every BUILD_INTERVAL ticks = the game's
+## 3s cadence at 10tps.
+func _run_match_ai(seed_val: int, match_idx: int) -> Dictionary:
+	var sim := Simulation.new()
+	sim.register_buildings(_all_buildings)
+	sim.initialize(seed_val, [
+		{"id": 0, "team": 0, "faction": &"kingdom", "perk": &""},
+		{"id": 1, "team": 1, "faction": &"horde", "perk": &""},
+	])
+	var factions: Array = [
+		load("res://data/factions/kingdom.tres"),
+		load("res://data/factions/horde.tres"),
+	]
+	var ais: Array = []
+	for i in 2:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = seed_val * 2 + i
+		ais.append(ArenaAI.new(i, rng))
+
+	for tick_i in MAX_TICKS:
+		var cmds: Array = []
+		if tick_i > 0 and tick_i % BUILD_INTERVAL == 0:
+			for i in 2:
+				var gold: int = FP.to_int(sim.players[i].gold)
+				cmds.append_array(ais[i].think(sim, factions[i], gold, sim.tick))
+		sim.step(cmds)
+
+		if sim.match_over:
+			return {
+				"match": match_idx,
+				"seed": seed_val,
+				"winner": sim.winning_team,
+				"ticks": sim.tick,
+				"castle0_hp": FP.to_int(sim.castles[0].hp),
+				"castle1_hp": FP.to_int(sim.castles[1].hp),
+				"strategies": [ais[0].strategy, ais[1].strategy],
+			}
+
+	var hp0_ai: int = FP.to_int(sim.castles[0].hp)
+	var hp1_ai: int = FP.to_int(sim.castles[1].hp)
+	var winner_ai: int = -1
+	if hp0_ai > hp1_ai:
+		winner_ai = 0
+	elif hp1_ai > hp0_ai:
+		winner_ai = 1
+	return {
+		"match": match_idx,
+		"seed": seed_val,
+		"winner": winner_ai,
+		"ticks": MAX_TICKS,
+		"castle0_hp": hp0_ai,
+		"castle1_hp": hp1_ai,
+		"timeout": true,
+		"strategies": [ais[0].strategy, ais[1].strategy],
 	}
 
 
@@ -184,9 +253,9 @@ func _run_match(seed_val: int, match_idx: int) -> Dictionary:
 	}
 
 
-func _print_report(results: Dictionary) -> void:
+func _print_report(results: Dictionary, label: String) -> void:
 	var wr: float = results.kingdom_wins * 100.0 / NUM_MATCHES
-	print("\n=== Balance Test Results ===")
+	print("\n=== Balance Test Results — %s ===" % label)
 	print("Kingdom wins: %d (%.1f%%)" % [results.kingdom_wins, wr])
 	print("Horde wins:   %d (%.1f%%)" % [results.horde_wins, 100.0 - wr - results.draws * 100.0 / NUM_MATCHES])
 	print("Draws:        %d" % results.draws)

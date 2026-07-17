@@ -42,6 +42,7 @@ run_headless "Behavior audit (movement)"       tests/test_behavior_audit.gd
 run_headless "Combat feel (walk cadence)"      tests/test_combat_feel.gd
 run_headless "Targeting diagnostics"           tests/test_targeting_diag.gd
 run_headless "Unit behavior scenarios"         tests/test_unit_behavior.gd
+run_headless "Arena AI (Phase 2.1 extraction)" tests/test_arena_ai.gd
 run_headless "Multiplayer (checksum/config)"   tests/test_multiplayer.gd
 run_headless "UIStyle kit contract"            tests/test_ui_style.gd
 
@@ -85,8 +86,8 @@ fi
 if [ "${RUN_NIGHTLY:-0}" = "1" ]; then
 	echo ""
 	echo "### L3 - nightly (non-fatal) ###"
-	echo "--- Balance (100 AI-vs-AI matches, ~3 min) ---"
-	godot --headless --path "$PROJ_DIR" -s tests/test_balance.gd 2>&1 | grep -E "win rate|Results:|PASS|FAIL" | tail -3 || echo "  (see balance_results.json)"
+	echo "--- Balance (2x100 matches: scripted mirror + real ArenaAI, ~6 min) ---"
+	godot --headless --path "$PROJ_DIR" -s tests/test_balance.gd 2>&1 | grep -E "Balance Test Results|wins:|verdict|Crashes" || echo "  (see balance_results.json)"
 	echo "--- Audio regression (needs display) ---"
 	godot --path "$PROJ_DIR" -- --audiotest 2>/dev/null && echo "  audio done" || echo "  audio SKIPPED (needs display)"
 fi

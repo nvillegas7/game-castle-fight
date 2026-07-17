@@ -42,6 +42,7 @@ before the fix, or the passing criterion.
 | ID | Item | Domain | Phase | Detector / Acceptance |
 |----|------|--------|-------|-----------------------|
 | T-QA1 | Placement-test hygiene: place_building is a silent no-op on invalid coords — audit all test placements (several team-1 ones were already dead under the 5x2 footprint) and make placement tests assert the building EXISTS afterward | A4 | 2 | every place_building in tests followed by an existence assert |
+| T-AI1 | AI place+wall same-tick race (pre-existing, surfaced by 2.1's test_arena_ai): ~25% of team-1 AI placements silently no-op — the place and wall commands from ONE think() are both validated against the pre-tick state, then race on gold/cells at apply. Fix: emit at most one build command per think, or re-validate at apply and retry next think | A5 | 3 | test_arena_ai no-op rate <10% both players at seed 777 |
 
 ## Phase 2 — Architecture enablers (sequential, shared files, no rewrite)
 

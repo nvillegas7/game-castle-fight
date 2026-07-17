@@ -191,9 +191,79 @@ static func build_textures(arena) -> void:
 	# betrays the 64px grid — lessons.md 2026-07-07); variation = decoration.
 	_build_tiled_zone(terrain_layer, tm1, Rect2(72, 72, 576, 896), 1.0, ts, Color.WHITE)
 
+	# 3.3b (approved arena_target.png rev B, 2026-07-17): worn lane path down
+	# the combat zone, then the side plateaus framing it.
+	_add_worn_path(terrain_layer, ts)
+	_add_side_plateaus(terrain_layer, tm1, ts)
+
 	_add_fortress_dressing(terrain_layer, tm1, ts)
 
 	_add_water_foam(arena)
+
+
+## 3.3b: worn-grass lane path (PORT of compose_arena.py worn_path/PATH).
+## A contiguous Tilemap_color4 patch — desaturated olive "trampled meadow" —
+## down the combat zone center: x0=296, 2 cols, y0=360, 5 rows (y=[360,680],
+## self-mirrors about the pivot: 360+680=1040). Rounded 3x3 edge tiles
+## (patch-on-patch per the pack's design, NOT the banned per-tile hue mixing).
+static func _add_worn_path(parent: Node2D, ts: float) -> void:
+	var tm4 = load("res://assets/sprites/terrain/Tilemap_color4.png")
+	if tm4 == null:
+		return
+	for r in 5:
+		var gy: int = 0 if r == 0 else (2 if r == 4 else 1)
+		for c in 2:
+			var gx: int = 0 if c == 0 else 2
+			var tile := AtlasTexture.new()
+			tile.atlas = tm4
+			tile.region = Rect2(gx * 64, gy * 64, 64, 64)
+			var spr := Sprite2D.new()
+			spr.texture = tile
+			spr.centered = false
+			spr.position = Vector2(296.0 + c * ts, 360.0 + r * ts)
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			parent.add_child(spr)
+
+
+## 3.3b: side plateaus (PORT of compose_arena.py plateau/PLATEAU_L) — one
+## elevated grass shelf per side band framing the combat zone: x0=72 (mirror
+## 520), 2 cols, grass y0=328 + 5 rows, then a one-tile stone FACE at y=648
+## (region [328,712] self-mirrors about the pivot: 328+712=1040). Tile
+## semantics from the loading screen's proven plateau mapping: col 5=L-edge,
+## 7=R-edge; row 0=dark top rim, 1=clean fill, 2=bottom transition, 4=stone
+## face. PERSPECTIVE-LOCKED: the stone face points SOUTH on both halves and is
+## NEVER flipped (the y-flip maps each shelf onto itself; orientation is owned
+## by the camera — lessons.md 2026-07-08c).
+static func _add_side_plateaus(parent: Node2D, tm: Texture2D, ts: float) -> void:
+	if tm == null:
+		return
+	for x0 in [72.0, 520.0]:
+		# 5 grass rows: top rim (row 0), 3x fill (row 1), bottom transition (row 2)
+		for r in 5:
+			var row_k: int = 0 if r == 0 else (2 if r == 4 else 1)
+			for c in 2:
+				var col_k: int = 5 if c == 0 else 7
+				var tile := AtlasTexture.new()
+				tile.atlas = tm
+				tile.region = Rect2(col_k * 64, row_k * 64, 64, 64)
+				var spr := Sprite2D.new()
+				spr.texture = tile
+				spr.centered = false
+				spr.position = Vector2(x0 + c * ts, 328.0 + r * ts)
+				spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				parent.add_child(spr)
+		# Stone cliff face row at y=648 (south end only — perspective lock)
+		for c in 2:
+			var col_k: int = 5 if c == 0 else 7
+			var tile := AtlasTexture.new()
+			tile.atlas = tm
+			tile.region = Rect2(col_k * 64, 4 * 64, 64, 64)
+			var spr := Sprite2D.new()
+			spr.texture = tile
+			spr.centered = false
+			spr.position = Vector2(x0 + c * ts, 648.0)
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			parent.add_child(spr)
 
 
 ## Integrated castle cliff base (design/arena_target.png; CASTLE-CLIFF 2026-07-14).
@@ -387,46 +457,53 @@ static func setup_decorations(arena) -> void:
 			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			deco_layer.add_child(spr)
 
-	# --- Trees: LAYOUT TREES_L = [(110,428,3),(110,580,2)], 4-way mirrored ---
-	var tree_sheets: Array[Texture2D] = []
-	for i in range(1, 5):
-		var path: String = deco_base + "Resources/Tree%d.png" % i
-		if ResourceLoader.exists(path):
-			tree_sheets.append(load(path))
-	if not tree_sheets.is_empty():
-		for cl in [[128.0, 428.0, 3], [128.0, 580.0, 2]]:
-			for k in int(cl[2]):
-				var sheet: Texture2D = tree_sheets[k % tree_sheets.size()]
-				var fh: int = int(sheet.get_height())
-				# Tree strips are 8 frames of 192px WIDTH (Tree1/2 are 192x256,
-				# NON-square) — the old square fh-wide crop bled a sliver of the
-				# next frame in: the "floating fir fragments" bug (2026-07-10).
-				var fw: int = sheet.get_width() / 8
-				var at := AtlasTexture.new()
-				at.atlas = sheet
-				at.region = Rect2(0, 0, fw, fh)
-				var dx: float = (k - cl[2] / 2.0) * 26.0 + 13.0
-				var dy: float = (k % 2) * 26.0
-				for pos in all4.call(cl[0] + dx, cl[1] + dy):
-					var spr := Sprite2D.new()
-					spr.texture = at
-					spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-					spr.scale = Vector2(0.52, 0.52)
-					spr.position = pos
-					spr.offset = Vector2(0, -fh * 0.5)  # ground-anchored, sways from base
-					deco_layer.add_child(spr)
-					var sway := spr.create_tween().set_loops()
-					var sdur: float = rng.randf_range(2.6, 3.8)
-					var samp: float = deg_to_rad(rng.randf_range(1.5, 3.0))
-					sway.tween_interval(rng.randf_range(0.0, sdur))
-					sway.tween_property(spr, "rotation", samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-					sway.tween_property(spr, "rotation", -samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	# --- Trees: 3.3b LAYOUT TREES_L (cx, gy, sheet 1-4, scale), 4-way mirrored.
+	# Plateau-top firs live in the shelf's SELF-MIRRORING grass zone y∈[392,648]
+	# (their y-mirrors land on the same shelf); (112,520) sits on the pivot and
+	# mirrors onto itself. 1/2 = fir, 3 = autumn (flat corner by the house). ---
+	for tl in [[98.0, 442.0, 1, 0.60], [150.0, 488.0, 2, 0.52],
+			[146.0, 432.0, 1, 0.50], [112.0, 520.0, 2, 0.62],
+			[102.0, 234.0, 3, 0.50]]:
+		var path: String = deco_base + "Resources/Tree%d.png" % int(tl[2])
+		if not ResourceLoader.exists(path):
+			continue
+		var sheet: Texture2D = load(path)
+		var fh: int = int(sheet.get_height())
+		# Tree strips are 8 frames of 192px WIDTH (Tree1/2 are 192x256,
+		# NON-square) — the old square fh-wide crop bled a sliver of the
+		# next frame in: the "floating fir fragments" bug (2026-07-10).
+		var fw: int = sheet.get_width() / 8
+		var at := AtlasTexture.new()
+		at.atlas = sheet
+		at.region = Rect2(0, 0, fw, fh)
+		var pivot_self: bool = absf(tl[1] - arena.FLIP_PIVOT_Y) < 0.01
+		var positions: Array = all4.call(tl[0], tl[1])
+		if pivot_self:  # gy==pivot: y-mirror duplicates exactly — keep L/R only
+			positions = [positions[0], positions[1]]
+		for pos in positions:
+			var spr := Sprite2D.new()
+			spr.texture = at
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			spr.scale = Vector2(tl[3], tl[3])
+			spr.position = pos
+			spr.offset = Vector2(0, -fh * 0.5)  # ground-anchored, sways from base
+			deco_layer.add_child(spr)
+			var sway := spr.create_tween().set_loops()
+			var sdur: float = rng.randf_range(2.6, 3.8)
+			var samp: float = deg_to_rad(rng.randf_range(1.5, 3.0))
+			sway.tween_interval(rng.randf_range(0.0, sdur))
+			sway.tween_property(spr, "rotation", samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+			sway.tween_property(spr, "rotation", -samp, sdur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-	# --- Bushes: LAYOUT BUSH_L = [(170,250)], 4-way ---
-	var bush_path: String = deco_base + "Decorations/Bushe1.png"
-	if ResourceLoader.exists(bush_path):
+	# --- Bushes + twiggy shrubs: LAYOUT BUSH_L = [(170,250,1)] +
+	# SHRUB_L = [(226,408,3),(232,588,4)] (Bushe3/4 sprigs at the column
+	# margin, v2's field shrubs), 4-way ---
+	for bl in [[170.0, 250.0, 1], [226.0, 408.0, 3], [232.0, 588.0, 4]]:
+		var bush_path: String = deco_base + "Decorations/Bushe%d.png" % int(bl[2])
+		if not ResourceLoader.exists(bush_path):
+			continue
 		var bsheet: Texture2D = load(bush_path)
-		for pos in all4.call(170.0, 250.0):
+		for pos in all4.call(bl[0], bl[1]):
 			var spr := Sprite2D.new()
 			spr.texture = _extract_sprite_frame(bsheet, 0)
 			spr.position = pos
@@ -442,10 +519,14 @@ static func setup_decorations(arena) -> void:
 			sway_tw.tween_property(spr, "rotation", sway_amp, sway_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 			sway_tw.tween_property(spr, "rotation", -sway_amp, sway_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-	# --- Midfield rock accents: POINT-mirrored pair (340,508)/(380,532) ---
-	var rock_path: String = deco_base + "Decorations/Rock1.png"
-	if ResourceLoader.exists(rock_path):
-		for pos in [Vector2(340, 508), Vector2(380, 532)]:
+	# --- Midfield rock accents: LAYOUT ROCKS_MID = [(340,508,Rock1),(288,438,Rock2)],
+	# POINT-mirrored (authored + 180° twins) ---
+	for rl in [[340.0, 508.0, 1], [288.0, 438.0, 2]]:
+		var rock_path: String = deco_base + "Decorations/Rock%d.png" % int(rl[2])
+		if not ResourceLoader.exists(rock_path):
+			continue
+		for pos in [Vector2(rl[0], rl[1]),
+				Vector2(720.0 - rl[0], 2.0 * arena.FLIP_PIVOT_Y - rl[1])]:
 			var spr := Sprite2D.new()
 			spr.texture = load(rock_path)
 			spr.position = pos
@@ -453,8 +534,25 @@ static func setup_decorations(arena) -> void:
 			spr.scale = Vector2(0.4, 0.4)
 			deco_layer.add_child(spr)
 
-	# --- Water rocks: LAYOUT WROCK_L = [(40,300,1),(34,470,3)], 4-way, bob ---
-	for wr in [[40.0, 300.0, 1], [34.0, 470.0, 3]]:
+	# --- Stumps + wood piles: LAYOUT STUMP_L = [(182,306,1)], WOOD_L = [(188,334)]
+	# (the corner "logging camp"), 4-way ---
+	for sl2 in [["Resources/Stump 1.png", 182.0, 306.0, 0.5],
+			["Resources/Wood Resource.png", 188.0, 334.0, 0.55]]:
+		var prop_path: String = deco_base + str(sl2[0])
+		if not ResourceLoader.exists(prop_path):
+			continue
+		var ptex: Texture2D = load(prop_path)
+		for pos in all4.call(sl2[1], sl2[2]):
+			var spr := Sprite2D.new()
+			spr.texture = ptex
+			spr.position = pos
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			spr.scale = Vector2(sl2[3], sl2[3])
+			deco_layer.add_child(spr)
+
+	# --- Water rocks: LAYOUT WROCK_L = [(40,300,1),(34,470,3),(38,168,2),
+	# (36,640,4)] (3.3b: grew to 4 authored spots → 16 mirrored), 4-way, bob ---
+	for wr in [[40.0, 300.0, 1], [34.0, 470.0, 3], [38.0, 168.0, 2], [36.0, 640.0, 4]]:
 		var path: String = deco_base + "Decorations/Water Rocks_%02d.png" % int(wr[2])
 		if not ResourceLoader.exists(path):
 			continue
@@ -474,21 +572,27 @@ static func setup_decorations(arena) -> void:
 			bob_tw.tween_property(spr, "position:y", pos.y + bob_amp, bob_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 			bob_tw.tween_property(spr, "position:y", pos.y - bob_amp, bob_dur * 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-	# --- Gold: LAYOUT GOLD_L = [(188,505)], 3 nuggets, 4-way ---
-	for k in 3:
-		var gold_path: String = deco_base + "Resources/Gold Stone %d.png" % ((k % 6) + 1)
+	# --- Gold: 3.3b LAYOUT GOLD_BIG (v2's midfield treasure) — POINT-mirrored
+	# (cx, gy, kind): Gold_Resource chunks @0.85 + Gold Stone 2 nuggets @0.55
+	# read as one centered cluster. ---
+	for gl in [[340.0, 500.0, true], [384.0, 478.0, true],
+			[310.0, 532.0, false], [368.0, 540.0, false]]:
+		var gold_path: String = deco_base + ("Resources/Gold_Resource.png" if gl[2] else "Resources/Gold Stone 2.png")
 		if not ResourceLoader.exists(gold_path):
 			continue
 		var gtex: Texture2D = load(gold_path)
-		for pos in all4.call(188.0 + (k - 1) * 30.0, 505.0 + (k % 2) * 14.0):
+		var gsc: float = 0.85 if gl[2] else 0.55
+		for pos in [Vector2(gl[0], gl[1]),
+				Vector2(720.0 - gl[0], 2.0 * arena.FLIP_PIVOT_Y - gl[1])]:
 			var spr := Sprite2D.new()
 			spr.texture = gtex
 			spr.position = pos
 			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			spr.scale = Vector2(0.55, 0.55)
+			spr.scale = Vector2(gsc, gsc)
 			deco_layer.add_child(spr)
 
-	# --- Sheep: LAYOUT SHEEP_L = [(190,350),(190,620)], 4-way, ground-anchored ---
+	# --- Sheep: LAYOUT SHEEP_L = [(176,414),(238,538)] (shelf + field pair),
+	# 4-way, ground-anchored ---
 	var sheep_tex = load(deco_base + "Resources/Sheep_Grass.png")
 	if sheep_tex:
 		var sheep_sf := SpriteFrames.new()
@@ -504,7 +608,7 @@ static func setup_decorations(arena) -> void:
 			atlas.atlas = sheep_tex
 			atlas.region = Rect2(si * sh_fh, 0, sh_fh, sh_fh)
 			sheep_sf.add_frame(&"graze", atlas)
-		for sl in [[190.0, 350.0], [190.0, 620.0]]:
+		for sl in [[176.0, 414.0], [238.0, 538.0]]:
 			for pos in all4.call(sl[0], sl[1]):
 				var sheep := AnimatedSprite2D.new()
 				sheep.sprite_frames = sheep_sf
@@ -542,7 +646,11 @@ static func setup_decorations(arena) -> void:
 			duck_sf.add_frame(&"swim", atlas)
 		var duck := AnimatedSprite2D.new()
 		duck.sprite_frames = duck_sf
-		duck.position = Vector2(36, rng.randf_range(430, 560))
+		# Fixed spot (was rng 430..560): the rng-drawn y shifted whenever a
+		# decoration was added upstream and could park the duck's yellow-green
+		# shading inside the floating-foliage scan band (flaked 2026-07-17).
+		# The detector exempts the drift envelope around design (36,500).
+		duck.position = Vector2(36, 500)
 		duck.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		duck.scale = Vector2(0.6, 0.6)
 		duck.play(&"swim")

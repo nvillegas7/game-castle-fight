@@ -285,3 +285,20 @@ verbatim" put the cliff 20px too low.
   build, a thin RED margin. Moving it a few px lower (clear of the foundation) gave a pure-
   grass 0-px baseline vs 760-px cliff — a real RED→GREEN. Get the no-cliff baseline by
   `git stash push -- <the one render file>` → capture, then pop → capture.
+
+---
+
+## Lesson (2026-07-17) — Two rules from 3.3b (side plateaus + worn path)
+
+1. **Pivot-straddling structures: mirrored decorations only in the SELF-MIRRORING
+   sub-zone.** A side plateau spanning y=[328,712] self-mirrors about the pivot as a
+   REGION, but its grass zone [328,648] maps to [392,712] — the south 64px of the image
+   is the stone face. A sheep authored at gy=352 put its y-mirror ON the cliff. Rule:
+   decorations on such a structure must sit in the intersection zone (here y∈[392,648]);
+   an item authored AT the pivot mirrors onto itself (dedupe it in the GAME port, or two
+   out-of-phase sway tweens ghost-double the sprite).
+2. **Never rng-position a visual that a pixel detector can see.** The rubber duck's
+   `rng.randf_range(430,560)` y meant ANY upstream decoration edit reshuffled the rng
+   sequence and could park the duck's yellow-green shading inside the floating-foliage
+   scan band (it did). Pin easter-egg/ambient positions to constants and exempt their
+   full drift ENVELOPE (tween min..max, not the spawn point) in the detector.

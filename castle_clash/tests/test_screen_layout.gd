@@ -77,6 +77,11 @@ func _init() -> void:
 	_check_arena_fortress_towers()        # decorative towers flank each castle
 	_check_arena_coastline_platform()     # platform edge at design x=72
 	_check_arena_no_floating_foliage()    # no cropped/floating tree art in water
+	# 3.3b terrain overhaul suite (2026-07-17) — approved arena_target.png rev B:
+	# side plateaus + worn center path + big central gold (density parity vs v2).
+	_check_arena_side_plateaus()          # elevated shelves' stone faces, both sides
+	_check_arena_worn_path()              # color4 worn-grass lane down the combat zone
+	_check_arena_central_gold()           # chunky gold cluster at field center
 	# Screen-parity P1 + HUD-alignment (2026-07-11). Pixel + static detectors.
 	# (HUD realigned to design/references/hud_target.png: transparent strip, yellow gold
 	# ribbon w/ no fill, cream cards + slate locked — several P1 detectors re-targeted.)
@@ -894,11 +899,11 @@ func _check_arena_coastline_platform() -> void:
 	var img := _load_capture(ARENA_CAPTURE)
 	if img == null:
 		return
-	# Rows chosen CLEAR of the left tree clusters (design y≈360-470/520-660,
-	# whose teal-green pine foliage fails the grass test and overhangs the coast)
-	# and of the fortress wall/houses: design y = 243, 700, 900.
+	# Rows chosen CLEAR of the left tree clusters, of the fortress wall/houses,
+	# AND (3.3b) of the side plateau (design y[328,712], whose coast edge is
+	# elevation stone, not grass): design y = 243, 750, 900.
 	var edges: Array = []
-	for y in [170, 490, 630]:
+	for y in [170, 525, 630]:
 		var first_green: int = -1
 		for x in range(0, 200):
 			if _arena_is_green(img.get_pixel(x, y)):
@@ -927,11 +932,17 @@ func _check_arena_no_floating_foliage() -> void:
 	if img == null:
 		return
 	# Intentional water decor is exempt: LAYOUT water-rock spots (mossy green
-	# tops read as "foliage"). Capture-space centers of the 8 mirrored rocks.
+	# tops read as "foliage"). Capture-space centers of the 16 mirrored rocks
+	# (3.3b: WROCK_L grew to 4 authored spots → 16 after 4-way mirroring).
 	var wrock_boxes: Array = []
 	for d in [[28, 210], [24, 329], [476, 210], [480, 329],
-			[28, 518], [24, 399], [476, 518], [480, 399]]:
+			[28, 518], [24, 399], [476, 518], [480, 399],
+			[27, 118], [477, 118], [27, 610], [477, 610],
+			[25, 448], [479, 448], [25, 280], [479, 280]]:
 		wrock_boxes.append(Rect2i(d[0] - 14, d[1] - 14, 28, 28))
+	# Rubber-duck easter egg: pinned at design (36,500), drifts x+8/bob y±4 —
+	# its yellow-green shading reads as "foliage". Exempt the drift envelope.
+	wrock_boxes.append(Rect2i(9, 334, 32, 32))
 	var bad_l: int = 0
 	var bad_r: int = 0
 	var worst := ""
@@ -956,6 +967,97 @@ func _in_any_box(boxes: Array, x: int, y: int) -> bool:
 		if b.has_point(Vector2i(x, y)):
 			return true
 	return false
+
+
+## Plateau/cliff STONE, tuned on Tilemap_color1 tile (5..7,4) texels at capture
+## scale (2026-07-17): blue-gray-teal where b>r clearly, NOT saturated water teal
+## (g<1.6r kills (71,171,169)) and NOT grass/worn (b>r+8 kills both greens).
+## Measured hit-rates: stone 0.79, grass 0.00, worn-path 0.00, water 0.00.
+## (Separate from _arena_is_stone, which the castle-cliff detector is calibrated on.)
+func _arena_is_plateau_stone(c: Color) -> bool:
+	var avg: float = (c.r + c.g + c.b) / 3.0
+	return c.b >= c.g - 0.024 and c.b > c.r + 0.031 and avg > 0.274 and avg < 0.804 \
+		and c.g >= c.r and absf(c.g - c.b) < 0.157 and c.g < c.r * 1.6
+
+
+## 3.3b: side plateaus (approved arena_target.png rev B) — an elevated shelf per
+## side band (design x[72,200]/[520,648], grass y[328,648], stone face y[648,712])
+## frames the combat zone. The mirrored corner tower (design x 95..185) occludes
+## the face's middle, so we sample the four tower-free FLANKS of the two stone
+## bands: cap x [50,67]+[129,141] (left) and [363,375]+[437,454] (right), y[458,494].
+## Calibrated 2026-07-17 on the 0.7x-scaled target vs the pre-port capture:
+## target total=1072 (per-window 376/154/151/391), pre-port build=172 (51/33/33/55).
+func _check_arena_side_plateaus() -> void:
+	print("[Arena side plateaus (3.3b terrain)]")
+	var img := _load_capture(ARENA_CAPTURE)
+	if img == null:
+		return
+	var wins := [Vector2i(50, 67), Vector2i(129, 141), Vector2i(363, 375), Vector2i(437, 454)]
+	var parts: Array = []
+	var total: int = 0
+	for w in wins:
+		var n: int = 0
+		for y in range(458, 494):
+			for x in range(w.x, w.y):
+				if _arena_is_plateau_stone(img.get_pixel(x, y)):
+					n += 1
+		parts.append(n)
+		total += n
+	# Bar: total ≥550 AND both outer flanks ≥150 — clean separation from the
+	# 172-total / 51-55-outer pre-port baseline, with margin under the 1072 target.
+	if total >= 550 and int(parts[0]) >= 150 and int(parts[3]) >= 150:
+		_assert_pass("side plateau stone faces present (stone px %s total=%d)" % [str(parts), total])
+	else:
+		_assert_fail("side plateaus missing — stone px %s total=%d (need ≥550, outers ≥150)" % [str(parts), total],
+			"elevated shelf stone faces at design y[648,712] x[72,200]/[520,648] per arena_target.png")
+
+
+## 3.3b: worn-grass lane (approved rev B) — a contiguous Tilemap_color4 patch at
+## design x[296,424] y[360,680]. Olive is separable from color1 grass: g-r in
+## (5,34) vs grass's ~30+ at higher g, b<r. Measured olive-fraction in the cap
+## window x[217,287] y[280,448]: target 0.92, color1 grass 0.00, pre-port capture
+## 0.0004. Units mid-match can occlude some of the window — bar set at 0.45.
+func _check_arena_worn_path() -> void:
+	print("[Arena worn lane path (3.3b terrain)]")
+	var img := _load_capture(ARENA_CAPTURE)
+	if img == null:
+		return
+	var n: int = 0
+	var area: int = 0
+	for y in range(280, 448):
+		for x in range(217, 287):
+			area += 1
+			var c: Color = img.get_pixel(x, y)
+			var d_gr: float = c.g - c.r
+			if d_gr > 0.02 and d_gr < 0.133 and c.g > 0.431 and c.g < 0.725 and c.b < c.r:
+				n += 1
+	var frac: float = float(n) / float(area)
+	if frac >= 0.45:
+		_assert_pass("worn lane path present (olive fraction %.2f in center window)" % frac)
+	else:
+		_assert_fail("worn lane path missing — olive fraction %.2f (need ≥0.45)" % frac,
+			"color4 patch at design x[296,424] y[360,680] per arena_target.png rev B")
+
+
+## 3.3b: central gold cluster (approved rev B) — Gold_Resource chunks + nuggets
+## around the pivot (design x[300,420] y[450,590] → cap x[210,294] y[315,413]).
+## Bright gold (r>200,g>150,b<110 at 8-bit): target=515 px, pre-port capture=0.
+func _check_arena_central_gold() -> void:
+	print("[Arena central gold cluster (3.3b terrain)]")
+	var img := _load_capture(ARENA_CAPTURE)
+	if img == null:
+		return
+	var n: int = 0
+	for y in range(315, 413):
+		for x in range(210, 294):
+			var c: Color = img.get_pixel(x, y)
+			if c.r > 0.784 and c.g > 0.588 and c.b < 0.431:
+				n += 1
+	if n >= 150:
+		_assert_pass("central gold cluster present (%d gold px)" % n)
+	else:
+		_assert_fail("central gold cluster missing — %d gold px (need ≥150)" % n,
+			"Gold_Resource cluster at design (340,500)/(384,478)+mirrors per arena_target.png")
 
 
 # --- Pixel-detector helpers ---

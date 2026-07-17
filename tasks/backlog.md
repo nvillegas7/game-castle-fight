@@ -68,10 +68,8 @@ before the fix, or the passing criterion.
 
 | ID | Item | Domain | Phase | Detector / Acceptance |
 |----|------|--------|-------|-----------------------|
-| BUG-32 | Roof icon decorations barely visible on upgraded buildings (3-5px on screen) | A2 | 3 | HIGH; double icon sizes / add outline; detector TBD |
 | BUG-50 | Red-castle placement: building visual and gray "occupied" tiles at different coords | A5+A2 | 1A | HIGH; needs place-in-red-zone capture detector + sim assert |
 | BUG-40 | Walk animation cadence vs move speed (PENDING LIVE PLAYTEST) | A2 | 1C | HIGH; overlaps 1C-1; needs human eyes on windowed game |
-| BUG-43 | Loading bar renders as 3 detached wood planks at 720×1280 (RE-OPENED) | A2 | 3 | HIGH; `_check_progress_bar_pixel_continuity` needs resolution-aware calibration |
 | BUG-47 | Main-menu tree foliage z-clips church/cottage spire | A2 | 3 | MEDIUM; `_check_tree_spire_zindex` currently FAILS |
 | BUG-49 | Main-menu ribbon/flag decorations clipped at screen edges | A2 | 3 | LOW; `_check_ribbon_edge_clipping` currently FAILS |
 | BUG-34 | Radial menu dismiss races with button click (can't sell/inspect in MP) | A2 | 1A | MEDIUM; overlaps 1A-4; kill deferred double-dismiss |

@@ -14,6 +14,7 @@ var _out_dir: String = ""
 var _match_started: bool = false
 var _build_timer: float = 0.0
 var _builds_done: int = 0
+var _gold_boosted: bool = false  # one-time test-gold boost (BUG-32 detector support)
 var _end_screen_captured: bool = false
 # Artifact integrity tracking — a 0-capture or save-failed run must exit non-zero.
 var _captured: Array[String] = []
@@ -128,14 +129,23 @@ func _auto_build() -> void:
 	var pi: int = sim.get_player_index(GameManager.local_player_id)
 	if pi == -1:
 		return
+	# BUG-32 detector support: boost test gold once so the roof-icon building
+	# (gryphon_roost, 130g, requires archer_range) lands within the capture
+	# window — offline capture run, no lockstep peer, so a direct sim write is
+	# safe. Without the boost the prereq/gold chain never completes in ~36s.
+	if not _gold_boosted:
+		_gold_boosted = true
+		sim.players[pi].gold = FP.from_int(600)
 	var gold: int = GameManager.get_player_gold(GameManager.local_player_id)
 	var faction: FactionData = GameManager.get_player_faction(GameManager.local_player_id)
 	if faction == null:
 		return
 
-	# Build order: combat first, then variety
+	# Build order: combat first, then variety. gryphon_roost right after its
+	# prereq so its WING roof icon is in every later game_0NN capture (BUG-32
+	# pixel detector reads it via game_state.json grid coords).
 	var build_order := [&"barracks", &"barracks", &"archer_range",
-		&"gold_mine", &"guard_tower", &"knight_hall", &"siege_workshop"]
+		&"gryphon_roost", &"gold_mine", &"guard_tower", &"knight_hall", &"siege_workshop"]
 	var target_type: StringName = build_order[mini(_builds_done, build_order.size() - 1)]
 
 	# Find the building data
@@ -258,6 +268,9 @@ func _dump_game_state() -> void:
 			state.buildings.append({
 				"id": e.id, "type": e.building_type, "team": e.team,
 				"hp": FP.to_int(e.hp),
+				# Grid coords let pixel detectors locate the building in the
+				# capture (BUG-32 roof-icon visibility).
+				"grid_x": e.get("grid_x", -1), "grid_y": e.get("grid_y", -1),
 			})
 	var json := JSON.stringify(state, "  ")
 	var f := FileAccess.open(_out_dir + "/game_state.json", FileAccess.WRITE)

@@ -55,36 +55,55 @@ func setup(p_team: int, p_building_type: StringName, p_tier: int, p_name: String
 
 	add_child(_sprite)
 
-	# Add roof icon overlay to distinguish upgraded buildings from their base
+	# Add roof icon overlay to distinguish upgraded buildings from their base.
+	# BUG-32 (2026-07-17): the old 18-26px targets rendered 3-5px on screen —
+	# user-confirmed invisible. Sizes DOUBLED and a dark backing silhouette
+	# (same texture, near-black, 1.12x) added behind the icon so it reads
+	# against any roof color. Detector: _check_roof_icon_visibility.
 	var icon_name: StringName = ROOF_ICONS.get(building_type, &"")
 	if icon_name != &"":
 		var icon_tex: Texture2D = SpriteRegistry.get_ui_texture(icon_name)
 		if icon_tex:
+			# Per-icon sizing and positioning on the roof
+			var icon_px: float
+			var icon_pos: Vector2
+			var icon_rot: float = 0.0
+			match icon_name:
+				&"wing_icon":
+					# Angel wings on the roof peak of Archery building
+					icon_px = 44.0
+					icon_pos = Vector2(0, -height * 0.30)
+				&"bolt_icon":
+					# Ballista bolt angled across the roof of House1 workshop
+					icon_px = 52.0
+					icon_pos = Vector2(2, -height * 0.26)
+					icon_rot = -30.0
+				&"horse_icon":
+					# Horse head on the roof of Barracks
+					icon_px = 36.0
+					icon_pos = Vector2(0, -height * 0.33)
+			var icon_s: float = icon_px / icon_tex.get_width()
+
+			# Backing FIRST (behind): dark silhouette for contrast on busy roofs
+			var backing := Sprite2D.new()
+			backing.texture = icon_tex
+			backing.centered = true
+			backing.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			backing.modulate = Color(0.04, 0.06, 0.09, 0.9)
+			backing.scale = Vector2(icon_s, icon_s) * 1.12
+			backing.position = icon_pos
+			backing.rotation_degrees = icon_rot
+			backing.z_index = 1
+			add_child(backing)
+
 			_roof_icon = Sprite2D.new()
 			_roof_icon.texture = icon_tex
 			_roof_icon.centered = true
 			_roof_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			_roof_icon.z_index = 1
-
-			# Per-icon sizing and positioning on the roof
-			match icon_name:
-				&"wing_icon":
-					# Angel wings on the roof peak of Archery building
-					var icon_s: float = 22.0 / icon_tex.get_width()
-					_roof_icon.scale = Vector2(icon_s, icon_s)
-					_roof_icon.position = Vector2(0, -height * 0.30)
-				&"bolt_icon":
-					# Ballista bolt angled across the roof of House1 workshop
-					var icon_s: float = 26.0 / icon_tex.get_width()
-					_roof_icon.scale = Vector2(icon_s, icon_s)
-					_roof_icon.position = Vector2(2, -height * 0.26)
-					_roof_icon.rotation_degrees = -30.0
-				&"horse_icon":
-					# Horse head on the roof of Barracks
-					var icon_s: float = 18.0 / icon_tex.get_width()
-					_roof_icon.scale = Vector2(icon_s, icon_s)
-					_roof_icon.position = Vector2(0, -height * 0.33)
-
+			_roof_icon.z_index = 2
+			_roof_icon.scale = Vector2(icon_s, icon_s)
+			_roof_icon.position = icon_pos
+			_roof_icon.rotation_degrees = icon_rot
 			add_child(_roof_icon)
 
 	queue_redraw()

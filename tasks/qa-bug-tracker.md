@@ -113,7 +113,14 @@ Root cause was in commit 9505d07: attack range used Y-only distance instead of f
 - **Fix**: Hide stats when h<110, or compute info_y with minimum spacing from type text.
 
 ### BUG-32: Roof icon decorations barely visible on upgraded buildings
-- **Status**: OPEN — Owner: A2
+- **Status**: FIXED + VERIFIED 2026-07-17 — icon targets doubled (wing 22→44,
+  bolt 26→52, horse 18→36) + near-black backing silhouette (1.12x) behind each
+  icon for contrast (`sprite_building_visual.gd`). **Detector**:
+  `_check_roof_icon_visibility` (autotest now places a gryphon_roost via gold
+  boost; locates it from game_state.json grid coords, unflipped player-0
+  mapping). Controlled git-stash baseline: pre-fix 16 pale px → post-fix 60
+  (bar 30). 4x crop shows readable wings. Feel sign-off on the deployed build
+  is Neil's; escalation path if still weak = banner/flag overlay (below).
 - **Severity**: HIGH (gameplay clarity)
 - **File**: `scripts/game/sprite_building_visual.gd:70-87`
 - **Root cause**: ROOF_ICONS use tiny pixel sizes: wing_icon=22px, bolt_icon=26px, horse_icon=18px. Buildings render at ~60x60px in battle. At that scale, icons are 3-5 pixels on screen — invisible to players. User confirmed: "the wings and the arrow on the roof and others are barely visible."
@@ -249,8 +256,18 @@ Root cause was in commit 9505d07: attack range used Y-only distance instead of f
 - **Acceptance**: Place a building in red zone via autotest, then capture the screen — gray occupied tiles must overlap the building footprint exactly (not appear at a different (row,col) offset).
 
 ### BUG-43: Loading screen progress bar — 3 detached wood plank elements lined up at same Y
-- **Status**: **RE-OPENED** by A4 (2026-04-18 17:09) — user playtest confirms the bar STILL shows 3 broken segments at 720×1280 mobile resolution. My earlier "VERIFIED" verdict was based on a wrong-coordinate crop (y=580 hit tree area, not the bar at y=900). New evidence `/tmp/castle_clash_test/loading_bar_actual.png` (crop=500×80@110,890 ×4 zoom) clearly shows: (1) left wood end-cap with red fill protruding, (2) DETACHED middle plank floating in mid-bar with no connection to either end, (3) right wood end-cap. The earlier StyleBox change either reverted, never took, or only fixed the NinePatch border lines (BUG-44) but left the 3-plank composition intact. Owner: A2 (visual re-fix), A4 (test enhancement)
-- **Detector**: `_check_progress_bar_pixel_continuity` in `tests/test_screen_layout.gd` — at 504×896 desktop preview the bar PASSES (1 wood run); at 720×1280 native the bug returns. NEEDS resolution-aware calibration before this detector is trusted.
+- **Status**: CLOSED 2026-07-17 — two separate defects unwound: (1) the ART was
+  already fixed by the round-4 cap+tiled-rivet rebuild
+  (`_build_wooden_progress_bar`, bar_y=990), which POSTDATES the 2026-04-18
+  re-open evidence; verified at BOTH resolutions (godot --resolution 720x1280
+  -- --autotest-loading → 4x crop shows one continuous bar; detector runs=1
+  main=259px native / 181px @504x896). (2) the DETECTOR was a vacuous green —
+  it sampled y=648, 43px above the rebuilt bar, found 0 wood runs and passed
+  that as "continuous". Recalibrated resolution-aware (rows from design
+  y 1024-1034 × h/1280), 0 runs = FAIL, three trough rows must each be one
+  ≥75%-width run; wood|fill|shine all classed as bar content (the shine sweep
+  carved false gaps).
+- **Detector**: `_check_progress_bar_pixel_continuity` — recalibrated 2026-07-17, trusted at 504×896 and 720×1280.
 - **Severity**: HIGH (visual — broken polish, makes T-098 work look unfinished)
 - **File**: `scripts/ui/loading_screen.gd` (progress bar construction lines 113-185)
 - **Evidence**: `/tmp/castle_clash_test/loading_000.png` (autotest 2026-04-18) and `/tmp/loading_progress_zoom.png` (cropped 504×140 → upscaled). Three separate wood-plank rectangles visible at y≈630, NOT a single continuous progress bar:

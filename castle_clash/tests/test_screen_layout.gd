@@ -57,7 +57,8 @@ func _init() -> void:
 	_check_repeat_texture_load()
 	_check_locked_card_overlap_pattern()
 	_check_progress_bar_construction()
-	_check_progress_bar_pixel_continuity()  # BUG-43 RE-OPEN: pixel-level check
+	_check_progress_bar_pixel_continuity()  # BUG-43: recalibrated 2026-07-17, no vacuous pass
+	_check_roof_icon_visibility()           # BUG-32: upgraded-building roof icons readable
 	_check_tip_strip_construction()
 	# Phase-1 detector suite (BUG-46/47/48/49) — pixel-level, run on
 	# /tmp/castle_clash_test/menu_battle_000.png from latest --autotest run.
@@ -362,48 +363,139 @@ func _check_progress_bar_construction() -> void:
 
 ## BUG-43 RE-OPEN: pixel-continuity check on the loading bar.
 ## Loads `/tmp/castle_clash_test/loading_000.png` (last autotest capture, 504×896
-## desktop window override). Scans the bar centerline and counts horizontal
-## "wood" runs separated by "green background" gaps. A continuous trough = exactly
-## 1 wood run. 3 detached planks = 3+ runs. Coordinates calibrated 2026-04-18:
-## bar Y-band y≈624-688, centerline ~y=648, bar interior x≈90..414.
+## BUG-43: the loading bar must read as ONE continuous piece, not detached planks.
+## RECALIBRATED 2026-07-17 — the previous version sampled y=648 (43px ABOVE the
+## bar, which lives at design y=990..1062 per loading_screen.gd bar_y=990/h=72),
+## found ZERO wood runs and passed that as "continuous": a vacuous green
+## (lessons.md "silent green" class). Now resolution-aware (works at 504x896 and
+## 720x1280) and ZERO runs = FAIL, never a pass. Calibrated by scanning the real
+## 504x896 capture: trough rows 715-725 give one wood|fill run x=162..344
+## (~182px vs 188 expected). Bar CONTENT = wood frame | red fill | bright shine
+## (the sweep can carve a >8px near-white gap in the fill mid-animation).
 func _check_progress_bar_pixel_continuity() -> void:
 	print("[Progress bar pixel continuity (BUG-43 pixel-level)]")
 	var img := _load_capture("loading_000.png")
 	if img == null:
 		return
-	# Bar centerline ~y=648 in 504×896 capture.
-	var y_sample: int = 648
-	var x_start: int = 90
-	var x_end: int = 414
-	var runs: Array = []  # list of {start, end}
-	var in_wood: bool = false
-	var run_start: int = -1
-	for x in range(x_start, x_end):
-		var c: Color = img.get_pixel(x, y_sample)
-		# Wood = brown-ish (R > G, dark to medium). Green bg = G > R.
-		var is_wood: bool = c.r > c.g and c.r > 0.25 and c.r < 0.75 and c.b < 0.5
-		if is_wood and not in_wood:
-			in_wood = true
-			run_start = x
-		elif not is_wood and in_wood:
-			in_wood = false
-			runs.append({"start": run_start, "end": x - 1})
-	if in_wood:
-		runs.append({"start": run_start, "end": x_end - 1})
-	# Coalesce runs separated by < 8px (anti-alias artifacts only)
-	var merged: Array = []
-	for r in runs:
-		if merged.size() > 0 and r.start - merged[-1].end < 8:
-			merged[-1].end = r.end
-		else:
-			merged.append({"start": r.start, "end": r.end})
-	if merged.size() <= 1:
-		_assert_pass("loading bar trough is one continuous wood run (%d run found)" % merged.size())
+	var w: int = img.get_width()
+	var h: int = img.get_height()
+	var sx: float = w / 720.0
+	var expected_w: int = roundi(269.0 * sx)  # design bar_w = 269
+	var min_w: int = int(expected_w * 0.75)
+	var x_start: int = roundi(160.0 * sx)
+	var x_end: int = roundi(560.0 * sx)
+	var bad_rows: int = 0
+	var row_reports: Array = []
+	# Trough-band rows, clear of the fill's dark top seam (design ~1018-1022
+	# scans as outline, not content — measured on the 504x896 capture).
+	for y_design in [1024.0, 1029.0, 1034.0]:
+		var y_sample: int = roundi(y_design * h / 1280.0)
+		var runs: Array = []
+		var in_bar: bool = false
+		var run_start: int = -1
+		for x in range(x_start, x_end):
+			var c: Color = img.get_pixel(x, y_sample)
+			var is_wood: bool = c.r > c.g and c.r > 0.25 and c.r < 0.75 and c.b < 0.5
+			var is_fill: bool = c.r > 0.59 and c.g < 0.39 and c.b < 0.39
+			# Shine sweep: bright + near-neutral (grass is green-dominant with
+			# channel spread > 0.25, so it stays background).
+			var spread: float = maxf(c.r, maxf(c.g, c.b)) - minf(c.r, minf(c.g, c.b))
+			var is_shine: bool = c.r > 0.6 and c.g > 0.5 and spread < 0.25
+			var is_content: bool = is_wood or is_fill or is_shine
+			if is_content and not in_bar:
+				in_bar = true
+				run_start = x
+			elif not is_content and in_bar:
+				in_bar = false
+				runs.append({"start": run_start, "end": x - 1})
+		if in_bar:
+			runs.append({"start": run_start, "end": x_end - 1})
+		# Coalesce runs separated by <8px (anti-alias artifacts only)
+		var merged: Array = []
+		for r in runs:
+			if merged.size() > 0 and r.start - merged[-1].end < 8:
+				merged[-1].end = r.end
+			else:
+				merged.append({"start": r.start, "end": r.end})
+		var main_w: int = 0
+		for m in merged:
+			main_w = maxi(main_w, m.end - m.start)
+		row_reports.append("y=%d runs=%d main=%dpx" % [y_sample, merged.size(), main_w])
+		if merged.size() != 1 or main_w < min_w:
+			bad_rows += 1
+			for i in merged.size():
+				_record("HIGH", "loading_000.png", y_sample,
+					"bar run #%d: x=%d..%d (width %d)" % [i + 1, merged[i].start, merged[i].end, merged[i].end - merged[i].start])
+	if bad_rows == 0:
+		_assert_pass("loading bar continuous at all 3 trough rows (%s; min %dpx)" % [", ".join(PackedStringArray(row_reports)), min_w])
 	else:
-		_assert_fail("loading bar has %d detached wood segments at y=%d (should be 1)" % [merged.size(), y_sample],
-			"BUG-43 RE-OPEN — middle plank floats between end caps")
-		for i in merged.size():
-			_record("HIGH", "loading_000.png", y_sample, "wood run #%d: x=%d..%d (width %d)" % [i + 1, merged[i].start, merged[i].end, merged[i].end - merged[i].start])
+		_assert_fail("loading bar broken or missing on %d/3 trough rows (%s)" % [bad_rows, ", ".join(PackedStringArray(row_reports))],
+			"BUG-43 — detached planks OR bar not at design y 1020-1034 (0 runs = stale calibration, not a pass)")
+
+
+## BUG-32: roof icons on upgraded buildings must be READABLE at game scale.
+## The autotest build order places a gryphon_roost (wing icon) and dumps its
+## grid coords to game_state.json; this detector converts grid→capture px.
+## Autotest runs OFFLINE and UNFLIPPED, so player-0 uses the direct mapping
+## x = 206 + gx*28, y = 695 + gy*28 (grid_to_screen's first branch — NOT the
+## T-085 flipped formula). Building 2x2 → center +28; icon at center
+## + (0, -height*0.30) = -15.6 (see sprite_building_visual.gd).
+## and counts icon-signature pixels in the icon window: pale-cyan wing art
+## (wing_icon.png opaque mean RGB ≈ (198,228,228)). The dark backing is NOT a
+## detector signal — the building's own outline pixels measure ~137 dark px
+## either way, so only the pale count discriminates. Calibrated 2026-07-17 on
+## game_010.png @504x896 via git-stash controlled baseline: pre-fix build =
+## 16 pale px (22px icon — the user's "barely visible" complaint), fixed
+## build (44px + dark backing) = 60. Bar at 30: two-sided margins 14/30.
+func _check_roof_icon_visibility() -> void:
+	print("[Roof icon visibility (BUG-32 pixel-level)]")
+	var img := _load_capture("game_010.png")
+	if img == null:
+		return
+	# Locate the roost from the state dump — placement can drift if the build
+	# order changes, so never hardcode the grid slot.
+	var state_path := _cap("game_state.json")
+	if not FileAccess.file_exists(state_path):
+		_assert_fail("game_state.json missing from capture run", "auto_screenshot dumps it at end of the game phase")
+		return
+	var state: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(state_path))
+	var roost: Dictionary = {}
+	for b in state.get("buildings", []):
+		if b.get("type", "") == "gryphon_roost" and int(b.get("team", -1)) == 0:
+			roost = b
+			break
+	if roost.is_empty():
+		_assert_fail("no player-0 gryphon_roost in the capture run",
+			"auto_screenshot build order must place one (BUG-32 detector support)")
+		return
+	var gx: int = int(roost.get("grid_x", -1))
+	var gy: int = int(roost.get("grid_y", -1))
+	if gx < 0 or gy < 0:
+		_assert_fail("gryphon_roost dumped without grid coords", "state dump must include grid_x/grid_y")
+		return
+	var sx: float = img.get_width() / 720.0
+	var sy: float = img.get_height() / 1280.0
+	# Building visual center (2x2 footprint, unflipped player-0 zone), icon
+	# 30% of height (52) above it → icon center ≈ center - 15.6 design px.
+	var cx: float = (206.0 + gx * 28.0 + 28.0) * sx
+	var cy: float = (695.0 + gy * 28.0 + 28.0 - 15.6) * sy
+	var half: int = roundi(24.0 * sx)  # window covers the 44px icon + backing rim
+	var pale: int = 0
+	var dark: int = 0
+	for y in range(int(cy) - half, int(cy) + half + 1):
+		for x in range(int(cx) - half, int(cx) + half + 1):
+			if x < 0 or y < 0 or x >= img.get_width() or y >= img.get_height():
+				continue
+			var c: Color = img.get_pixel(x, y)
+			if c.g > 0.78 and c.b > 0.78 and c.r < 0.88 and c.g > c.r:
+				pale += 1
+			elif (c.r + c.g + c.b) < 0.42:
+				dark += 1
+	if pale >= 30:
+		_assert_pass("roost wing icon readable (pale=%d px in icon window; dark=%d informational)" % [pale, dark])
+	else:
+		_assert_fail("roof icon invisible at game scale — pale=%d px (need ≥30; pre-fix baseline 16)" % pale,
+			"BUG-32 — icon target px too small (sprite_building_visual.gd)")
 
 
 ## Detects tip strip / NinePatch edge artifacts (BUG-44).

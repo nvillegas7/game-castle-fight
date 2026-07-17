@@ -207,8 +207,15 @@ Root cause was in commit 9505d07: attack range used Y-only distance instead of f
 - **Fix direction**: remove the X tween (or randomize X per-puff with stddev > 12px); each chimney's puff should rise straight up from its base position. Each chimney should be one TextureRect that animates its Y from chimney_y → chimney_y - 40 over a long period, not a row of puffs sharing X drift.
 
 ### BUG-47: Main menu — tree foliage z-clips through church/cottage spire (left side)
-- **Status**: OPEN — Owner: A2
-- **Detector**: `_check_tree_spire_zindex` in `tests/test_screen_layout.gd` — currently FAILS with 19 mixed Y-rows in left scenic strip
+- **Status**: CLOSED-OBSOLETE 2026-07-18 — the P2 menu redesign REMOVED all
+  scenic structures (current scenic = castle + tree groves; verified by capture
+  crop), so the artifact class has no subject matter. The quarantined detector
+  was false-positiving on the LOGO art at its stale coordinates; recalibration
+  attempts only found new false-positive classes (sky-grass gradient,
+  inter-tree gaps, birch trunks) and it was RETIRED (lessons.md 2026-07-18:
+  a detector with no true-positive class is negative value). If scenic
+  structures return, re-file with a detector calibrated against that layout.
+- **Detector**: retired (was `_check_tree_spire_zindex`)
 - **Severity**: MEDIUM (visual — user-flagged: "overlapping trees to buildings")
 - **File**: `scripts/ui/main_menu.gd` background scene composition: trees lines 682-705, buildings lines 665-680 (no `z_index` set on either)
 - **Root cause**: NEITHER tree NOR building sprites set `z_index`. They render in node-tree-add-order, which produces inconsistent layering (tree foliage cuts through cottage spire silhouette).
@@ -222,8 +229,14 @@ Root cause was in commit 9505d07: attack range used Y-only distance instead of f
 - **Fix direction**: Either remove the row entirely (it doesn't add value), reduce to 1-2 fences with variation in rotation/scale, or use a single wider "fence row" art asset rather than instancing 3 small ones.
 
 ### BUG-49: Main menu — partial ribbon/flag decorations clipped at screen edges
-- **Status**: OPEN — Owner: A2
-- **Detector**: `_check_ribbon_edge_clipping` in `tests/test_screen_layout.gd` — currently FAILS with 3 right-edge ribbon zones (y=400-560, 100-215 ribbon-px each)
+- **Status**: CLOSED 2026-07-18 — the floating ribbons were removed in the P2
+  redesign; the quarantined detector's 30 hits were all INTENDED full-bleed
+  composition (header bar, parallax clouds, edge groves, plateau — verified by
+  edge-strip crops; the approved v2/v3 references bleed at edges everywhere).
+  Detector recalibrated to the honest invariant — no saturated ribbon/banner
+  palette art (red/gold) clipped at an edge below the header band (y≥130) —
+  and UN-QUARANTINED, passing on real signal.
+- **Detector**: `_check_ribbon_edge_clipping` (recalibrated 2026-07-18, strict ribbon palette)
 - **Severity**: LOW (visual polish — user-flagged: "partial ribbons animated")
 - **File**: `scripts/ui/main_menu.gd::_add_castle_flags` lines 751-799 (T-099 flag wave work)
 - **Root cause**: flag anchors at Vector2(68, 220), Vector2(617, 190), Vector2(590, 620) place the rightmost flag's banner texture beyond the safe area; banner extends past viewport edge.
@@ -246,8 +259,18 @@ Root cause was in commit 9505d07: attack range used Y-only distance instead of f
 - **Acceptance**: After fix, `_check_non_battle_tab_scenic_bleed` PASSES (both edge bands < 150 scenic px). User-visible: tapping Army/Shop/Settings/Social produces a clean dark-brown content panel with NO trees, grass, buildings, or Battle-tab UI visible.
 
 ### BUG-50: Red castle building placement — building visual sits at one cell, gray "occupied" tiles render at a different coordinate
-- **Status**: OPEN — Owner: A5 (sim authoritative grid) + A2 (overlay rendering)
-- **Detector**: NOT YET WRITTEN — requires `auto_screenshot.gd` extension that places a building in the red zone before capturing, then a detector that checks gray-tile bounding box vs building visual bounding box. Tracked separately.
+- **Status**: FIXED + VERIFIED 2026-07-18 — root cause exactly as hypothesized
+  below: `building_grid._visual_row()` inverted rows for `player_index == 1`
+  UNCONDITIONALLY while the building visuals (`grid_to_screen`) invert only
+  when `view_flipped` — so in the offline (unflipped) view the enemy overlay
+  drew occupied tiles row-mirrored under correctly-placed buildings. Fix: a
+  `view_flipped` flag on building_grid (set by game_arena at match start and
+  in `_apply_perspective_flip`); `_visual_row`, the ghost row and the tap→sim
+  row now ALL key on it — one orientation source of truth.
+- **Detector**: `_check_occupancy_overlay_mapping` — headless layout-layer
+  invariant (PROCESS §5): overlay row set must equal the grid_to_screen row
+  band for every (player, flip, row, size). RED 36 mismatch cases pre-fix →
+  GREEN 0 post-fix.
 - **Severity**: HIGH (gameplay correctness — placing a building in red zone marks the WRONG cells as occupied, blocking subsequent placements at correct spots and freeing up cells under the visible building)
 - **User-reported (2026-04-18)**: "I do see a bug in red player castle, the building placed generates a gray, occupied tiles in another coordinates instead of under it"
 - **Likely root cause**: `building_grid.gd` overlay coordinates assume player-0 mirroring (top-down) but use the same row/col → screen translation for player-1 (red) zone. After T-085 perspective flip + T-096 5×2 footprint, the per-team `(row, col) → (screen_x, screen_y)` map probably wasn't updated for team 1, so the visual sprite renders at the FLIP_PIVOT_Y-mirrored position while the gray-tile occupancy mask still draws at the un-mirrored coordinate.

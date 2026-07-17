@@ -10,6 +10,10 @@ const GRID_ROWS: int = 10
 
 ## Which player this grid belongs to (set by parent).
 var player_index: int = 0
+## BUG-50: whether the arena view is Y-flipped (T-085 perspective flip). Set by
+## game_arena alongside player_index; row inversion follows THIS, not the
+## player index, so the overlay always agrees with grid_to_screen.
+var view_flipped: bool = false
 
 # Placement state
 var selected_building: BuildingData = null
@@ -55,11 +59,15 @@ func _draw_grid_lines() -> void:
 	draw_rect(Rect2(0, 0, w, h), border_col, false, 1.5)
 
 
-## T-085: Convert a sim grid row to a visual draw row (for 1-cell items).
-## Player 1's grid (player_index=1) is displayed in BuildZone0 (bottom of screen)
-## with rows inverted so castle (sim row 0) appears at the bottom.
+## T-085 / BUG-50: Convert a sim grid row to a visual draw row (per cell).
+## Rows invert iff the VIEW is flipped — matching game_arena.grid_to_screen,
+## which places the building visuals. The old `player_index == 1` condition
+## inverted the enemy overlay in the UNFLIPPED offline view too, drawing the
+## gray occupied tiles row-mirrored under correctly-placed buildings (the
+## user-reported BUG-50 mismatch). view_flipped is set by game_arena at match
+## start and in _apply_perspective_flip — one orientation source of truth.
 func _visual_row(row: int) -> int:
-	if player_index == 1:
+	if view_flipped:
 		return (GRID_ROWS - 1) - row
 	return row
 
@@ -95,11 +103,10 @@ func _draw_ghost() -> void:
 
 	# T-085: Ghost visual Y — convert sim row back to visual row.
 	# Must account for building height: visual = (GRID_ROWS - size_y) - sim_gy
+	# BUG-50: inversion follows view_flipped (one orientation source of truth).
 	var visual_gy: int = ghost_grid_pos.y
-	if GameManager.simulation:
-		var local_idx: int = GameManager.simulation.get_player_index(GameManager.local_player_id)
-		if local_idx == 1 and player_index == local_idx:
-			visual_gy = (GRID_ROWS - selected_building.grid_size.y) - ghost_grid_pos.y
+	if view_flipped:
+		visual_gy = (GRID_ROWS - selected_building.grid_size.y) - ghost_grid_pos.y
 	var rect := Rect2(
 		ghost_grid_pos.x * CELL_SIZE,
 		visual_gy * CELL_SIZE,
@@ -304,12 +311,12 @@ func _update_ghost_position(screen_pos: Vector2) -> void:
 	gx = clampi(gx, 0, GRID_COLS - selected_building.grid_size.x)
 	gy = clampi(gy, 0, GRID_ROWS - selected_building.grid_size.y)
 
-	# T-085: Invert grid Y for flipped player (player 2 in multiplayer).
+	# T-085: Invert grid Y for the flipped view (player 2 in multiplayer).
+	# BUG-50: keyed on view_flipped (identical today — flip ⇔ local is player 1 —
+	# but one source of truth keeps tap, ghost and overlay in lockstep).
 	var sim_gy: int = gy
-	if GameManager.simulation:
-		var local_idx: int = GameManager.simulation.get_player_index(GameManager.local_player_id)
-		if local_idx == 1:
-			sim_gy = (GRID_ROWS - selected_building.grid_size.y) - gy
+	if view_flipped:
+		sim_gy = (GRID_ROWS - selected_building.grid_size.y) - gy
 
 	ghost_grid_pos = Vector2i(gx, sim_gy)
 

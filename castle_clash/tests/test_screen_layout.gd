@@ -18,11 +18,13 @@ var _quarantine: int = 0
 var _findings: Array = []  # list of {severity, file, line, msg}
 
 # Detectors for known, tracked, unresolved bugs. They report RED but don't fail
-# the gate (Rare quarantine policy). BUG-47/49 are Phase-3 UI items and may be
-# real bugs OR stale-calibration false positives (lessons.md 2026-04-18 — these
-# exact detectors misfired on a legitimate redesign); Phase 3 resolves which and
-# rewrites them two-phase. Removing a ref here means the bug is truly fixed.
-const QUARANTINED: Array = ["BUG-47", "BUG-49"]
+# the gate (Rare quarantine policy). Removing a ref here means the bug is truly
+# fixed. 2026-07-18: BUG-47/49 resolved as STALE-CALIBRATION false positives —
+# their artifacts (church spire, floating ribbons) were removed by the P2 menu
+# redesign; both detectors recalibrated to guard the invariant on the current
+# layout and un-quarantined. List now empty — keep the mechanism for the next
+# genuinely-tracked-but-unfixed bug.
+const QUARANTINED: Array = []
 
 const UI_SCRIPTS: Array = [
 	"res://scripts/ui/loading_screen.gd",
@@ -59,13 +61,18 @@ func _init() -> void:
 	_check_progress_bar_construction()
 	_check_progress_bar_pixel_continuity()  # BUG-43: recalibrated 2026-07-17, no vacuous pass
 	_check_roof_icon_visibility()           # BUG-32: upgraded-building roof icons readable
+	_check_occupancy_overlay_mapping()      # BUG-50: overlay rows == building-visual rows
 	_check_tip_strip_construction()
-	# Phase-1 detector suite (BUG-46/47/48/49) — pixel-level, run on
+	# Phase-1 detector suite (BUG-46/48/49) — pixel-level, run on
 	# /tmp/castle_clash_test/menu_battle_000.png from latest --autotest run.
+	# BUG-47 (tree z-clips church spire) RETIRED 2026-07-18: the P2 redesign
+	# removed all scenic structures, leaving the detector nothing to guard —
+	# every recalibration attempt only found new false-positive classes (logo
+	# art, sky-grass gradient, inter-tree gaps, birch trunks). If scenic
+	# structures return, write a calibrated detector against that real layout.
 	_check_chimney_smoke_vertical()       # BUG-46
-	_check_tree_spire_zindex()            # BUG-47
 	_check_fence_row_repetition()         # BUG-48
-	_check_ribbon_edge_clipping()         # BUG-49
+	_check_ribbon_edge_clipping()         # BUG-49 (recalibrated 2026-07-18)
 	# Phase-2 detector suite (BUG-51/52) — user-reported 2026-04-21.
 	_check_battle_tab_always_lifted()     # BUG-51
 	_check_non_battle_tab_scenic_bleed()  # BUG-52
@@ -498,6 +505,52 @@ func _check_roof_icon_visibility() -> void:
 			"BUG-32 — icon target px too small (sprite_building_visual.gd)")
 
 
+## BUG-50: the gray "occupied" overlay must mark the SAME rows the building
+## visual occupies, for every (player, view_flipped) combination. User report:
+## a red-zone building drew its occupied tiles at different coordinates.
+## Root cause: building_grid._visual_row() inverted rows for player_index==1
+## UNCONDITIONALLY, while grid_to_screen (game_arena.gd) inverts only when
+## view_flipped — so in offline (unflipped) view the enemy overlay was drawn
+## row-mirrored under correctly-placed building visuals. Headless layout-layer
+## invariant (PROCESS §5): instance building_grid.gd, compare its drawn row set
+## against the grid_to_screen row band (formula mirrored here).
+func _check_occupancy_overlay_mapping() -> void:
+	print("[Occupancy overlay row mapping (BUG-50 invariant)]")
+	var script = load("res://scripts/game/building_grid.gd")
+	var grid: Node2D = Node2D.new()
+	grid.set_script(script)
+	var rows: int = grid.GRID_ROWS
+	var mismatches: Array = []
+	for flipped in [false, true]:
+		for p_idx in [0, 1]:
+			grid.player_index = p_idx
+			grid.set("view_flipped", flipped)  # no-op pre-fix (property absent) → RED
+			for h in [1, 2]:               # 1-cell walls and 2x2 buildings
+				for r in range(0, rows - h + 1):
+					# Overlay: the set of visual rows _visual_row maps the
+					# occupied sim rows onto.
+					var drawn: Array = []
+					for i in h:
+						drawn.append(grid._visual_row(r + i))
+					drawn.sort()
+					# Building visual: grid_to_screen's row band (game_arena.gd
+					# 345-356): direct rows unflipped, (rows - r - h) top when flipped.
+					var band_top: int = r if not flipped else (rows - r - h)
+					var expect: Array = []
+					for i in h:
+						expect.append(band_top + i)
+					if drawn != expect:
+						mismatches.append("p%d flip=%s r=%d h=%d drawn=%s expect=%s"
+							% [p_idx, flipped, r, h, str(drawn), str(expect)])
+	grid.free()
+	if mismatches.is_empty():
+		_assert_pass("overlay rows match building-visual rows for all (player, flip, row, size)")
+	else:
+		_assert_fail("BUG-50 — occupied-tile rows diverge from building visual in %d cases (e.g. %s)"
+			% [mismatches.size(), mismatches[0]],
+			"building_grid._visual_row must invert iff view_flipped, matching grid_to_screen")
+
+
 ## Detects tip strip / NinePatch edge artifacts (BUG-44).
 func _check_tip_strip_construction() -> void:
 	print("[Tip strip NinePatch usage (BUG-44)]")
@@ -600,33 +653,6 @@ func _check_chimney_smoke_vertical() -> void:
 ## PASS rule: at most ONE Y row in the left scenic strip may have both
 ## green > 30 AND gray > 30 simultaneously. (The cottage roof apex is one
 ## legitimate row of mixing; multi-row mixing means trees pass through.)
-func _check_tree_spire_zindex() -> void:
-	print("[Tree z-clip through spire (BUG-47 pixel)]")
-	var img := _load_capture(MENU_CAPTURE)
-	if img == null:
-		return
-	var mixing_rows: Array = []
-	for y in range(140, 340, 4):
-		var greens: int = 0
-		var grays: int = 0
-		for x in range(0, 250):
-			var c: Color = img.get_pixel(x, y)
-			if c.g > c.r + 0.04 and c.g > 0.4:
-				greens += 1
-			if absf(c.r - c.g) < 0.05 and c.r > 0.4 and c.r < 0.78 and c.b < c.r + 0.12:
-				grays += 1
-		if greens > 30 and grays > 30:
-			mixing_rows.append({"y": y, "green": greens, "gray": grays})
-	if mixing_rows.size() <= 1:
-		_assert_pass("left scenic strip has clean tree/building z-order (%d mixed rows)" % mixing_rows.size())
-	else:
-		_assert_fail("BUG-47 — %d Y-rows show green/gray sandwich in left scenic strip" % mixing_rows.size(),
-			"trees lack consistent z_index vs cottage spire")
-		for mr in mixing_rows.slice(0, 5):
-			_record("MEDIUM", MENU_CAPTURE, mr.y,
-				"BUG-47 — y=%d green=%d gray=%d" % [mr.y, mr.green, mr.gray])
-
-
 ## BUG-48: Top-right corner shows 3 identical fence sprites in a row at evenly
 ## spaced X. Calibrated on buggy build (2026-04-18): y=160-180, brown-wood
 ## clusters at x=[470, 488, 497] in the top-right region (x=320..504).
@@ -676,46 +702,56 @@ func _check_fence_row_repetition() -> void:
 			"BUG-48 — y=%d centers=%s max_gap=%dpx" % [first.y, str(first.centers), first.max_gap])
 
 
-## BUG-49: Decoration sprites clipped at screen edges (originally filed as
-## "partial ribbons"; user actually meant any edge-clipped scenery — towers,
-## cottages, ribbons all qualify). Calibrated 2026-04-18 on 504×896 capture:
-## the rightmost edge clips a tower, the bottom-right clips a cottage, etc.
-##
-## PASS rule: the leftmost 16-px column AND the rightmost 16-px column may not
-## contain >180 non-grass pixels within any 80-px Y window. (16 px = inside the
-## safe area; any sprite reaching that depth is being clipped by the viewport.)
+## BUG-49 (RECALIBRATED 2026-07-18): originally "partial ribbons clipped at
+## screen edges". The old rule flagged ANY decoration pixels in the edge
+## columns — but the CURRENT approved design is full-bleed on purpose: the
+## header bar spans edge-to-edge, parallax clouds drift across the frame, the
+## side groves and plateau bleed off-frame exactly like the approved loading
+## screen and the v2/v3 reference mockups. Its 30 quarantined hits were all
+## intended composition (verified by edge-strip crops 2026-07-18); the actual
+## floating-ribbon artifact was removed in the P2 redesign. The invariant kept:
+## no RIBBON/BANNER-family art (saturated red or gold, the Tiny Swords ribbon
+## palette) may sit half-clipped at an edge OUTSIDE the header band (y<130).
 func _check_ribbon_edge_clipping() -> void:
-	print("[Edge-clipped scenery (BUG-49 pixel)]")
+	print("[Edge-clipped ribbons (BUG-49 pixel)]")
 	var img := _load_capture(MENU_CAPTURE)
 	if img == null:
 		return
 	var h: int = img.get_height()
 	var w: int = img.get_width()
 	var hits: Array = []
-	for y0 in range(0, h - 80, 40):
+	for y0 in range(130, h - 80, 40):
 		var y1: int = y0 + 80
 		var left: int = 0
 		var right: int = 0
 		for y in range(y0, y1):
 			for x in range(0, 16):
-				if _is_decoration_pixel(img.get_pixel(x, y)):
+				if _is_ribbon_pixel(img.get_pixel(x, y)):
 					left += 1
 			for x in range(w - 16, w):
-				if _is_decoration_pixel(img.get_pixel(x, y)):
+				if _is_ribbon_pixel(img.get_pixel(x, y)):
 					right += 1
-		if left > 180:
+		if left > 60:
 			hits.append({"side": "LEFT", "y0": y0, "y1": y1, "px": left})
-		if right > 180:
+		if right > 60:
 			hits.append({"side": "RIGHT", "y0": y0, "y1": y1, "px": right})
 	if hits.is_empty():
-		_assert_pass("no ribbon-like clipping at screen edges")
+		_assert_pass("no ribbon/banner art clipped at screen edges (below header)")
 	else:
 		_assert_fail("BUG-49 — %d edge-clipped ribbon zones" % hits.size(),
-			"flags/ribbons sit outside the visible viewport")
+			"a ribbon/banner sits half-outside the viewport")
 		for h_entry in hits.slice(0, 4):
 			_record("LOW", MENU_CAPTURE, h_entry.y0,
 				"BUG-49 — %s edge y=%d-%d ribbon_px=%d" %
 				[h_entry.side, h_entry.y0, h_entry.y1, h_entry.px])
+
+
+## Tiny Swords ribbon/banner palette: saturated red (Ribbon_Red family) or
+## warm gold (Ribbon_Yellow) — distinct from foliage, sky, wood and grass.
+func _is_ribbon_pixel(c: Color) -> bool:
+	var is_red: bool = c.r > 0.62 and c.r > c.g + 0.28 and c.b < 0.35
+	var is_gold: bool = c.r > 0.75 and c.g > 0.55 and c.g < c.r - 0.08 and c.b < 0.30
+	return is_red or is_gold
 
 
 ## BUG-51: Battle tab button is permanently styled as active (gold + lifted)
@@ -1193,23 +1229,9 @@ func _find_bright_nongreen_clusters(img: Image, y: int, w: int) -> Array:
 	return clusters
 
 
-func _is_ribbon_pixel(c: Color) -> bool:
-	var brightness: float = (c.r + c.g + c.b) / 3.0
-	var sat: float = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b))
-	# Saturated, bright, not grass-green
-	var is_grass: bool = c.g > c.r + 0.04 and c.g > c.b + 0.04
-	return brightness > 0.39 and sat > 0.20 and not is_grass
-
-
-## True when pixel belongs to any non-grass scenery (towers, cottages, ribbons,
-## stone, wood, etc.). Used by BUG-49 edge-clipping detector.
-func _is_decoration_pixel(c: Color) -> bool:
-	var is_grass: bool = c.g > c.r + 0.05 and c.g > c.b + 0.04 and c.g > 0.30
-	# Skip very dark transparent-edge / shadow pixels
-	var brightness: float = (c.r + c.g + c.b) / 3.0
-	if brightness < 0.18:
-		return false
-	return not is_grass
+# (2026-07-18: the loose _is_ribbon_pixel + _is_decoration_pixel helpers were
+# deleted with the old over-broad BUG-49 rule — the strict ribbon/banner
+# palette helper next to _check_ribbon_edge_clipping replaced them.)
 
 
 # --- Helpers ---

@@ -302,3 +302,27 @@ verbatim" put the cliff 20px too low.
    sequence and could park the duck's yellow-green shading inside the floating-foliage
    scan band (it did). Pin easter-egg/ambient positions to constants and exempt their
    full drift ENVELOPE (tween min..max, not the spawn point) in the detector.
+
+---
+
+## Lesson (2026-07-18) — Retire detectors whose artifact class lost its subject matter
+
+**Context**: BUG-47's detector ("tree z-clips church spire") sat quarantined-RED for
+months. Triage found the P2 menu redesign had REMOVED all scenic structures — the
+artifact was impossible, and the detector was flagging the logo art at its stale
+coordinates. Three recalibration attempts each minted a NEW false-positive class
+(sky-grass gradient, inter-tree gaps, birch trunks) because the layout contains no
+true positives to calibrate against.
+
+**Rules:**
+- **Quarantine is a decision debt, not a parking lot.** A quarantined detector means
+  "real bug OR stale calibration — unresolved". Resolve it promptly: fix the bug, or
+  declare the artifact obsolete and retire/recalibrate the detector. Months of
+  quarantined-RED output train everyone to ignore findings.
+- **A detector needs a live true-positive class.** If the layout no longer contains
+  the thing the detector guards, retire it with a note (re-file detector-first if the
+  subject returns). Recalibrating a subject-less detector can only produce false
+  positives — each "fix" moves the noise, never removes it.
+- **Same-named heuristics drift apart**: the old loose `_is_ribbon_pixel` (any bright
+  saturated pixel) survived beside the new strict ribbon-palette helper and collided.
+  When replacing a detector's rule, delete its orphaned helpers in the same commit.

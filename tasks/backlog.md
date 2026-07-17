@@ -68,10 +68,7 @@ before the fix, or the passing criterion.
 
 | ID | Item | Domain | Phase | Detector / Acceptance |
 |----|------|--------|-------|-----------------------|
-| BUG-50 | Red-castle placement: building visual and gray "occupied" tiles at different coords | A5+A2 | 1A | HIGH; needs place-in-red-zone capture detector + sim assert |
 | BUG-40 | Walk animation cadence vs move speed (PENDING LIVE PLAYTEST) | A2 | 1C | HIGH; overlaps 1C-1; needs human eyes on windowed game |
-| BUG-47 | Main-menu tree foliage z-clips church/cottage spire | A2 | 3 | MEDIUM; `_check_tree_spire_zindex` currently FAILS |
-| BUG-49 | Main-menu ribbon/flag decorations clipped at screen edges | A2 | 3 | LOW; `_check_ribbon_edge_clipping` currently FAILS |
 | BUG-34 | Radial menu dismiss races with button click (can't sell/inspect in MP) | A2 | 1A | MEDIUM; overlaps 1A-4; kill deferred double-dismiss |
 | BUG-30 | Card bottom-text overlap in 2-row layout | A2 | 3 | MEDIUM; hide stats when card h<110 |
 | BUG-29 | Gold coin icon far from gold text in battle HUD | A2 | 3 | LOW; left-align gold label |

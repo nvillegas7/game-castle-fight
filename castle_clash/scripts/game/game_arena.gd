@@ -131,6 +131,8 @@ func _ready() -> void:
 	# Default camera: full arena view, both castles visible
 	_zoom_level = 1.0
 	view_flipped = false
+	grid_overlay_0.view_flipped = false
+	grid_overlay_1.view_flipped = false
 	if camera:
 		camera.zoom = Vector2.ONE
 		camera.position = Vector2(360, 640)
@@ -253,6 +255,9 @@ func _apply_perspective_flip() -> void:
 		var tmp: int = grid_overlay_0.player_index
 		grid_overlay_0.player_index = grid_overlay_1.player_index
 		grid_overlay_1.player_index = tmp
+		# BUG-50: overlays must invert rows in lockstep with grid_to_screen
+		grid_overlay_0.view_flipped = true
+		grid_overlay_1.view_flipped = true
 
 
 ## Clamp camera position so the visible area stays within the arena bounds.

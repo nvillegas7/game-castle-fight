@@ -144,10 +144,18 @@ func think(sim: Simulation, faction: FactionData, gold: int, match_time: int) ->
 		else:
 			return out
 
+	var cmds_before_place: int = out.size()
 	_place(sim, chosen, out)
 
-	# Place maze walls periodically
-	if wall_count < 4 and ai_bld_count > 3 and match_time > 300 and gold > 30:
+	# Place maze walls periodically — but NEVER in the same think as a building
+	# placement (T-AI1, 2026-07-18): both commands were validated against the
+	# same pre-tick state and apply sequentially at tick+1, so the wall silently
+	# no-oped whenever the building spent the gold or took the cells first
+	# (measured 25% wasted commands for player 1 at seed 777). Deferring the
+	# wall one think (~3s) re-validates it against fresh state and removes the
+	# race entirely. Deliberate behavior change from the pre-extraction code.
+	if out.size() == cmds_before_place \
+			and wall_count < 4 and ai_bld_count > 3 and match_time > 300 and gold > 30:
 		_place_wall(sim, ai_index, faction, gold, out)
 
 	return out

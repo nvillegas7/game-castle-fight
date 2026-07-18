@@ -41,14 +41,13 @@ before the fix, or the passing criterion.
 | ID | Item | Domain | Phase | Detector / Acceptance |
 |----|------|--------|-------|-----------------------|
 | T-QA1 | Placement-test hygiene: place_building is a silent no-op on invalid coords — audit all test placements (several team-1 ones were already dead under the 5x2 footprint) and make placement tests assert the building EXISTS afterward | A4 | 2 | every place_building in tests followed by an existence assert |
-| T-AI1 | AI place+wall same-tick race (pre-existing, surfaced by 2.1's test_arena_ai): ~25% of team-1 AI placements silently no-op — the place and wall commands from ONE think() are both validated against the pre-tick state, then race on gold/cells at apply. Fix: emit at most one build command per think, or re-validate at apply and retry next think | A5 | 3 | test_arena_ai no-op rate <10% both players at seed 777 |
 
 ## Phase 2 — Architecture enablers (sequential, shared files, no rewrite)
 
 | ID | Item | Domain | Phase | Detector / Acceptance |
 |----|------|--------|-------|-----------------------|
 | 2.3 | ⏳ PARTIAL: project Theme via gui/theme/custom ✓; default font = Pixel Operator Bold (e0e35b4, replaced NinjaNormal for readability — user-flagged; CC0, crisp import flags). TODO: MorkDungeon title-font variation for headings; shared `ui_style.gd` for StyleBoxes | A2 | 2 | readable global font ✓ |
-| 2.4 | Shared `scenic_background.gd` (delete the 250-line verbatim copy) | A2 | 2 | one source, both callers use it |
+| 2.4 | ~~Shared scenic_background.gd~~ DOWNGRADED 2026-07-18: the "250-line verbatim copy" premise is stale — the two builders diverged; difflib measures only ~62 verbatim lines in 5 scattered blocks. Unifying two approved screens for that is a bad trade; revisit only if a third scenic consumer appears | A2 | 2 | (annotated, not planned) |
 | 2.5 | Sim read facade (O(1) get_entity, castle_ratio, player_gold) + `z_layers.gd` constants | A5/A1 | 2 | removes 80+ private reads / per-frame O(n²) scans |
 
 ## Phase 3 — UI/UX parity polish (parallel per-screen on the new theme)

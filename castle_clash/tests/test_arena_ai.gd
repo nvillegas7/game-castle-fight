@@ -126,6 +126,10 @@ func _test_placements_land_for_both_players() -> void:
 		elif landed < 2:
 			_bad("player %d placements silently no-oped — issued %d, landed %d" % [i, issued, landed],
 				"T-079/BUG-51: check team-relative rows vs the castle footprint")
+		elif landed < issued - issued / 10:
+			# T-AI1 acceptance: ≤10% silent no-ops. Pre-fix baseline (seed 777):
+			# player 1 lost 4/16 (25%) to the place+wall same-tick race.
+			_bad("player %d: %d of %d placements no-oped (T-AI1 bar: ≤10%%)" % [i, issued - landed, issued])
 		elif landed * 2 < issued:
 			# think() pre-checks can_place_building against the pre-tick state, but
 			# a place+wall pair from ONE think can race on gold/cells at apply time

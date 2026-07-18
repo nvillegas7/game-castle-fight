@@ -40,7 +40,6 @@ before the fix, or the passing criterion.
 
 | ID | Item | Domain | Phase | Detector / Acceptance |
 |----|------|--------|-------|-----------------------|
-| T-QA1 | Placement-test hygiene: place_building is a silent no-op on invalid coords — audit all test placements (several team-1 ones were already dead under the 5x2 footprint) and make placement tests assert the building EXISTS afterward | A4 | 2 | every place_building in tests followed by an existence assert |
 
 ## Phase 2 — Architecture enablers (sequential, shared files, no rewrite)
 

@@ -624,8 +624,8 @@ func _test_skill_data_fields() -> void:
 		Command.place_building(0, &"archer_range", 2, 0),
 		Command.place_building(0, &"knight_hall", 4, 0),
 		Command.place_building(1, &"barracks", 0, 0),
-		Command.place_building(1, &"archer_range", 2, 0),
-		Command.place_building(1, &"knight_hall", 4, 0),
+		Command.place_building(1, &"archer_range", 2, 8),
+		Command.place_building(1, &"knight_hall", 4, 8),
 	])
 	for i in 300:
 		sim.step([])
@@ -698,7 +698,7 @@ func _test_stress_long_match() -> void:
 		Command.place_building(0, &"barracks", 0, 0),
 		Command.place_building(0, &"archer_range", 2, 0),
 		Command.place_building(1, &"barracks", 0, 0),
-		Command.place_building(1, &"archer_range", 2, 0),
+		Command.place_building(1, &"archer_range", 2, 8),
 	])
 	# Run 500 ticks — should not crash or infinite loop
 	for i in 500:

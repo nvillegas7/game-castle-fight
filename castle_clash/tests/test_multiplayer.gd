@@ -294,7 +294,7 @@ func _test_deterministic_two_player_sync() -> void:
 	])
 	# Tick 2: player 1 places archer range
 	commands_per_tick.append([
-		Command.place_building(1, &"archer_range", 2, 2),
+		Command.place_building(1, &"archer_range", 2, 6),
 	])
 
 	# Run same scenario twice — must produce identical checksums
@@ -654,8 +654,8 @@ func _test_two_sim_json_wire_lockstep() -> void:
 	}
 	var script_p1: Dictionary = {
 		1: [Command.place_building(1, &"barracks", 0, 2)],
-		40: [Command.place_building(1, &"archer_range", 2, 2)],
-		210: [Command.place_building(1, &"gold_mine", 4, 2)],
+		40: [Command.place_building(1, &"archer_range", 2, 6)],
+		210: [Command.place_building(1, &"gold_mine", 4, 6)],
 	}
 
 	var sim_a := _create_wire_sim()

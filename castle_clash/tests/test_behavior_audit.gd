@@ -255,8 +255,8 @@ func _audit_full_army_scenario() -> void:
 		Command.place_building(0, &"archer_range", 2, 0),
 		Command.place_building(0, &"priest_temple", 4, 0),
 		Command.place_building(1, &"war_camp", 0, 0),
-		Command.place_building(1, &"axe_range", 2, 0),
-		Command.place_building(1, &"war_drums", 4, 0),
+		Command.place_building(1, &"axe_range", 2, 8),
+		Command.place_building(1, &"war_drums", 4, 8),
 	])
 	# Wait for T1 prerequisites
 	for i in 20:
@@ -265,8 +265,8 @@ func _audit_full_army_scenario() -> void:
 	sim.step([
 		Command.place_building(0, &"knight_hall", 6, 0),
 		Command.place_building(0, &"siege_workshop", 8, 0),
-		Command.place_building(1, &"berserker_pit", 6, 0),
-		Command.place_building(1, &"demolisher_works", 8, 0),
+		Command.place_building(1, &"berserker_pit", 6, 8),
+		Command.place_building(1, &"demolisher_works", 8, 8),
 	])
 
 	var histories := _collect_history(sim, 2000)

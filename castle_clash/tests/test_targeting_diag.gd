@@ -176,7 +176,7 @@ func _test_units_dont_walk_past_buildings() -> void:
 		Command.place_building(0, &"barracks", 0, 0),
 		Command.place_building(0, &"barracks", 4, 0),
 		Command.place_building(1, &"war_camp", 0, 0),
-		Command.place_building(1, &"war_camp", 4, 0),
+		Command.place_building(1, &"war_camp", 4, 8),
 	])
 
 	for i in 800:

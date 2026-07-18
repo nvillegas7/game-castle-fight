@@ -61,7 +61,6 @@ before the fix, or the passing criterion.
 | 3.3 | Battle-zone READABILITY (HUD): gold elixir-bar fill + cheapest-card marker, locked cards→grayscale+padlock, wave preview strip | A2 | 3 | golden diff; no permanent red-card noise |
 | 3.4 | Mobile hardening: ability/wrath buttons ≥88px, safe-area insets on header/tab bar, tap-and-hold replaces hover | A2 | 3 | layout assertion: touch targets ≥88px |
 | 3.5 | End screen takeover: hide HUD/gold bar/card hand behind results; restore on replay | A2 | 3 | golden: results screen has no bleed-through |
-| 3.6 | Army tab: **tappable unit detail popup** (unit sprites + de-spreadsheet + warm cards DONE in P4) | A2 | 3 | tap scenario opens a detail popup |
 | 3.8 | Theme rollout: migrate remaining screens to Theme/ui_style; delete per-label overrides | A2 | 3 | per-screen golden after migration |
 
 ## Open bugs (qa-bug-tracker.md) — fold into the phase above they belong to

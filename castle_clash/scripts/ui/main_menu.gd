@@ -1824,9 +1824,13 @@ func _add_unit_card(parent: VBoxContainer, ud: UnitData, bd: BuildingData, is_ki
 		10, 2))
 	card.custom_minimum_size = Vector2(680, 140)
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# 3.6: expand-in-place detail (design/army_popup_target.png, concept B).
+	# Named for tap targeting (scenario army_popup.gd) and toggled on tap.
+	card.name = "UnitCard_%s" % ud.id
 	parent.add_child(card)
 
 	var hbox := HBoxContainer.new()
+	hbox.name = "CompactRow"
 	hbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	# BUG-52: keep the icon inset ≥26 so its left edge clears the scenic-bleed
 	# detector band (capture x<30) on the neighbouring tabs' shared background.
@@ -1835,24 +1839,9 @@ func _add_unit_card(parent: VBoxContainer, ud: UnitData, bd: BuildingData, is_ki
 	hbox.add_theme_constant_override("separation", 12)
 	card.add_child(hbox)
 
-	# P4 (backlog 3.6): show the UNIT idle sprite, not the spawner building. Tiny
-	# Swords frames are 192x192 with the character ~60px centered, so crop to the
-	# opaque content rect or it renders as a ~27px speck in the 88px box.
+	# P4 (backlog 3.6): show the UNIT idle sprite, not the spawner building.
 	var team: int = 0 if is_kingdom else 1
-	var unit_tex: Texture2D = null
-	var frames: SpriteFrames = SpriteRegistry.get_unit_sprites(ud.id, team)
-	if frames and frames.has_animation(&"idle") and frames.get_frame_count(&"idle") > 0:
-		var f: Texture2D = frames.get_frame_texture(&"idle", 0)
-		if f:
-			unit_tex = f
-			var im: Image = f.get_image()
-			if im:
-				var r: Rect2i = im.get_used_rect()
-				if r.size.x > 0 and r.size.y > 0:
-					var at := AtlasTexture.new()
-					at.atlas = f
-					at.region = Rect2(r)
-					unit_tex = at
+	var unit_tex: Texture2D = _unit_idle_texture(ud, team)
 	if unit_tex == null:  # never render an empty row: fall back to the building icon
 		unit_tex = SpriteRegistry.get_building_sprite(bd.id, team)
 	if unit_tex:
@@ -1913,6 +1902,251 @@ func _add_unit_card(parent: VBoxContainer, ud: UnitData, bd: BuildingData, is_ki
 	cost_lbl.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02, 1))
 	cost_lbl.add_theme_constant_override("outline_size", 2)
 	hbox.add_child(cost_lbl)
+
+	# 3.6: full-rect TouchArea on top (the tab-bar pattern) so a tap anywhere on
+	# the card toggles the in-place detail — content nodes never eat the event.
+	var touch := Control.new()
+	touch.name = "TouchArea"
+	touch.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	touch.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.add_child(touch)
+	touch.gui_input.connect(func(ev: InputEvent) -> void:
+		if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) \
+				or (ev is InputEventScreenTouch and ev.pressed):
+			_toggle_unit_detail(card, ud, bd, is_kingdom))
+
+
+# --- 3.6: expand-in-place unit detail (PORT of design/army_popup_target.png,
+# approved concept B 2026-07-18). LAYOUT below mirrors the compositor's
+# render_card() geometry translated to card-local coords (card = mock rect
+# (20,300,700,810) → local origin). Fonts 16/32 only (UIStyle contract). ---
+
+var _expanded_card: Panel = null
+
+## Skill blurbs (3.6). DRAFTED from skill names — flavor text only, the sim is
+## authoritative for behavior. Flagged for design review (A0/Neil); unknown ids
+## fall back to the prettified id.
+const SKILL_DESC := {
+	&"arcane_shield": "Absorbs damage with a magical barrier.",
+	&"barbed_bolt": "Bolts rend the target, wounding over time.",
+	&"battle_cry": "Rallies nearby allies to strike harder.",
+	&"blood_frenzy": "Attacks ever faster as the frenzy builds.",
+	&"boulder_splash": "Boulders deal splash damage on impact.",
+	&"burning_ground": "Scorches the ground, burning enemies.",
+	&"charge": "Rushes the enemy line at high speed.",
+	&"critical_strike": "Chance to strike for heavy bonus damage.",
+	&"devotion_aura": "Nearby allies take reduced damage.",
+	&"dive_bomb": "Dives from above for a crushing hit.",
+	&"enrage": "Grows stronger as wounds accumulate.",
+	&"evasion": "Chance to dodge incoming attacks.",
+	&"fireball": "Hurls a fireball that splashes on impact.",
+	&"holy_light": "Heals the most wounded nearby ally.",
+	&"impale": "Skewers the target for bonus damage.",
+	&"lance_charge": "A thunderous charge with lance lowered.",
+	&"lance_pierce": "The lance pierces through to enemies behind.",
+	&"mana_shield": "Converts damage taken into mana loss.",
+	&"piercing_shot": "Shots punch through multiple enemies.",
+	&"poison_spit": "Venom that poisons the target over time.",
+	&"rending_throw": "A thrown blade that tears armor.",
+	&"savage_charge": "A brutal charge that staggers the target.",
+	&"shield_wall": "Raises shields to block incoming damage.",
+	&"siege_fire": "Burning payloads that shatter defenses.",
+	&"siege_momentum": "Builds speed and power as it advances.",
+	&"toughness": "Hardened hide shrugs off light blows.",
+	&"volley": "Looses a volley of arrows over the line.",
+	&"war_cry": "A terrifying cry that empowers the warband.",
+	&"war_drums": "Drums that quicken nearby allies' attacks.",
+}
+
+
+func _toggle_unit_detail(card: Panel, ud: UnitData, bd: BuildingData, is_kingdom: bool) -> void:
+	SFX.play_ui("card_select")
+	var was_expanded: bool = (_expanded_card == card)
+	# Collapse whichever card is open (incl. this one)
+	if _expanded_card != null and is_instance_valid(_expanded_card):
+		_expanded_card.custom_minimum_size.y = 140
+		var open_detail: Control = _expanded_card.get_node_or_null("UnitDetail")
+		if open_detail:
+			open_detail.visible = false
+		var open_row: Control = _expanded_card.get_node_or_null("CompactRow")
+		if open_row:
+			open_row.visible = true
+		_expanded_card = null
+	if was_expanded:
+		return
+	# Expand this card: swap the compact row for the detail block
+	card.custom_minimum_size.y = 510
+	var row: Control = card.get_node_or_null("CompactRow")
+	if row:
+		row.visible = false
+	var detail: Control = card.get_node_or_null("UnitDetail")
+	if detail == null:
+		detail = _build_unit_detail(ud, bd, is_kingdom)
+		card.add_child(detail)
+		# TouchArea stays the topmost child so taps keep toggling
+		card.move_child(card.get_node("TouchArea"), card.get_child_count() - 1)
+	detail.visible = true
+	_expanded_card = card
+
+
+func _build_unit_detail(ud: UnitData, bd: BuildingData, is_kingdom: bool) -> Control:
+	var detail := Control.new()
+	detail.name = "UnitDetail"
+	detail.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var team: int = 0 if is_kingdom else 1
+
+	# Sprite: content-cropped idle, 160px tall, centered on x=90
+	var tex: Texture2D = _unit_idle_texture(ud, team)
+	if tex == null:
+		tex = SpriteRegistry.get_building_sprite(bd.id, team)
+	if tex:
+		var spr := TextureRect.new()
+		spr.texture = tex
+		var th: float = maxf(1.0, float(tex.get_height()))
+		var tw: float = tex.get_width() * (160.0 / th)
+		spr.position = Vector2(90.0 - tw / 2.0, 40.0)
+		spr.size = Vector2(tw, 160.0)
+		spr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		spr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		spr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		detail.add_child(spr)
+
+	# Name (32 gold) + cost/tier (16, right)
+	var name_lbl := Label.new()
+	name_lbl.name = "DetailName"
+	name_lbl.text = ud.display_name.to_upper()
+	name_lbl.position = Vector2(190, 22)
+	name_lbl.add_theme_font_size_override("font_size", UIStyle.FONT_TITLE)
+	name_lbl.add_theme_color_override("font_color", Color(1, 0.88, 0.35))
+	name_lbl.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+	name_lbl.add_theme_constant_override("outline_size", 3)
+	detail.add_child(name_lbl)
+	var ct := Label.new()
+	ct.text = "%dg · T%d" % [bd.gold_cost, bd.tier]
+	ct.position = Vector2(500, 38)
+	ct.size = Vector2(156, 22)
+	ct.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	ct.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+	ct.add_theme_color_override("font_color", UIStyle.TEXT_CREAM)
+	ct.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+	ct.add_theme_constant_override("outline_size", 1)
+	detail.add_child(ct)
+
+	# Chips row
+	var chips := HBoxContainer.new()
+	chips.position = Vector2(190, 76)
+	chips.add_theme_constant_override("separation", 6)
+	chips.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var role_idx: int = clampi(ud.role, 0, 4)
+	_add_unit_chip(chips, ROLE_NAMES[role_idx], ROLE_COLORS[role_idx])
+	_add_unit_chip(chips, ATTACK_TYPE_NAMES[clampi(ud.attack_type, 0, 3)], Color(0.55, 0.5, 0.5))
+	_add_unit_chip(chips, ARMOR_TYPE_NAMES[clampi(ud.armor_type, 0, 3)] + " armor", Color(0.5, 0.52, 0.55))
+	detail.add_child(chips)
+
+	# Stat tiles: 3x2 grid of wood slots with big values (de-spreadsheeted)
+	var atk_per_s: float = 10.0 / maxf(1.0, float(ud.attack_speed_ticks))
+	var tiles := [["HP", str(ud.max_hp)], ["DMG", str(ud.attack_damage)],
+		["SPD", str(ud.move_speed)], ["RNG", str(ud.attack_range)],
+		["ARM", str(ud.armor)], ["ATK/S", "%.1f" % atk_per_s]]
+	for i in tiles.size():
+		var tile := Panel.new()
+		tile.position = Vector2(190 + (i % 3) * 158, 120 + (i / 3) * 82)
+		tile.size = Vector2(148, 72)
+		tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tile.add_theme_stylebox_override("panel", _make_style(
+			Color(UIStyle.PANEL_WOOD.r, UIStyle.PANEL_WOOD.g, UIStyle.PANEL_WOOD.b, 0.92),
+			UIStyle.PANEL_BORDER, 10, 2))
+		var tl := Label.new()
+		tl.text = tiles[i][0]
+		tl.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+		tl.offset_top = 6
+		tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tl.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+		tl.add_theme_color_override("font_color", Color(0.78, 0.73, 0.6))
+		tile.add_child(tl)
+		var tv := Label.new()
+		tv.text = tiles[i][1]
+		tv.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+		tv.offset_top = -42
+		tv.offset_bottom = -6
+		tv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tv.add_theme_font_size_override("font_size", UIStyle.FONT_TITLE)
+		tv.add_theme_color_override("font_color", UIStyle.TEXT_CREAM)
+		tv.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+		tv.add_theme_constant_override("outline_size", 2)
+		tile.add_child(tv)
+		detail.add_child(tile)
+
+	# Extras line
+	var extras := Label.new()
+	extras.text = "Aggro %d · Magic def %d · Bounty %dg" % [ud.aggro_range, ud.magic_defense, ud.bounty]
+	extras.position = Vector2(190, 282)
+	extras.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+	extras.add_theme_color_override("font_color", Color(0.78, 0.73, 0.6))
+	detail.add_child(extras)
+
+	# Skill strips (name + drafted blurb)
+	var skill_ids: Array = []
+	if ud.skill_id != &"":
+		skill_ids.append(ud.skill_id)
+	if ud.skill_id_2 != &"":
+		skill_ids.append(ud.skill_id_2)
+	for i in skill_ids.size():
+		var sid: StringName = skill_ids[i]
+		var strip := Panel.new()
+		strip.position = Vector2(20, 316 + i * 66)
+		strip.size = Vector2(640, 58)
+		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		strip.add_theme_stylebox_override("panel", _make_style(
+			Color(0.26, 0.20, 0.12, 0.8), Color(0.63, 0.50, 0.26), 10, 2))
+		var sn := Label.new()
+		sn.text = str(sid).replace("_", " ").capitalize()
+		sn.position = Vector2(14, 6)
+		sn.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+		sn.add_theme_color_override("font_color", Color(1, 0.88, 0.35))
+		sn.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+		sn.add_theme_constant_override("outline_size", 1)
+		strip.add_child(sn)
+		var sd := Label.new()
+		sd.text = SKILL_DESC.get(sid, str(sid).replace("_", " ").capitalize() + ".")
+		sd.position = Vector2(14, 30)
+		sd.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+		sd.add_theme_color_override("font_color", Color(0.78, 0.73, 0.6))
+		strip.add_child(sd)
+		detail.add_child(strip)
+
+	# Collapse hint
+	var hint := Label.new()
+	hint.text = "^ tap to close ^"
+	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	hint.offset_top = -30
+	hint.offset_bottom = -8
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+	hint.add_theme_color_override("font_color", Color(0.78, 0.73, 0.6))
+	detail.add_child(hint)
+	return detail
+
+
+## Content-cropped idle frame for a unit (Tiny Swords frames are 192x192 with
+## the character ~60px centered — without the crop it renders as a speck).
+func _unit_idle_texture(ud: UnitData, team: int) -> Texture2D:
+	var frames: SpriteFrames = SpriteRegistry.get_unit_sprites(ud.id, team)
+	if frames and frames.has_animation(&"idle") and frames.get_frame_count(&"idle") > 0:
+		var f: Texture2D = frames.get_frame_texture(&"idle", 0)
+		if f:
+			var im: Image = f.get_image()
+			if im:
+				var r: Rect2i = im.get_used_rect()
+				if r.size.x > 0 and r.size.y > 0:
+					var at := AtlasTexture.new()
+					at.atlas = f
+					at.region = Rect2(r)
+					return at
+			return f
+	return null
 
 
 ## P4: a small tinted role/type chip (cream text on the role colour) via the shared kit.

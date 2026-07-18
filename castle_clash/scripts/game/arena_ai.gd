@@ -44,6 +44,14 @@ func think(sim: Simulation, faction: FactionData, gold: int, match_time: int) ->
 	if strategy == -1:
 		strategy = _rng.randi() % 3
 
+	# 1D-5: fire Castle Wrath (one-time panic ability) once own castle is at
+	# or below the sim's 30-percent readiness threshold. Sim-side guards refuse
+	# early fires; castle_wrath_available prevents re-emits after use.
+	for castle in sim.castles:
+		if castle.team == player_id and castle.get("castle_wrath_available", false):
+			if FP.to_int(castle.hp) * 10 <= FP.to_int(castle.max_hp) * 3:
+				out.append(Command.use_ability(player_id, &"castle_wrath", 0, 0))
+
 	# Activate special building abilities when ready
 	_try_activate(sim, ai_index, out)
 

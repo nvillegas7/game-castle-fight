@@ -114,7 +114,7 @@ func _test_command_serialization_roundtrip() -> void:
 	var commands := [
 		Command.place_building(0, &"barracks", 3, 4),
 		Command.sell_building(1, 42),
-		Command.use_ability(0, &"war_horn", 5, 6),
+		Command.use_ability(0, &"castle_wrath", 5, 6),
 		Command.activate_building(1, 99),
 	]
 
@@ -142,7 +142,7 @@ func _test_command_serialization_roundtrip() -> void:
 	var ability: Dictionary = deserialized[2]
 	_assert(ability.type == Command.Type.USE_ABILITY, "ability type preserved")
 	_assert(ability.player_id == 0, "ability player_id preserved")
-	_assert(ability.ability_id == &"war_horn", "ability ability_id preserved")
+	_assert(ability.ability_id == &"castle_wrath", "ability ability_id preserved")
 	_assert(ability.target_x == 5, "ability target_x preserved")
 	_assert(ability.target_y == 6, "ability target_y preserved")
 

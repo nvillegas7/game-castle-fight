@@ -32,7 +32,6 @@ before the fix, or the passing criterion.
 | 1D-2 | Fireball splash uses event payload coords (kill live sim re-lookup) | A5/A2 | 1D | splash VFX at event-reported center |
 | 1D-3 | castle_wrath_refused → button shake/toast; ready-chime only for LOCAL player's castle | A2 | 1D | refusal feedback shown; chime not cross-fired |
 | 1D-4 | Emit skill_proc for the six silent skills or delete their dead VFX/SFX branches | A5 | 1D | each skill either fires or has no dead branch |
-| 1D-5 | Offline AI uses Castle Wrath; fix test_multiplayer.gd to use a real ability id | A5 | 1D | test_multiplayer.gd references valid ability |
 | 1D-6 | Rally/Rage buff readability: brief tint or speed-lines on buffed units | A2 | 1D | buffed units visually distinct |
 
 ## New (2026-07-10)

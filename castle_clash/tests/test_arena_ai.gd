@@ -29,6 +29,7 @@ func _init() -> void:
 	_test_placements_land_for_both_players()
 	_test_strategy_openings()
 	_test_seeded_determinism()
+	_test_ai_uses_castle_wrath()
 	print("\n=== Results: %d passed, %d failed ===" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -186,6 +187,48 @@ func _test_strategy_openings() -> void:
 		_ok("self-rolled strategies in range (p0=%d p1=%d)" % [s0, s1])
 	else:
 		_bad("strategy out of range", "p0=%d p1=%d" % [s0, s1])
+
+
+## 1D-5: the AI must fire Castle Wrath (one-time panic ability, ready at
+## <=30 percent own-castle HP) — it was human-only before this.
+func _test_ai_uses_castle_wrath() -> void:
+	print("[AI uses Castle Wrath at low HP]")
+	var sim := Simulation.new()
+	sim.register_buildings(_all_buildings)
+	sim.initialize(55, [
+		{"id": 0, "team": 0, "faction": &"kingdom", "perk": &""},
+		{"id": 1, "team": 1, "faction": &"horde", "perk": &""},
+	])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 55
+	var ai := ArenaAI.new(1, rng)
+	var faction: FactionData = _faction(&"horde")
+
+	var wrath := func(cmds: Array) -> bool:
+		for c in cmds:
+			if c.get("type", -1) == Command.Type.USE_ABILITY and c.get("ability_id", &"") == &"castle_wrath":
+				return true
+		return false
+
+	var out1: Array = ai.think(sim, faction, 100, 10)
+	if wrath.call(out1):
+		_bad("AI fired Castle Wrath at FULL castle HP")
+	else:
+		_ok("no wrath at full HP")
+
+	sim.castles[1].hp = FP.from_int(1000)  # 20 percent of 5000
+	var out2: Array = ai.think(sim, faction, 100, 20)
+	if wrath.call(out2):
+		_ok("AI fires Castle Wrath at 20 percent HP")
+	else:
+		_bad("AI did not fire Castle Wrath at 20 percent HP")
+
+	sim.step(out2)  # apply — consumes castle_wrath_available
+	var out3: Array = ai.think(sim, faction, 100, 30)
+	if wrath.call(out3):
+		_bad("AI re-fired a consumed Castle Wrath")
+	else:
+		_ok("no wrath re-emit after use (availability consumed)")
 
 
 func _test_seeded_determinism() -> void:

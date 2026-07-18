@@ -561,14 +561,14 @@ func _on_match_state(match_state) -> void:
 				var tick: int = int(data.tick)
 				var commands: Array = _deserialize_commands(data.get("commands", []))
 				_remote_commands_received[tick] = true
-				GameManager.command_buffer.replace_commands(tick, commands)
+				GameManager.command_buffer.replace_commands(tick, commands, GameManager.local_player_id)
 			else:
 				for tick_data in ticks_array:
 					var t: int = int(tick_data.tick)
 					var commands: Array = _deserialize_commands(tick_data.get("commands", []))
 					_remote_commands_received[t] = true
 					# Replace — later payload for same tick may have more commands
-					GameManager.command_buffer.replace_commands(t, commands)
+					GameManager.command_buffer.replace_commands(t, commands, GameManager.local_player_id)
 
 		OpCode.CHECKSUM:
 			# Buffer instead of compare-or-drop: the local sim may not have
@@ -707,7 +707,7 @@ func _reset_to_offline() -> void:
 func _serialize_commands(commands: Array) -> Array:
 	var result: Array = []
 	for cmd in commands:
-		var s := { "type": cmd.type, "player_id": cmd.player_id }
+		var s := { "type": cmd.type, "player_id": cmd.player_id, "seq": cmd.get("seq", 0) }
 		match int(cmd.type):
 			Command.Type.PLACE_BUILDING:
 				s["building_type"] = str(cmd.building_type)
@@ -728,7 +728,7 @@ func _serialize_commands(commands: Array) -> Array:
 func _deserialize_commands(data: Array) -> Array:
 	var result: Array = []
 	for item in data:
-		var cmd: Dictionary = { "type": int(item.type), "player_id": int(item.player_id) }
+		var cmd: Dictionary = { "type": int(item.type), "player_id": int(item.player_id), "seq": int(item.get("seq", 0)) }
 		match cmd.type:
 			Command.Type.PLACE_BUILDING:
 				cmd["building_type"] = StringName(str(item.building_type))

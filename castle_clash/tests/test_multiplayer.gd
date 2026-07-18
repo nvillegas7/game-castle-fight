@@ -36,6 +36,7 @@ func _run_tests() -> void:
 	_test_lockstep_tick_readiness()
 	_test_stall_timeout_logic()
 	_test_two_sim_json_wire_lockstep()
+	_test_same_player_command_order_deterministic()
 	_test_match_config_build_id_mismatch_aborts()
 	_test_matchmaker_roster_validation()
 	_test_match_config_seed_conflict_aborts()
@@ -609,13 +610,43 @@ func _build_wire_payload(nm, hist: Dictionary, tick: int, partial: bool) -> Stri
 ## NOTE: buffer is untyped — command_buffer.gd references the GameManager
 ## autoload, so the CommandBuffer class_name cannot be resolved at this test
 ## script's compile time (before autoloads register). Use load() at runtime.
-func _apply_wire_payload(nm, buffer, payload_json: String) -> void:
+func _apply_wire_payload(nm, buffer, payload_json: String, local_pid: int) -> void:
 	var data = JSON.parse_string(payload_json)
 	var ticks_array: Array = data.get("ticks", [])
 	for tick_data in ticks_array:
 		var t: int = int(tick_data.tick)
 		var commands: Array = nm._deserialize_commands(tick_data.get("commands", []))
-		buffer.replace_commands(t, commands)
+		buffer.replace_commands(t, commands, local_pid)
+
+
+## 1B-3: two peers receiving the SAME same-player commands in OPPOSITE
+## insertion orders (out-of-order delivery) must apply them in ONE order.
+## Sort key must be (player_id, seq) — player_id alone leaves same-player
+## order insertion-dependent (and sort_custom is not stability-guaranteed).
+func _test_same_player_command_order_deterministic() -> void:
+	var c1 := Command.place_building(0, &"barracks", 0, 0)
+	c1["seq"] = 1
+	var c2 := Command.place_building(0, &"archer_range", 4, 0)
+	c2["seq"] = 2
+	var c3 := Command.place_building(1, &"war_camp", 0, 8)
+	c3["seq"] = 1
+	var buf_a := CommandBuffer.new()
+	for c in [c1, c2, c3]:
+		buf_a.add_command(7, c)
+	var buf_b := CommandBuffer.new()
+	for c in [c3, c2, c1]:  # reversed arrival
+		buf_b.add_command(7, c)
+	var a := buf_a.get_commands(7)
+	var b := buf_b.get_commands(7)
+	_assert(a.size() == 3 and b.size() == 3, "order test: both buffers hold 3 commands")
+	var same := true
+	for i in a.size():
+		if a[i] != b[i]:
+			same = false
+	_assert(same, "same-player same-tick commands apply in identical order on both peers")
+	_assert(a[0].get("seq", -1) == 1 and a[1].get("seq", -1) == 2,
+		"player 0 commands honor sender seq order (1 then 2)")
+
 
 
 func _test_two_sim_json_wire_lockstep() -> void:
@@ -711,10 +742,10 @@ func _test_two_sim_json_wire_lockstep() -> void:
 		# local commands — set it per receiving side, like each real client.
 		gm.local_player_id = 1
 		for pj in deliver_to_b:
-			_apply_wire_payload(nm, buf_b, pj)
+			_apply_wire_payload(nm, buf_b, pj, 1)
 		gm.local_player_id = 0
 		for pj in deliver_to_a:
-			_apply_wire_payload(nm, buf_a, pj)
+			_apply_wire_payload(nm, buf_a, pj, 0)
 
 		sim_a.step(buf_a.get_commands(t))
 		sim_b.step(buf_b.get_commands(t))

@@ -91,10 +91,16 @@ func _load_faction_data() -> void:
 		push_warning("GameManager: No faction data loaded! Check res://data/factions/")
 
 
+var _cmd_seq: int = 0  # 1B-3: per-session sender-authoritative command sequence
+
 ## Called by UI to submit a command for the next tick (offline mode).
 func submit_command(command: Dictionary) -> void:
 	if state != State.PLAYING:
 		return
+	# 1B-3: stamp a monotonic per-sender seq so both peers apply same-player
+	# same-tick commands in ONE order (CommandBuffer sorts (player_id, seq)).
+	_cmd_seq += 1
+	command["seq"] = _cmd_seq
 	command_buffer.add_command(current_tick + 1, command)
 
 
@@ -147,6 +153,7 @@ func start_online_match(seed_value: int, player_data: Array, my_player_id: int) 
 
 
 func _init_simulation(seed_value: int, player_data: Array) -> void:
+	_cmd_seq = 0  # 1B-3: fresh sequence per match
 	simulation = Simulation.new()
 
 	var all_buildings: Array = []

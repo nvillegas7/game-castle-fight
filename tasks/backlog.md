@@ -19,7 +19,6 @@ before the fix, or the passing criterion.
 | 1A-4 | Radial menu at true cell center; scale hit radius by zoom; kill double-fire path | A2 | 1A | `radial_menu_under_zoom` scenario (see BUG-34) |
 | 1A-5 | ⏳ PARTIAL (6ea781f: wheel event.pressed guard + ZOOM_MIN 1.0 done). TODO: reparent Blocked!/info popup to UILayer; zoom-to-cursor; fix middle-drag pan (consumed by STOP ColorRect) | A2 | 1A | popup renders in screen space regardless of pan/zoom |
 | ~~1B-2~~ | ✅ DONE Surface lobby aborts in main_menu (NetworkManager.match_error → message + retry, version_mismatch → "refresh browser") | A2 | 1B | — |
-| 1B-3 | Total command ordering: per-player seq number; sort (player_id, seq) | A1 | 1B | test_multiplayer.gd asserts deterministic apply order |
 | ~~1B-4~~ | ✅ DONE Freeze match on desync (GameManager._on_desync_detected → MATCH_OVER + set_process(false)) | A1 | 1B | — |
 | ~~1B-5~~ | ✅ DONE (453725a) order-sensitive checksum covering all mutable state + subchecksums + state dump. TODO(minor): dense checksum send in first 200 ticks | A1/A5 | 1B | — |
 | 1B-6 | ⏳ DEFERRED (dedicated task): extract LockstepPeer (RefCounted, injected transport+clock) → two-peer headless harness with FakeRelay + BUG-DESYNC1 stall-boundary scenario. Note: test_multiplayer `_test_two_sim_json_wire_lockstep` already covers 520-tick determinism + dup/out-of-order delivery; this adds staging/stall-timing coverage. Risky refactor of live net code — do carefully. | A1 | 1B | BUG-DESYNC1 scenario red on +1 staging, green on +2 |

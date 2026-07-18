@@ -118,6 +118,9 @@ func _ready() -> void:
 	_add_press_feedback(play_btn)
 	_add_press_feedback(online_btn)
 
+	# 3.1: game-mode selector row (design/battle_mode_row_target.png, variant b)
+	_build_mode_row(battle_panel)
+
 	EventBus.connected_to_server.connect(_on_connected)
 	EventBus.disconnected_from_server.connect(_on_disconnected)
 	EventBus.match_found.connect(_on_match_found)
@@ -241,86 +244,70 @@ func _build_progression_display() -> void:
 	# T-046: Miniature building cards from selected faction
 	_build_faction_building_preview(battle_panel)
 
-	# T-056: Game mode selection
-	_build_mode_selector(battle_panel)
+	# T-056 mode selector: superseded by _build_mode_row (3.1, kit-styled)
 
 
-## T-056: Game mode selector — horizontal row of 3 mode buttons with description
-var _mode_buttons: Array[Button] = []
+## 3.1: game-mode selector — PORT of design/battle_mode_row_target.png
+## (variant b, approved 2026-07-18): 3 chips 150x44 gap 16 centered at design
+## y=1076 (panel-local 986; ContentArea top=90), 16px desc line at +52.
+## Selected = gold ring (Avatars pattern). Replaces the T-056 selector that was
+## buried with _build_progression_display (12/14px fonts, pre-P2 layout).
+var _mode_chips: Array[Button] = []
 var _mode_desc_label: Label = null
 const MODE_DESCRIPTIONS := {
 	0: "Classic match — standard rules",
 	1: "2x income & spawn speed — fast games",
 	2: "Both players use the same faction",
 }
+const MODE_NAMES := ["Standard", "Blitz", "Mirror"]
 
-func _build_mode_selector(parent: Control) -> void:
-	var mode_row := HBoxContainer.new()
-	mode_row.name = "ModeRow"
-	# BUG-MENU 2026-04-11: Moved up to y=440 so mode desc at y=494 doesn't collide
-	# with FactionDesc at y=560. Previous y=500 put desc at y=550 overlapping.
-	mode_row.position = Vector2(120, 440)
-	mode_row.size = Vector2(480, 48)
-	mode_row.add_theme_constant_override("separation", 12)
-	mode_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	parent.add_child(mode_row)
-
-	var modes := [
-		{"id": GameManager.GameMode.STANDARD, "name": "Standard"},
-		{"id": GameManager.GameMode.BLITZ, "name": "Blitz"},
-		{"id": GameManager.GameMode.MIRROR, "name": "Mirror"},
-	]
-
-	for i in modes.size():
-		var m: Dictionary = modes[i]
-		var btn := Button.new()
-		btn.text = m.name
-		btn.custom_minimum_size = Vector2(140, 40)
-		btn.add_theme_font_size_override("font_size", 14)
-		btn.pressed.connect(_on_mode_selected.bind(m.id))
-		mode_row.add_child(btn)
-		_mode_buttons.append(btn)
-
-	# Description label below mode row (y=440+48+6 = 494)
+func _build_mode_row(parent: Control) -> void:
+	_mode_chips.clear()
+	var modes_enum := [GameManager.GameMode.STANDARD, GameManager.GameMode.BLITZ, GameManager.GameMode.MIRROR]
+	for i in 3:
+		var chip := Button.new()
+		chip.name = "ModeChip_%s" % MODE_NAMES[i]
+		chip.text = MODE_NAMES[i]
+		chip.position = Vector2(119.0 + i * 166.0, 986.0)  # 150w + 16 gap
+		chip.size = Vector2(150, 44)
+		chip.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+		chip.pressed.connect(_on_mode_chip.bind(modes_enum[i]))
+		parent.add_child(chip)
+		_mode_chips.append(chip)
 	_mode_desc_label = Label.new()
 	_mode_desc_label.name = "ModeDesc"
-	_mode_desc_label.position = Vector2(120, 494)
-	_mode_desc_label.size = Vector2(480, 20)
+	_mode_desc_label.position = Vector2(0, 1030)
+	_mode_desc_label.size = Vector2(720, 22)
 	_mode_desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_mode_desc_label.add_theme_font_size_override("font_size", 12)
-	_mode_desc_label.add_theme_color_override("font_color", Color(0.92, 0.86, 0.68, 1.0))  # BUG-41: opaque cream for mode description
-	_mode_desc_label.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.03, 1.0))
+	_mode_desc_label.add_theme_font_size_override("font_size", UIStyle.FONT_BODY)
+	_mode_desc_label.add_theme_color_override("font_color", Color(0.82, 0.77, 0.64))
+	_mode_desc_label.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
 	_mode_desc_label.add_theme_constant_override("outline_size", 2)
 	parent.add_child(_mode_desc_label)
+	_refresh_mode_row()
 
-	_refresh_mode_buttons()
 
-
-func _on_mode_selected(mode: int) -> void:
+func _on_mode_chip(mode: int) -> void:
 	SFX.play_ui("card_select")
 	GameManager.selected_game_mode = mode as GameManager.GameMode
-	_refresh_mode_buttons()
+	_refresh_mode_row()
 
 
-func _refresh_mode_buttons() -> void:
+func _refresh_mode_row() -> void:
 	var modes_enum := [GameManager.GameMode.STANDARD, GameManager.GameMode.BLITZ, GameManager.GameMode.MIRROR]
-	for i in _mode_buttons.size():
-		var btn: Button = _mode_buttons[i]
-		var selected: bool = (modes_enum[i] == GameManager.selected_game_mode)
+	for i in _mode_chips.size():
+		var chip: Button = _mode_chips[i]
+		var sel: bool = (modes_enum[i] == GameManager.selected_game_mode)
 		var style := StyleBoxFlat.new()
-		if selected:
-			style.bg_color = Color(0.5, 0.38, 0.1, 0.9)
-			style.border_color = Color(1.0, 0.82, 0.2, 0.85)
-			style.set_border_width_all(2)
-		else:
-			style.bg_color = Color(0.2, 0.15, 0.1, 0.7)
-			style.border_color = Color(0.4, 0.3, 0.15, 0.4)
-			style.set_border_width_all(1)
-		style.set_corner_radius_all(8)
-		style.set_content_margin_all(6)
-		btn.add_theme_stylebox_override("normal", style)
-		btn.add_theme_color_override("font_color", Color(1, 0.9, 0.5) if selected else Color(0.6, 0.55, 0.4))
-	# Update mode description text
+		style.bg_color = Color(0.157, 0.118, 0.078, 0.88)   # (40,30,20)
+		style.border_color = Color(1.0, 0.82, 0.24) if sel else Color(0.47, 0.36, 0.19)
+		style.set_border_width_all(3 if sel else 2)
+		style.set_corner_radius_all(10)
+		for st in ["normal", "hover", "pressed", "focus"]:
+			chip.add_theme_stylebox_override(st, style)
+		chip.add_theme_color_override("font_color", Color(1.0, 0.82, 0.24) if sel else UIStyle.TEXT_CREAM)
+		chip.add_theme_color_override("font_outline_color", UIStyle.OUTLINE_DARK)
+		chip.add_theme_constant_override("outline_size", 1)
 	if _mode_desc_label:
 		_mode_desc_label.text = MODE_DESCRIPTIONS.get(GameManager.selected_game_mode, "")
 

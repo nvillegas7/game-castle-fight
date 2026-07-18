@@ -169,11 +169,11 @@ func _ready() -> void:
 	# T-054: Show selected perk on battle screen
 	_show_perk_indicator()
 
-	# Tutorial disabled 2026-04-14 — was blocking interaction for new players.
-	# The tutorial overlay covers the screen and prevents building card usage.
-	# Re-enable when tutorial flow is polished and tested.
-	# if PlayerData.games_played == 0 and GameManager.tutorial_mode:
-	#	_show_tutorial()
+	# 3.1 (2026-07-18): tutorial RE-ENABLED for first-run only. The 2026-04-14
+	# disable reason (overlay blocked all input) is fixed — tutorial.gd's root
+	# is MOUSE_FILTER_IGNORE now. Scenario: tests/scenarios/tutorial_first_run.gd
+	if PlayerData.games_played == 0 and GameManager.tutorial_mode:
+		_show_tutorial()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1201,6 +1201,7 @@ const TutorialScript := preload("res://scripts/ui/tutorial.gd")
 func _show_tutorial() -> void:
 	_tutorial_active = true
 	_tutorial_overlay = TutorialScript.new()
+	_tutorial_overlay.name = "TutorialOverlay"  # 3.1: scenario tap target
 	add_child(_tutorial_overlay)
 
 

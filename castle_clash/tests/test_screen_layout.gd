@@ -97,6 +97,7 @@ func _init() -> void:
 	_check_gold_bar_yellow()              # gold bar is a yellow ribbon, no red, no fill meter
 	_check_hud_fonts_quantized()          # hud.gd + card_hand.gd fonts in {16,32}
 	_check_hud_touch_targets()            # HP pill / card / ability / wrath sizes
+	_check_mode_selector_present()        # 3.1: Standard/Blitz/Mirror chips on the battle tab
 	# Screen-parity P2 — Menu shell + Battle tab (2026-07-10).
 	_check_menu_sky_not_flat_green()      # sky is a gradient, not a flat green wall
 	_check_tab_labels_legible()           # inactive tab labels cream, not 2.1:1 void
@@ -1088,6 +1089,46 @@ func _check_arena_no_floating_foliage() -> void:
 	else:
 		_assert_fail("foliage floating in water — L=%d R=%d px beyond the rim band, e.g. %s" % [bad_l, bad_r, worst],
 			"tree canopies must stay within 17px of the island rim; check frame-crop bleed")
+
+
+## 3.1: the game-mode selector row must be on the battle tab — 3 dark chip
+## bodies (design x 119..601, y 1076..1120 → cap x 83..421, y 753..784) with
+## gaps between them. Scans the chip mid-row (cap y≈768) for dark-chip runs
+## ((40,30,20) bg family). RED pre-3.1 (grass band → 0 runs), GREEN = exactly
+## 3 runs of ≥60 cap px. Spec: design/battle_mode_row_target.png (variant b).
+func _check_mode_selector_present() -> void:
+	print("[Game-mode selector chips (3.1)]")
+	var img := _load_capture(MENU_CAPTURE)
+	if img == null:
+		return
+	var sy: float = img.get_height() / 1280.0
+	var sx: float = img.get_width() / 720.0
+	var y_mid: int = roundi(1098.0 * sy)
+	var runs: int = 0
+	var cur: int = 0
+	var gap: int = 99
+	for x in range(roundi(100.0 * sx), roundi(620.0 * sx)):
+		var c: Color = img.get_pixel(x, y_mid)
+		# chip = dark body | gold ring/label | cream label (text crosses the row)
+		var is_chip: bool = (c.r < 0.35 and c.g < 0.30 and c.b < 0.25) \
+			or (c.r > 0.8 and c.g > 0.6 and c.b < 0.45) \
+			or (c.r > 0.85 and c.g > 0.8 and c.b > 0.6)
+		if is_chip:
+			cur = cur + 1 + mini(gap, 5) if cur > 0 else 1
+			gap = 0
+		else:
+			gap += 1
+			if gap > 5:
+				if cur >= roundi(60.0 * sx):
+					runs += 1
+				cur = 0
+	if cur >= roundi(60.0 * sx):
+		runs += 1
+	if runs == 3:
+		_assert_pass("mode selector present (3 chip runs at cap y=%d)" % y_mid)
+	else:
+		_assert_fail("mode selector missing/malformed — %d chip runs at cap y=%d (need 3)" % [runs, y_mid],
+			"Standard/Blitz/Mirror chips per design/battle_mode_row_target.png")
 
 
 func _in_any_box(boxes: Array, x: int, y: int) -> bool:

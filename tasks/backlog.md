@@ -18,7 +18,6 @@ before the fix, or the passing criterion.
 | 1A-3 | Hand-rolled two-finger pinch-zoom + pan from ScreenTouch/ScreenDrag; enable Android pan-and-scale | A2 | 1A | `pinch_zoom_pan` scenario asserts camera transform |
 | 1A-4 | Radial menu at true cell center; scale hit radius by zoom; kill double-fire path | A2 | 1A | `radial_menu_under_zoom` scenario (see BUG-34) |
 | 1A-5 | ⏳ PARTIAL (6ea781f: wheel event.pressed guard + ZOOM_MIN 1.0 done). TODO: reparent Blocked!/info popup to UILayer; zoom-to-cursor; fix middle-drag pan (consumed by STOP ColorRect) | A2 | 1A | popup renders in screen space regardless of pan/zoom |
-| 1B-1 | ⚠️ NEEDS USER: sync fix is committed (bdb34e6); deploy it — `cd castle_clash && ./build.sh` (needs brotli+wrangler+Cloudflare auth). Live build predates the fix. | A1 | 1B | served index.<hash>.pck newer than Apr 19 |
 | ~~1B-2~~ | ✅ DONE Surface lobby aborts in main_menu (NetworkManager.match_error → message + retry, version_mismatch → "refresh browser") | A2 | 1B | — |
 | 1B-3 | Total command ordering: per-player seq number; sort (player_id, seq) | A1 | 1B | test_multiplayer.gd asserts deterministic apply order |
 | ~~1B-4~~ | ✅ DONE Freeze match on desync (GameManager._on_desync_detected → MATCH_OVER + set_process(false)) | A1 | 1B | — |
@@ -56,11 +55,9 @@ before the fix, or the passing criterion.
 
 | ID | Item | Domain | Phase | Detector / Acceptance |
 |----|------|--------|-------|-----------------------|
-| 3.1 | Re-enable buried features: tutorial (gate games_played==0), game-mode selector (Blitz/Mirror). Faction selection DEFERRED (Decision 2) | A2 | 3 | tutorial + mode selector reachable |
 | 3.2 | Battle tab: single CTA hierarchy (merge BATTLE ribbon + PLAY ONLINE), legible inactive tab labels, progression display restored | A2 | 3 | per-screen golden + layout assertions |
 | 3.3 | Battle-zone READABILITY (HUD): gold elixir-bar fill + cheapest-card marker, locked cards→grayscale+padlock, wave preview strip | A2 | 3 | golden diff; no permanent red-card noise |
 | 3.4 | Mobile hardening: ability/wrath buttons ≥88px, safe-area insets on header/tab bar, tap-and-hold replaces hover | A2 | 3 | layout assertion: touch targets ≥88px |
-| 3.5 | End screen takeover: hide HUD/gold bar/card hand behind results; restore on replay | A2 | 3 | golden: results screen has no bleed-through |
 | 3.8 | Theme rollout: migrate remaining screens to Theme/ui_style; delete per-label overrides | A2 | 3 | per-screen golden after migration |
 
 ## Open bugs (qa-bug-tracker.md) — fold into the phase above they belong to

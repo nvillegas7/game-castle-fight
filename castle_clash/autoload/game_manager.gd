@@ -108,10 +108,11 @@ func start_test_match() -> void:
 	else:
 		ai_faction = &"horde" if selected_faction == &"kingdom" else &"kingdom"
 
-	# Tutorial disabled 2026-04-14 — was blocking interaction for new players.
-	# Re-enable when tutorial flow is polished.
-	tutorial_mode = false
-	tutorial_step = 4  # mark as completed
+	# 3.1 (2026-07-18): tutorial re-enabled for the FIRST offline game only.
+	# (2026-04-14 disable reason — overlay ate all input — fixed in tutorial.gd:
+	# root overlay is MOUSE_FILTER_IGNORE.) Online matches still skip it.
+	tutorial_mode = PlayerData.games_played == 0
+	tutorial_step = 1 if tutorial_mode else 4
 
 	var player_data := [
 		{ "id": 0, "team": 0, "faction": selected_faction, "perk": selected_perk },

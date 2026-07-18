@@ -36,7 +36,10 @@ func _ready() -> void:
 func _build_ui() -> void:
 	_overlay = Control.new()
 	_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	# 3.1 re-enable: IGNORE, not STOP — the STOP root ate every tap on screen
+	# ("tutorial blocks building card usage", the 2026-04-14 disable reason).
+	# The overlay is pure guidance; steps advance on sim events via EventBus.
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_overlay)
 
 	# Dark overlay — custom drawn with spotlight cutout
@@ -138,7 +141,9 @@ func _show_step(step: int) -> void:
 			_text_panel.size = Vector2(480, 60)
 			_got_it_btn.visible = false
 			_start_arrow_bob(990, 8)
-			_overlay.mouse_filter = Control.MOUSE_FILTER_PASS
+			# 3.1: IGNORE, not PASS — PASS still consumes the tap against lower
+			# CanvasLayers (the card hand); only IGNORE is true click-through.
+			_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 		Step.CARD_PLACE:
 			_set_spotlight(BUILD_ZONE_RECT)

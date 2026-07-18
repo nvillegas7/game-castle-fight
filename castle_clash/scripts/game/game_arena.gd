@@ -662,19 +662,15 @@ func _on_castle_hit(hit_team: int, _damage: int, _remaining_hp: int, attacker_id
 
 
 # T-022: Skill visual effects
-func _on_skill_activated(unit_id: int, skill_id: StringName) -> void:
+func _on_skill_activated(unit_id: int, skill_id: StringName, center: Vector2 = Vector2.INF) -> void:
 	if _unit_visuals.has(unit_id):
 		var visual = _unit_visuals[unit_id]
 		var effect_pos: Vector2 = visual.position
-		# T-084 fireball: the splash lands at the attacker's TARGET, not on
-		# the mage himself. Look up the sim target and render the burst there.
-		if skill_id == &"fireball" and GameManager.simulation:
-			var unit = GameManager.simulation._find_entity_by_id(unit_id)
-			if unit and unit.get("target_id", -1) != -1:
-				var tgt = GameManager.simulation._find_entity_by_id(unit.target_id)
-				if tgt:
-					var tgt_pos := Vector2(FP.to_float(tgt.x), FP.to_float(tgt.y))
-					effect_pos = sim_to_screen(tgt_pos)
+		# T-084/1D-2 fireball: the splash lands at the EVENT's center payload —
+		# the sim's coords at proc time. (The old live re-lookup chased a target
+		# that could move or die before the visual layer handled the event.)
+		if skill_id == &"fireball" and center.is_finite():
+			effect_pos = sim_to_screen(center)
 		var effect := Effects.create_skill_effect(skill_id, effect_pos, visual.team)
 		units_layer.add_child(effect)
 	# T-029: Per-skill differentiated SFX

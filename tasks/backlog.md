@@ -29,7 +29,6 @@ before the fix, or the passing criterion.
 | ~~1C-5~~ | ✅ DONE Removed ~171 lines dead code (_separate_units, LOS helpers, combat_flow_fields, _cell_team_count, hysteresis). Kept aggro_range (in checksum) + flow_fields (tool reads it). Golden byte-identical → zero behavior change. | A5 | 1C | — |
 | ~~1C-6~~ | ✅ DONE (a7efa38) set_walk_speed_ratio added to procedural fallback — no more per-frame error | A2 | 1C | — |
 | ~~1D-1~~ | ✅ DONE (060f5b9) EventBus.ability_activated signal + game_manager dispatch arm (event was dropped) + game_arena ring/SFX for BOTH teams from sim-confirmed event. test_combat_feel 8/0 | A5→A2 | 1D | — |
-| 1D-2 | Fireball splash uses event payload coords (kill live sim re-lookup) | A5/A2 | 1D | splash VFX at event-reported center |
 | 1D-3 | castle_wrath_refused → button shake/toast; ready-chime only for LOCAL player's castle | A2 | 1D | refusal feedback shown; chime not cross-fired |
 | 1D-4 | Emit skill_proc for the six silent skills or delete their dead VFX/SFX branches | A5 | 1D | each skill either fires or has no dead branch |
 | 1D-6 | Rally/Rage buff readability: brief tint or speed-lines on buffed units | A2 | 1D | buffed units visually distinct |

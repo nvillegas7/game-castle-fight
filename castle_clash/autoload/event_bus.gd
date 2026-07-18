@@ -26,7 +26,9 @@ signal unit_spawned(unit_id: int, unit_type: StringName)
 signal unit_died(unit_id: int, killer_id: int, bounty: int, pos_x: float, pos_y: float)
 signal unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: float, target_y: float)
 signal unit_healed(healer_id: int, target_id: int, amount: int, target_x: float, target_y: float)
-signal skill_activated(unit_id: int, skill_id: StringName)
+# 1D-2: center = sim-space splash coords from the skill_proc payload
+# (Vector2.INF when the skill has no ground point).
+signal skill_activated(unit_id: int, skill_id: StringName, center: Vector2)
 ## Special-building active ability (War Horn rally_cry, Blood Totem blood_rage).
 ## Fires for BOTH teams from the sim, so enemy activations are visible/audible.
 signal ability_activated(building_id: int, team: int, ability: String, duration: int)

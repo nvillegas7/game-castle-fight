@@ -342,7 +342,12 @@ func _advance_simulation_tick() -> void:
 			"prep_phase_ended":
 				EventBus.prep_phase_ended.emit()
 			"skill_proc":
-				EventBus.skill_activated.emit(event.unit_id, StringName(event.skill))
+				# 1D-2: forward the sim's splash center so the visual layer
+				# never re-looks-up a moving/dead target in the live sim.
+				var skill_center := Vector2.INF
+				if event.has("center_x"):
+					skill_center = Vector2(FP.to_float(event.center_x), FP.to_float(event.center_y))
+				EventBus.skill_activated.emit(event.unit_id, StringName(event.skill), skill_center)
 			"ability_activated":
 				# Was silently dropped — no arm here — so War Horn / Blood Totem
 				# activations were invisible + inaudible (esp. the enemy's).

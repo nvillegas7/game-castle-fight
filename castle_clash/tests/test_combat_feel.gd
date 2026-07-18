@@ -11,6 +11,7 @@ func _init() -> void:
 	print("\n=== COMBAT FEEL ===\n")
 	_test_walk_cadence()
 	_test_ability_activation()
+	_test_fireball_center_payload()
 	print("\n=== Results: %d passed, %d failed ===" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -39,6 +40,26 @@ func _test_walk_cadence() -> void:
 	_ok("half speed -> ~0.5x cadence", is_equal_approx(CombatTuning.walk_ratio_for_speed(2.24), 0.5),
 		"got %f" % CombatTuning.walk_ratio_for_speed(2.24))
 	_ok("stationary -> 1.0 (no divide-by-zero)", CombatTuning.walk_ratio_for_speed(0.0) == 1.0)
+
+
+## 1D-2: the fireball splash must render from the EVENT payload, not a live
+## sim re-lookup (the sim advances before the visual layer handles the event).
+func _test_fireball_center_payload() -> void:
+	print("[Fireball splash center payload (1D-2)]")
+	# (a) construction: game_manager's skill_proc dispatch must forward the
+	# center to EventBus (the old arm dropped it).
+	var gm_src: String = FileAccess.get_file_as_string("res://autoload/game_manager.gd")
+	var arm: int = gm_src.find("\"skill_proc\":")
+	var arm_src: String = gm_src.substr(arm, 260) if arm >= 0 else ""
+	_ok("skill_proc dispatch forwards center payload",
+		arm_src.contains("center_x"), "game_manager skill_proc arm drops center_x/center_y")
+	# (b) the visual handler must NOT re-look-up the live sim
+	var ga_src: String = FileAccess.get_file_as_string("res://scripts/game/game_arena.gd")
+	var handler: int = ga_src.find("func _on_skill_activated")
+	var handler_src: String = ga_src.substr(handler, 900) if handler >= 0 else ""
+	_ok("skill handler has no live-sim private re-lookup",
+		not handler_src.contains("_find_entity_by_id"),
+		"fireball splash still re-looks-up the moving target in the live sim")
 
 
 func _test_ability_activation() -> void:

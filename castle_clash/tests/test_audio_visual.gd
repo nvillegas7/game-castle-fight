@@ -97,7 +97,7 @@ func _on_building_destroyed(building_id: int) -> void:
 func _on_castle_damaged(team: int, damage: int, remaining: int, attacker_id: int) -> void:
 	_log_audio("combat", "play_castle_hit", "team=%d dmg=%d rem=%d" % [team, damage, remaining])
 
-func _on_skill_activated(unit_id: int, skill_id: StringName) -> void:
+func _on_skill_activated(unit_id: int, skill_id: StringName, _center: Vector2 = Vector2.INF) -> void:
 	_log_audio("combat", "play_skill", "unit=%d skill=%s" % [unit_id, skill_id])
 
 func _on_wave_started(wave: int) -> void:

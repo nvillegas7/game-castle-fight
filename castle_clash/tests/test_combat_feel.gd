@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_fireball_center_payload()
 	_test_no_dead_skill_branches()
 	_test_wrath_refusal_feedback()
+	_test_aoe_swing_dedupe()
 	print("\n=== Results: %d passed, %d failed ===" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -99,6 +100,16 @@ func _test_wrath_refusal_feedback() -> void:
 	_ok("game_arena listens to castle_wrath_refused",
 		ga.contains("castle_wrath_refused.connect"),
 		"refusals are silent — no shake/toast handler connected")
+
+
+## 1C-4: an AoE attack emits N unit_attacked events (one per victim) — the
+## attacker's swing/SFX/projectile must fire ONCE per attack, not N times.
+func _test_aoe_swing_dedupe() -> void:
+	print("[AoE attacker-FX dedupe (1C-4)]")
+	var ga: String = FileAccess.get_file_as_string("res://scripts/game/game_arena.gd")
+	_ok("attacker FX guarded per attacker per tick",
+		ga.contains("_attacker_fx_tick"),
+		"multi-victim events replay the swing/projectile per victim")
 
 
 func _test_ability_activation() -> void:

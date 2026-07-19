@@ -81,6 +81,8 @@ var _ambient_time: float = 0.0
 # T-043: Ability buttons
 var _ability_buttons: Dictionary = {}   # building_id -> Control
 var _ability_container: HBoxContainer = null
+# 1C-4: attacker_id -> last sim tick attacker-side attack FX played (dedupe)
+var _attacker_fx_tick: Dictionary = {}
 
 const ROLE_CHARS := ["M", "R", "C", "F", "S"]  # Melee, Ranged, Caster, Flying, Siege
 
@@ -596,8 +598,14 @@ func _on_unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: 
 		GameManager.advance_tutorial(3)
 	# T-085: Transform sim coords → screen coords
 	var target_pos := sim_to_screen(Vector2(target_x, target_y))
+	# 1C-4: attacker-side FX (sound, swing, hitstop, projectile) fire ONCE per
+	# attack — an AoE emits one unit_attacked per victim in the same tick, and
+	# replaying the swing N times read as machine-gun stutter. Victim-side FX
+	# (damage number, flash, hit-stop) stay per-event.
+	var first_fx: bool = _attacker_fx_tick.get(attacker_id, -1) != GameManager.current_tick
+	_attacker_fx_tick[attacker_id] = GameManager.current_tick
 	# Sound
-	if _unit_visuals.has(attacker_id):
+	if first_fx and _unit_visuals.has(attacker_id):
 		var av = _unit_visuals[attacker_id]
 		if av.position.distance_to(target_pos) > 40:
 			SFX.play_shoot(av.role)
@@ -610,15 +618,15 @@ func _on_unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: 
 		_unit_visuals[target_id].flash_hit()
 		# T-059: Hit-stop on target (2-frame freeze for combat crunch)
 		_unit_visuals[target_id].trigger_hitstop()
-	# Attack animation on attacker
-	if _unit_visuals.has(attacker_id):
+	# Attack animation on attacker (once per attack — see first_fx above)
+	if first_fx and _unit_visuals.has(attacker_id):
 		var attacker_visual = _unit_visuals[attacker_id]
 		# T-059: Hit-stop on attacker
 		attacker_visual.trigger_hitstop()
 		attacker_visual.play_attack(target_pos)
 		var from_p: Vector2 = attacker_visual.position
 		_spawn_attack_projectile(attacker_visual, from_p, target_pos)
-	elif _building_visuals.has(attacker_id):
+	elif first_fx and _building_visuals.has(attacker_id):
 		# Tower attack — fire a projectile from the building to the target
 		var tower_visual = _building_visuals[attacker_id]
 		var tower_center: Vector2 = tower_visual.position

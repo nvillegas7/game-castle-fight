@@ -25,7 +25,6 @@ before the fix, or the passing criterion.
 | ~~1C-1~~ | ✅ DONE (a7efa38) Foot-skate fixed — CombatTuning.walk_ratio_for_speed (px/tick baseline 4.48, was px/sec 44.8). test_combat_feel 5/0 | A2 | 1C | — |
 | ~~1C-2~~ | ✅ DONE (d84d354) Hit-stop real — freeze sprite frame + hold position on impact (is_in_hitstop guard) | A2 | 1C | — |
 | 1C-3 | Impact timing: delay damage number/flash to strike frame (melee) / projectile arrival (ranged); arrow impact puff | A2 | 1C | damage number fires on impact frame |
-| 1C-4 | Dedupe attacker swing VFX on AoE multi-victim events | A2 | 1C | one swing VFX per attack, N hit VFX |
 | ~~1C-5~~ | ✅ DONE Removed ~171 lines dead code (_separate_units, LOS helpers, combat_flow_fields, _cell_team_count, hysteresis). Kept aggro_range (in checksum) + flow_fields (tool reads it). Golden byte-identical → zero behavior change. | A5 | 1C | — |
 | ~~1C-6~~ | ✅ DONE (a7efa38) set_walk_speed_ratio added to procedural fallback — no more per-frame error | A2 | 1C | — |
 | ~~1D-1~~ | ✅ DONE (060f5b9) EventBus.ability_activated signal + game_manager dispatch arm (event was dropped) + game_arena ring/SFX for BOTH teams from sim-confirmed event. test_combat_feel 8/0 | A5→A2 | 1D | — |

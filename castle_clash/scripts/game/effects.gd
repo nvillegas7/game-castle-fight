@@ -232,12 +232,9 @@ static func create_skill_effect(skill: StringName, pos: Vector2, team: int = 0) 
 			return _create_glow_flash(pos, Color(1.0, 0.2, 0.1, 0.7), 12.0)
 		&"burning_ground":
 			return create_fire(pos, 0.3)
-		&"devotion_aura":
-			return _create_aura_ring(pos, Color(1.0, 0.85, 0.2))
-		&"cleave":
-			return _create_cleave_arc(pos, tc)
-		&"siege_momentum":
-			return _create_glow_flash(pos, Color(0.9, 0.5, 0.1, 0.8), 16.0)
+		# 1D-4 (2026-07-19): devotion_aura / cleave / siege_momentum branches
+		# DELETED — the sim never emits skill_proc for them (passives/no such
+		# skill), so the arms were unreachable. Re-add together with a sim proc.
 		&"charge", &"charge_hit":
 			return _create_glow_flash(pos, Color(0.9, 0.6, 0.15, 0.7), 10.0)
 		&"volley":
@@ -306,26 +303,6 @@ static func _create_ring_pulse(pos: Vector2, color: Color, max_radius: float) ->
 	node._max_radius = max_radius
 	return node
 
-
-## T-022: Devotion Aura — pulsing gold ring that lingers briefly
-static func _create_aura_ring(pos: Vector2, color: Color) -> Node2D:
-	var node := _AuraRing.new()
-	node.position = pos
-	node.z_index = 41
-	node._color = color
-	return node
-
-
-## T-022: Cleave — arc slash effect at target position
-static func _create_cleave_arc(pos: Vector2, team_color: Color) -> Node2D:
-	var node := _CleaveArc.new()
-	node.position = pos
-	node.z_index = 46
-	node._color = team_color
-	return node
-
-
-## T-022: Piercing Shot — bright white arrow trail on proc
 static func _create_piercing_trail(pos: Vector2) -> Node2D:
 	var node := _PiercingTrail.new()
 	node.position = pos

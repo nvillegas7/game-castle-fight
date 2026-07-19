@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_walk_cadence()
 	_test_ability_activation()
 	_test_fireball_center_payload()
+	_test_no_dead_skill_branches()
 	print("\n=== Results: %d passed, %d failed ===" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -60,6 +61,33 @@ func _test_fireball_center_payload() -> void:
 	_ok("skill handler has no live-sim private re-lookup",
 		not handler_src.contains("_find_entity_by_id"),
 		"fireball splash still re-looks-up the moving target in the live sim")
+
+
+## 1D-4: every per-skill VFX/SFX branch must correspond to a skill the sim
+## actually procs — dead branches imply feedback the player can never see.
+func _test_no_dead_skill_branches() -> void:
+	print("[No dead skill VFX/SFX branches (1D-4)]")
+	var sim_src: String = FileAccess.get_file_as_string("res://core/simulation.gd")
+	var proc_re := RegEx.new()
+	proc_re.compile("\"skill\": \"([a-z_]+)\"")
+	var procd := {}
+	for m in proc_re.search_all(sim_src):
+		procd[m.get_string(1)] = true
+	var branch_re := RegEx.new()
+	branch_re.compile("&\"([a-z_]+)\":")
+	# Generic effect ids used internally by effects.gd, not skill branches.
+	var generic := {"dust": true, "explosion": true, "fire": true, "heal_effect": true}
+	var dead: Array = []
+	for src_path in ["res://scripts/game/effects.gd", "res://autoload/sfx.gd"]:
+		var src: String = FileAccess.get_file_as_string(src_path)
+		# Only scan the skill-dispatch match blocks (create_skill_effect / play_skill)
+		var start: int = src.find("create_skill_effect") if src_path.contains("effects") else src.find("func play_skill")
+		var block: String = src.substr(start, 3600) if start >= 0 else ""
+		for m in branch_re.search_all(block):
+			var id := m.get_string(1)
+			if not procd.has(id) and not generic.has(id):
+				dead.append("%s: &\"%s\"" % [src_path.get_file(), id])
+	_ok("no dead per-skill branches (sim never procs them)", dead.is_empty(), str(dead))
 
 
 func _test_ability_activation() -> void:

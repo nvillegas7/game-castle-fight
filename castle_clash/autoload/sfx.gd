@@ -437,27 +437,14 @@ func play_skill(skill_id: StringName = &"") -> void:
 	# Try file-based first for generic skill sound
 	if skill_id == &"" and _play_sfx_file("skill"):
 		return
-	# Per-skill procedural synthesis
+	# Per-skill procedural synthesis. (1D-4: devotion_aura/cleave arms deleted —
+	# the sim never procs them; re-add together with a sim-side skill_proc.)
 	match skill_id:
-		&"devotion_aura":
-			# Soft chime/hum
-			_play_layered([
-				{"freq": 880, "dur": 0.2, "vol": 0.1, "type": "sine", "attack": 0.05},
-				{"freq": 1320, "dur": 0.15, "vol": 0.06, "type": "sine", "attack": 0.04, "delay": 0.05},
-				{"freq": 660, "dur": 0.3, "vol": 0.08, "type": "sine", "attack": 0.1},
-			])
 		&"piercing_shot":
 			# Sharp whistle
 			_play_layered([
 				{"freq": 1800, "dur": 0.1, "vol": 0.15, "type": "sine", "slide": 600, "attack": 0.002},
 				{"freq": 0, "dur": 0.02, "vol": 0.1, "type": "noise", "attack": 0.001},
-			])
-		&"cleave":
-			# Heavy slash
-			_play_layered([
-				{"freq": 0, "dur": 0.06, "vol": 0.3, "type": "noise", "attack": 0.001},
-				{"freq": 200, "dur": 0.12, "vol": 0.2, "type": "saw", "slide": -150, "attack": 0.002},
-				{"freq": 80, "dur": 0.08, "vol": 0.15, "type": "sine", "delay": 0.04},
 			])
 		&"mana_shield":
 			# Glass/crystal barrier

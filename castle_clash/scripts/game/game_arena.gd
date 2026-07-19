@@ -113,6 +113,7 @@ func _ready() -> void:
 	EventBus.skill_activated.connect(_on_skill_activated)
 	# T-090 Castle Wrath — HUD button + shockwave VFX
 	EventBus.castle_wrath_ready.connect(_on_castle_wrath_ready)
+	EventBus.castle_wrath_refused.connect(_on_castle_wrath_refused)
 	EventBus.castle_wrath_activated.connect(_on_castle_wrath_activated)
 	# 1D-1: special-building ability activations (both teams) → ring + SFX
 	EventBus.ability_activated.connect(_on_ability_activated)
@@ -972,6 +973,35 @@ func _on_castle_wrath_ready(team: int, _castle_id: int) -> void:
 	if pi < 0 or GameManager.simulation.players[pi].team != team:
 		return
 	_spawn_castle_wrath_button()
+
+
+## 1D-3: refused wrath gets visible feedback — button shake + reason toast.
+## Local player only (the opponent's refusals are not our feedback).
+func _on_castle_wrath_refused(team: int, reason: String) -> void:
+	if GameManager.simulation == null:
+		return
+	var pi: int = GameManager.simulation.get_player_index(GameManager.local_player_id)
+	if pi < 0 or GameManager.simulation.players[pi].team != team:
+		return
+	if _castle_wrath_btn and is_instance_valid(_castle_wrath_btn):
+		var home_x: float = _castle_wrath_btn.position.x
+		var tw := _castle_wrath_btn.create_tween()
+		for off in [8.0, -8.0, 5.0, -5.0, 0.0]:
+			tw.tween_property(_castle_wrath_btn, "position:x", home_x + off, 0.05)
+	var toast := Label.new()
+	toast.text = "Castle Wrath: " + ("castle not damaged enough" if reason == &"" or reason == "hp_too_high" else reason.replace("_", " "))
+	toast.position = Vector2(360 - 180, 860)
+	toast.size = Vector2(360, 30)
+	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	toast.add_theme_font_size_override("font_size", 16)
+	toast.add_theme_color_override("font_color", Color(1, 0.65, 0.4))
+	toast.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02))
+	toast.add_theme_constant_override("outline_size", 3)
+	$UILayer.add_child(toast)
+	var ttw := toast.create_tween()
+	ttw.tween_interval(1.4)
+	ttw.tween_property(toast, "modulate:a", 0.0, 0.5)
+	ttw.tween_callback(toast.queue_free)
 
 
 func _spawn_castle_wrath_button() -> void:

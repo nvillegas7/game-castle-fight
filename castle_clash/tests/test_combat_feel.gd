@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_ability_activation()
 	_test_fireball_center_payload()
 	_test_no_dead_skill_branches()
+	_test_wrath_refusal_feedback()
 	print("\n=== Results: %d passed, %d failed ===" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -88,6 +89,16 @@ func _test_no_dead_skill_branches() -> void:
 			if not procd.has(id) and not generic.has(id):
 				dead.append("%s: &\"%s\"" % [src_path.get_file(), id])
 	_ok("no dead per-skill branches (sim never procs them)", dead.is_empty(), str(dead))
+
+
+## 1D-3: a refused Castle Wrath must produce visible feedback — the sim emits
+## castle_wrath_refused but nothing listened (silent refusal).
+func _test_wrath_refusal_feedback() -> void:
+	print("[Castle Wrath refusal feedback (1D-3)]")
+	var ga: String = FileAccess.get_file_as_string("res://scripts/game/game_arena.gd")
+	_ok("game_arena listens to castle_wrath_refused",
+		ga.contains("castle_wrath_refused.connect"),
+		"refusals are silent — no shake/toast handler connected")
 
 
 func _test_ability_activation() -> void:

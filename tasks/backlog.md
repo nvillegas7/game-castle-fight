@@ -29,7 +29,6 @@ before the fix, or the passing criterion.
 | ~~1C-5~~ | ✅ DONE Removed ~171 lines dead code (_separate_units, LOS helpers, combat_flow_fields, _cell_team_count, hysteresis). Kept aggro_range (in checksum) + flow_fields (tool reads it). Golden byte-identical → zero behavior change. | A5 | 1C | — |
 | ~~1C-6~~ | ✅ DONE (a7efa38) set_walk_speed_ratio added to procedural fallback — no more per-frame error | A2 | 1C | — |
 | ~~1D-1~~ | ✅ DONE (060f5b9) EventBus.ability_activated signal + game_manager dispatch arm (event was dropped) + game_arena ring/SFX for BOTH teams from sim-confirmed event. test_combat_feel 8/0 | A5→A2 | 1D | — |
-| 1D-3 | castle_wrath_refused → button shake/toast; ready-chime only for LOCAL player's castle | A2 | 1D | refusal feedback shown; chime not cross-fired |
 | 1D-6 | Rally/Rage buff readability: brief tint or speed-lines on buffed units | A2 | 1D | buffed units visually distinct |
 
 ## New (2026-07-10)
@@ -61,5 +60,4 @@ before the fix, or the passing criterion.
 | BUG-40 | Walk animation cadence vs move speed (PENDING LIVE PLAYTEST) | A2 | 1C | HIGH; overlaps 1C-1; needs human eyes on windowed game |
 | BUG-34 | Radial menu dismiss races with button click (can't sell/inspect in MP) | A2 | 1A | MEDIUM; overlaps 1A-4; kill deferred double-dismiss |
 | BUG-30 | Card bottom-text overlap in 2-row layout | A2 | 3 | MEDIUM; hide stats when card h<110 |
-| BUG-29 | Gold coin icon far from gold text in battle HUD | A2 | 3 | LOW; left-align gold label |
 | BUG-35 | MP command delivery unverified — no ACK/retransmit (P2 hardening, superseded by DESYNC1) | A1 | 1B | P2; overlaps 1B-6; explicit ACK + bounded retransmit |

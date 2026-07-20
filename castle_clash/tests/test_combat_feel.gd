@@ -15,6 +15,12 @@ func _init() -> void:
 	_test_no_dead_skill_branches()
 	_test_wrath_refusal_feedback()
 	_test_aoe_swing_dedupe()
+	_test_impact_timing()
+	# Silent-abort guard: a runtime script error inside a test function aborts
+	# it mid-way — remaining asserts never run and the suite can go green
+	# vacuously (bit us in 1C-3 when a load() crashed). Bump when adding asserts.
+	_ok("all 21 asserts ran (silent-abort ratchet)", _pass + _fail == 21,
+		"ran %d — a test function aborted early or the count needs a bump" % (_pass + _fail))
 	print("\n=== Results: %d passed, %d failed ===" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -110,6 +116,60 @@ func _test_aoe_swing_dedupe() -> void:
 	_ok("attacker FX guarded per attacker per tick",
 		ga.contains("_attacker_fx_tick"),
 		"multi-victim events replay the swing/projectile per victim")
+
+
+## 1C-3: victim-side FX (damage number, flash, hit-stop, melee hit SFX) must
+## land on the strike frame (melee wind-up) / projectile arrival (ranged) —
+## not at attack initiation. Effects.flight_time is the single source of truth
+## for projectile durations on BOTH the sprite path and the tween fallback.
+func _test_impact_timing() -> void:
+	print("[Impact timing (1C-3)]")
+	# flight_time lives in CombatTuning (pure, autoload-free) — effects.gd
+	# itself references SpriteRegistry so it can't even LOAD in -s headless
+	# mode; a load() crash here aborts the rest of this function silently
+	# (hence the assert-count ratchet at the end of the suite).
+	var ct_src: String = FileAccess.get_file_as_string("res://scripts/game/combat_tuning.gd")
+	var has_ft: bool = ct_src.contains("static func flight_time(")
+	_ok("CombatTuning.flight_time exists", has_ft, "no single source of truth for flight durations")
+	if has_ft:
+		# .call keeps resolution at runtime — a parse-time reference makes the
+		# whole suite unloadable while the func is missing (RED must stay clean).
+		var ct: GDScript = load("res://scripts/game/combat_tuning.gd")
+		var far: float = ct.call("flight_time", &"arrow", Vector2.ZERO, Vector2(0, 440))
+		var near: float = ct.call("flight_time", &"arrow", Vector2.ZERO, Vector2(0, 1))
+		_ok("arrow: 440px at 220px/s -> 2.0s, point-blank floored at 0.15s",
+			is_equal_approx(far, 2.0) and is_equal_approx(near, 0.15),
+			"far=%f near=%f" % [far, near])
+		var rock: float = ct.call("flight_time", &"rock", Vector2.ZERO, Vector2(0, 440))
+		_ok("rock slower than arrow over the same distance", rock > far,
+			"rock=%f arrow=%f" % [rock, far])
+		_ok("tower bolt keeps its fixed 0.2s",
+			is_equal_approx(ct.call("flight_time", &"tower", Vector2.ZERO, Vector2(0, 300)), 0.2))
+	# Drift guard: creators must derive durations from flight_time, not
+	# re-inlined formulas (or the deferred FX silently desyncs from the visual).
+	var eff_src: String = FileAccess.get_file_as_string("res://scripts/game/effects.gd")
+	_ok("projectile creators derive durations from CombatTuning.flight_time",
+		not eff_src.contains("maxf(dist / ") and eff_src.contains("CombatTuning.flight_time(&"),
+		"a creator recomputes its own duration — delay will drift from arrival")
+	# strike_delay on both visual classes (construction — the scripts reference
+	# the SpriteRegistry autoload so they can't compile in -s headless mode).
+	# The sprite path must guard _has_sprites: a bare visual returns 0.0.
+	for path in ["res://scripts/game/sprite_unit_visual.gd", "res://scripts/game/unit_visual.gd"]:
+		var src: String = FileAccess.get_file_as_string(path)
+		var at: int = src.find("func strike_delay")
+		var body: String = src.substr(at, 400) if at >= 0 else ""
+		var guarded: bool = body.contains("_has_sprites") if path.contains("sprite_") else body.contains("0.0")
+		_ok("%s has a spriteless-safe strike_delay()" % path.get_file(), at >= 0 and guarded,
+			"missing, or no spriteless guard/0.0 fallback")
+	# Construction: the attack handler defers victim FX via _impact_fx instead
+	# of inlining the damage number at initiation.
+	var ga_src: String = FileAccess.get_file_as_string("res://scripts/game/game_arena.gd")
+	var h0: int = ga_src.find("func _on_unit_attacked")
+	var h1: int = ga_src.find("func _on_unit_healed")
+	var handler: String = ga_src.substr(h0, h1 - h0) if (h0 >= 0 and h1 > h0) else ""
+	_ok("_on_unit_attacked defers victim FX through _impact_fx",
+		handler.contains("_impact_fx") and not handler.contains("create_damage_number("),
+		"damage number still fires at attack initiation")
 
 
 func _test_ability_activation() -> void:

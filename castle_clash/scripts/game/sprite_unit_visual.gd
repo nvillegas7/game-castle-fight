@@ -184,6 +184,21 @@ func is_in_hitstop() -> bool:
 	return _hitstop_timer > 0.0
 
 
+## 1C-3: seconds from play_attack() until the strike frame lands — the wind-up
+## phase below (40% of frames at 0.6x speed). game_arena defers victim-side
+## impact FX (damage number, flash, hit SFX) by this long for melee attacks.
+func strike_delay() -> float:
+	if not _has_sprites or _sprite == null or _sprite.sprite_frames == null:
+		return 0.0
+	if not _sprite.sprite_frames.has_animation(ANIM_ATTACK):
+		return 0.0
+	var frame_count: int = _sprite.sprite_frames.get_frame_count(ANIM_ATTACK)
+	var fps: float = _sprite.sprite_frames.get_animation_speed(ANIM_ATTACK)
+	if frame_count < 3 or fps <= 0.0:
+		return 0.0
+	return ceili(frame_count * 0.4) / (fps * 0.6)
+
+
 ## Play attack animation with timing contrast (slow wind-up, fast strike, medium recovery).
 func play_attack(target_pos: Vector2 = Vector2.ZERO) -> void:
 	if not _has_sprites:

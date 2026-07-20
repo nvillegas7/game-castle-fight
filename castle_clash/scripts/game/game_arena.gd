@@ -83,6 +83,9 @@ var _ability_buttons: Dictionary = {}   # building_id -> Control
 var _ability_container: HBoxContainer = null
 # 1C-4: attacker_id -> last sim tick attacker-side attack FX played (dedupe)
 var _attacker_fx_tick: Dictionary = {}
+# 1C-3: attacker_id -> impact delay of that attack, so same-tick AoE sibling
+# events (which skip the first_fx block) defer their victim FX identically
+var _attacker_impact_delay: Dictionary = {}
 
 const ROLE_CHARS := ["M", "R", "C", "F", "S"]  # Melee, Ranged, Caster, Flying, Siege
 
@@ -604,33 +607,42 @@ func _on_unit_attacked(attacker_id: int, target_id: int, damage: int, target_x: 
 	# (damage number, flash, hit-stop) stay per-event.
 	var first_fx: bool = _attacker_fx_tick.get(attacker_id, -1) != GameManager.current_tick
 	_attacker_fx_tick[attacker_id] = GameManager.current_tick
-	# Sound
-	if first_fx and _unit_visuals.has(attacker_id):
-		var av = _unit_visuals[attacker_id]
-		if av.position.distance_to(target_pos) > 40:
-			SFX.play_shoot(av.role)
-		else:
-			SFX.play_hit(av.role)
-	# Damage number
-	units_layer.add_child(Effects.create_damage_number(damage, target_pos))
-	# Hit flash on target
-	if _unit_visuals.has(target_id):
-		_unit_visuals[target_id].flash_hit()
-		# T-059: Hit-stop on target (2-frame freeze for combat crunch)
-		_unit_visuals[target_id].trigger_hitstop()
-	# Attack animation on attacker (once per attack — see first_fx above)
-	if first_fx and _unit_visuals.has(attacker_id):
-		var attacker_visual = _unit_visuals[attacker_id]
-		# T-059: Hit-stop on attacker
-		attacker_visual.trigger_hitstop()
-		attacker_visual.play_attack(target_pos)
-		var from_p: Vector2 = attacker_visual.position
-		_spawn_attack_projectile(attacker_visual, from_p, target_pos)
-	elif first_fx and _building_visuals.has(attacker_id):
-		# Tower attack — fire a projectile from the building to the target
-		var tower_visual = _building_visuals[attacker_id]
-		var tower_center: Vector2 = tower_visual.position
-		units_layer.add_child(Effects.create_projectile(tower_center, target_pos, Color(1.0, 0.7, 0.2), 0.2))
+	# 1C-3: attacker-side FX fire NOW (swing, launch, shoot SFX); victim-side FX
+	# (damage number, flash, hit-stop, melee hit SFX, arrival puff) defer until
+	# the strike frame (melee wind-up) / projectile arrival.
+	var hit_role: int = -1     # melee hit SFX at impact; -1 = none (this event)
+	var puff: bool = false     # projectile-arrival dust (once per attack)
+	if first_fx:
+		var impact_delay: float = 0.0
+		if _unit_visuals.has(attacker_id):
+			var attacker_visual = _unit_visuals[attacker_id]
+			# T-059: Hit-stop on attacker
+			attacker_visual.trigger_hitstop()
+			attacker_visual.play_attack(target_pos)
+			var flight: float = _spawn_attack_projectile(attacker_visual, attacker_visual.position, target_pos)
+			if flight > 0.0:
+				SFX.play_shoot(attacker_visual.role)
+				impact_delay = flight
+				puff = true
+			else:
+				hit_role = attacker_visual.role
+				impact_delay = attacker_visual.strike_delay()
+		elif _building_visuals.has(attacker_id):
+			# Tower attack — fire a projectile from the building to the target
+			var tower_visual = _building_visuals[attacker_id]
+			var flight: float = CombatTuning.flight_time(&"tower", tower_visual.position, target_pos)
+			units_layer.add_child(Effects.create_projectile(tower_visual.position, target_pos, Color(1.0, 0.7, 0.2), flight))
+			impact_delay = flight
+			puff = true
+		_attacker_impact_delay[attacker_id] = impact_delay
+	var delay: float = _attacker_impact_delay.get(attacker_id, 0.0)
+	if delay > 0.03:
+		# Node-bound tween: auto-killed if the arena is freed before impact.
+		var tw := create_tween()
+		tw.tween_interval(delay)
+		tw.tween_callback(_impact_fx.bind(target_id, damage, target_pos, hit_role, puff))
+	else:
+		_impact_fx(target_id, damage, target_pos, hit_role, puff)
 
 
 func _on_unit_healed(healer_id: int, _target_id: int, amount: int, target_x: float, target_y: float) -> void:
@@ -688,31 +700,46 @@ func _on_skill_activated(unit_id: int, skill_id: StringName, center: Vector2 = V
 
 ## Spawn the appropriate projectile based on attacker role/type.
 ## Shared between unit-vs-unit and unit-vs-castle attacks.
-func _spawn_attack_projectile(attacker_visual: Node2D, from_p: Vector2, target_pos: Vector2) -> void:
+## 1C-3: returns the projectile flight time (0.0 = melee, no projectile) so
+## the caller can defer victim-side impact FX until arrival.
+func _spawn_attack_projectile(attacker_visual: Node2D, from_p: Vector2, target_pos: Vector2) -> float:
 	if attacker_visual.role == 4:  # Siege — differentiate catapult (rock) vs ballista (bolt)
 		var ut: StringName = attacker_visual.unit_type
-		if ut == &"ballista_unit" or ut == &"scorpion":
-			var proj := Effects.create_bolt_projectile(from_p, target_pos, attacker_visual.team)
-			if proj:
-				units_layer.add_child(proj)
-		else:
-			var proj := Effects.create_rock_projectile(from_p, target_pos, attacker_visual.team)
-			if proj:
-				units_layer.add_child(proj)
-	elif attacker_visual.role == 1:  # Ranged
+		var kind: StringName = &"bolt" if (ut == &"ballista_unit" or ut == &"scorpion") else &"rock"
+		var proj := Effects.create_bolt_projectile(from_p, target_pos, attacker_visual.team) \
+			if kind == &"bolt" else Effects.create_rock_projectile(from_p, target_pos, attacker_visual.team)
+		if proj:
+			units_layer.add_child(proj)
+		return CombatTuning.flight_time(kind, from_p, target_pos)
+	elif attacker_visual.role == 1 or attacker_visual.role == 3:  # Ranged / Flying
 		var proj := Effects.create_arrow_projectile(from_p, target_pos, attacker_visual.team)
 		if proj:
 			units_layer.add_child(proj)
+		return CombatTuning.flight_time(&"arrow", from_p, target_pos)
 	elif attacker_visual.role == 2:  # Caster — magic projectile (T-083)
 		var proj := Effects.create_fireball_projectile(from_p, target_pos, attacker_visual.team)
 		if proj:
 			units_layer.add_child(proj)
-	elif attacker_visual.role == 3:  # Flying — also ranged
-		var proj := Effects.create_arrow_projectile(from_p, target_pos, attacker_visual.team)
-		if proj:
-			units_layer.add_child(proj)
-	else:
-		units_layer.add_child(Effects.create_dust(target_pos, 0.25))
+		return CombatTuning.flight_time(&"fireball", from_p, target_pos)
+	units_layer.add_child(Effects.create_dust(target_pos, 0.25))
+	return 0.0
+
+
+## 1C-3: victim-side impact FX — deferred by the caller to the strike frame /
+## projectile arrival. Damage number always shows (position captured at proc
+## time); flash/hit-stop only if the victim visual still exists.
+func _impact_fx(target_id: int, damage: int, target_pos: Vector2, hit_role: int, puff: bool) -> void:
+	if not is_inside_tree():
+		return
+	if hit_role >= 0:
+		SFX.play_hit(hit_role)
+	if puff:
+		units_layer.add_child(Effects.create_dust(target_pos, 0.2))
+	units_layer.add_child(Effects.create_damage_number(damage, target_pos))
+	if _unit_visuals.has(target_id):
+		_unit_visuals[target_id].flash_hit()
+		# T-059: Hit-stop on target (2-frame freeze for combat crunch)
+		_unit_visuals[target_id].trigger_hitstop()
 
 
 # --- Position Sync ---

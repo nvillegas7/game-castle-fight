@@ -74,12 +74,11 @@ static func create_arrow_projectile(from_pos: Vector2, to_pos: Vector2, team: in
 		node._texture = arrow_tex
 		node._target_pos = to_pos
 		node._target_px = 22.0   # Small arrow
-		node._speed = 220.0      # Fast
+		node._duration = CombatTuning.flight_time(&"arrow", from_pos, to_pos)
 		return node
 	# Fallback: bright procedural
 	var color := Color(0.2, 0.6, 1.0) if team == 0 else Color(1.0, 0.3, 0.2)
-	var dist: float = from_pos.distance_to(to_pos)
-	return create_projectile(from_pos, to_pos, color, maxf(dist / 150.0, 0.15))
+	return create_projectile(from_pos, to_pos, color, CombatTuning.flight_time(&"arrow", from_pos, to_pos))
 
 
 ## Rock projectile — use sprite rock texture if available.
@@ -92,10 +91,9 @@ static func create_rock_projectile(from_pos: Vector2, to_pos: Vector2, team: int
 		node._texture = rock_tex
 		node._target_pos = to_pos
 		node._target_px = 18.0   # Medium rock
-		node._speed = 140.0      # Slower arc feel
+		node._duration = CombatTuning.flight_time(&"rock", from_pos, to_pos)  # Slower arc feel
 		return node
-	var dist: float = from_pos.distance_to(to_pos)
-	return create_projectile(from_pos, to_pos, Color(0.7, 0.5, 0.25), maxf(dist / 150.0, 0.2))
+	return create_projectile(from_pos, to_pos, Color(0.7, 0.5, 0.25), CombatTuning.flight_time(&"rock", from_pos, to_pos))
 
 
 ## Fireball projectile for mage — magic projectile with sprite + glow fallback.
@@ -108,12 +106,11 @@ static func create_fireball_projectile(from_pos: Vector2, to_pos: Vector2, team:
 		node._texture = fb_tex
 		node._target_pos = to_pos
 		node._target_px = 32.0
-		node._speed = 200.0
+		node._duration = CombatTuning.flight_time(&"fireball", from_pos, to_pos)
 		return node
 	# Fallback: glowing magic orb
 	var color := Color(0.4, 0.7, 1.0) if team == 0 else Color(1.0, 0.5, 0.2)
-	var dist: float = from_pos.distance_to(to_pos)
-	return create_projectile(from_pos, to_pos, color, maxf(dist / 200.0, 0.15))
+	return create_projectile(from_pos, to_pos, color, CombatTuning.flight_time(&"fireball", from_pos, to_pos))
 
 
 ## Bolt projectile for ballista — use sprite bolt texture if available.
@@ -128,11 +125,10 @@ static func create_bolt_projectile(from_pos: Vector2, to_pos: Vector2, team: int
 		# T-082 UPDATE: User now wants 4× archer arrow size. A6 upscaled the
 		# source PNG to 256×256. 22 (archer) × 4 = 88.
 		node._target_px = 88.0
-		node._speed = 250.0      # Very fast
+		node._duration = CombatTuning.flight_time(&"bolt", from_pos, to_pos)  # Very fast
 		return node
 	var color := Color(0.5, 0.7, 0.9) if team == 0 else Color(0.9, 0.5, 0.3)
-	var dist: float = from_pos.distance_to(to_pos)
-	return create_projectile(from_pos, to_pos, color, maxf(dist / 200.0, 0.12))
+	return create_projectile(from_pos, to_pos, color, CombatTuning.flight_time(&"bolt", from_pos, to_pos))
 
 
 ## Sprite-based heal effect (uses Heal_Effect.png from Tiny Swords).
@@ -541,7 +537,10 @@ class _ArrowEffect extends Node2D:
 	var _time: float = 0.0
 	var _sprite: Sprite2D = null
 	var _target_px: float = 24.0  # Target display size in pixels
-	var _speed: float = 200.0     # Pixels per second
+	# 1C-3: duration comes from CombatTuning.flight_time, set by the creator —
+	# game_arena defers impact FX by the same number, so arrival must not be
+	# recomputed here from a separate speed.
+	var _duration: float = 0.2
 
 	func _ready() -> void:
 		_start_pos = position
@@ -557,9 +556,7 @@ class _ArrowEffect extends Node2D:
 
 	func _process(delta: float) -> void:
 		_time += delta
-		var total_dist: float = _start_pos.distance_to(_target_pos)
-		var duration: float = maxf(total_dist / _speed, 0.05)
-		var t: float = minf(_time / duration, 1.0)
+		var t: float = minf(_time / maxf(_duration, 0.05), 1.0)
 		position = _start_pos.lerp(_target_pos, t)
 		if t >= 1.0:
 			queue_free()

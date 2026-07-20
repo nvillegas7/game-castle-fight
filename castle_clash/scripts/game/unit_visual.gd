@@ -72,6 +72,12 @@ func play_attack(_target_pos: Vector2 = Vector2.ZERO) -> void:
 	_anim_timer = 0.0
 	_anim_duration = ATK_DUR.get(role, 0.35)
 
+## 1C-3: the procedural fallback has no wind-up/strike phase contrast, so
+## impact FX fire immediately for it — 0.0 keeps the game_arena call site
+## uniform with sprite_unit_visual.strike_delay().
+func strike_delay() -> float:
+	return 0.0
+
 func play_cast() -> void:
 	_anim_state = AnimState.CASTING
 	_anim_timer = 0.0

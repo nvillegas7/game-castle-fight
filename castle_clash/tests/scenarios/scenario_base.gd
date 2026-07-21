@@ -190,7 +190,7 @@ func force_state(state: Dictionary) -> void:
 				new_hp = FP.from_int(int(state["castle%d_hp" % team]))
 			if new_hp >= 0:
 				sim.castles[team].hp = new_hp
-				var ce = sim._find_entity_by_id(sim.castles[team].get("entity_id", -1))
+				var ce = sim.get_entity(sim.castles[team].get("entity_id", -1))
 				if ce:
 					ce.hp = new_hp
 	var arena := find_arena()

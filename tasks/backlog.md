@@ -37,7 +37,8 @@ before the fix, or the passing criterion.
 |----|------|--------|-------|-----------------------|
 | 2.3 | ⏳ PARTIAL: project Theme via gui/theme/custom ✓; default font = Pixel Operator Bold (e0e35b4, replaced NinjaNormal for readability — user-flagged; CC0, crisp import flags). TODO: MorkDungeon title-font variation for headings; shared `ui_style.gd` for StyleBoxes | A2 | 2 | readable global font ✓ |
 | 2.4 | ~~Shared scenic_background.gd~~ DOWNGRADED 2026-07-18: the "250-line verbatim copy" premise is stale — the two builders diverged; difflib measures only ~62 verbatim lines in 5 scattered blocks. Unifying two approved screens for that is a bad trade; revisit only if a third scenic consumer appears | A2 | 2 | (annotated, not planned) |
-| 2.5 | Sim read facade (O(1) get_entity, castle_ratio, player_gold) + `z_layers.gd` constants | A5/A1 | 2 | removes 80+ private reads / per-frame O(n²) scans |
+| 2.5 | ✅ CORE DONE — retriaged 2026-07-21: the "80+ private reads / O(n²)" premise was stale (measured 48 `GameManager.simulation.*` sites, most through legit API). The real hot-path cost was `_find_entity_by_id` = a LINEAR scan called per unit per tick from targeting/combat. Fixed: self-healing O(1) `_entity_index` + public `get_entity()` (core/simulation.gd); 10 internal + 9 external callers migrated. test_sim_facade 10/10, replay golden byte-identical. | A5 | 2 | — |
+| 2.5b | Low-value cleanup (optional): migrate the ~30 raw `.entities`/`.players`/`.castles` reads in UI/visual files to `get_entity`/existing API + add `z_layers.gd` z-index constants. No perf impact (these are cold paths); do only if a screen touches them anyway. | A2 | 2 | fewer private sim pokes from the view layer |
 
 ## Phase 3 — UI/UX parity polish (parallel per-screen on the new theme)
 

@@ -9,6 +9,11 @@ var match_seed: int
 
 # Game state -- all values are fixed-point or plain ints
 var entities: Array[Dictionary] = []
+# 2.5-core: id → entity dict, kept in lockstep with `entities` on every
+# append/remove. Turns _find_entity_by_id (called per unit per tick from
+# targeting/combat) from O(entities) into O(1). NOT part of sim state — it is
+# a pure derived index of `entities`, so it never enters compute_checksum.
+var _entity_index: Dictionary = {}
 var next_entity_id: int = 0
 var castles: Array[Dictionary] = []
 var players: Array[Dictionary] = []
@@ -119,6 +124,7 @@ func initialize(seed_value: int, player_data: Array, mode_config: Dictionary = {
 	tick = 0
 	next_entity_id = 0
 	entities.clear()
+	_entity_index.clear()
 	wave_number = 0
 	wave_timer = WAVE_INTERVAL_TICKS
 	match_over = false
@@ -187,6 +193,7 @@ func initialize(seed_value: int, player_data: Array, mode_config: Dictionary = {
 			"grid_size_y": CASTLE_FOOTPRINT_H,
 		}
 		entities.append(castle_entity)
+		_entity_index[castle_id] = castle_entity
 		castle["entity_id"] = castle_id
 
 	# Initialize unit occupancy grid (covers full arena)
@@ -567,11 +574,29 @@ func player_has_building(player_index: int, building_type: StringName) -> bool:
 	return false
 
 
-func _find_entity_by_id(id: int):
+## 2.5-core: public O(1) entity lookup for the visual/UI layer and internal
+## callers (replaces the per-tick linear scan). Rides _entity_index, which is
+## maintained at every spawn/death. SELF-HEALING: on a miss it falls back to a
+## linear scan and caches the hit — so an entity appended outside the
+## instrumented paths (e.g. a test shim doing entities.append directly) still
+## resolves, and this never returns null for an id that is live in `entities`.
+## The scan runs only on a miss (target_id on the hot path is always a live,
+## indexed id → O(1)); its result is identical to the old scan, so determinism
+## and the replay golden are unaffected.
+func get_entity(id: int):
+	var e = _entity_index.get(id)
+	if e != null:
+		return e
 	for entity in entities:
 		if entity.id == id:
+			_entity_index[id] = entity
 			return entity
 	return null
+
+
+## Retained name for the ~10 internal call sites; delegates to get_entity.
+func _find_entity_by_id(id: int):
+	return get_entity(id)
 
 
 # --- Command Processing ---
@@ -762,6 +787,7 @@ func _handle_place_building(cmd: Dictionary) -> Array[Dictionary]:
 		"ability_active_ticks": 0,
 	}
 	entities.append(entity)
+	_entity_index[entity.id] = entity
 
 	for row in range(gy, gy + size_y):
 		for col in range(gx, gx + size_x):
@@ -825,6 +851,7 @@ func _handle_sell_building(cmd: Dictionary) -> Array[Dictionary]:
 		for col in range(entity.grid_x, entity.grid_x + entity.grid_size_x):
 			grid[row][col] = -1
 
+	_entity_index.erase(entity.id)
 	entities.remove_at(building_idx)
 	_rebuild_flow_field(player_index)
 
@@ -1131,6 +1158,7 @@ func _spawn_from_building(building: Dictionary) -> Array[Dictionary]:
 			"stuck_ticks": 0,
 		}
 		entities.append(unit)
+		_entity_index[unit.id] = unit
 		_register_unit_cell(unit)
 
 		units_spawned[team] += 1
@@ -2646,6 +2674,7 @@ func _cleanup_dead() -> Array[Dictionary]:
 						grid[row][col] = -1
 				if entity.player_index < dirty_flow.size():
 					dirty_flow[entity.player_index] = true
+			_entity_index.erase(entity.id)
 			entities.remove_at(i)
 	# Batch rebuild flow fields for grids that changed
 	for pi in dirty_flow.size():

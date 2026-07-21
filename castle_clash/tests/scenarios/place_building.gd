@@ -24,7 +24,7 @@ func run() -> void:
 	check("target cell (%d,%d) occupied after drag" % [TARGET.x, TARGET.y], eid >= 0,
 		"grid_cells[0][%d][%d]=%d" % [TARGET.y, TARGET.x, sim.grid_cells[0][TARGET.y][TARGET.x]])
 	if eid >= 0:
-		var ent = sim._find_entity_by_id(eid)
+		var ent = sim.get_entity(eid)
 		check("placed entity is a %s" % BUILDING,
 			ent != null and ent.get("building_type", &"") == BUILDING,
 			"entity=%s" % str(ent.get("building_type", "null") if ent else "null"))

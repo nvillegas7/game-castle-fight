@@ -334,7 +334,7 @@ func _test_chase_to_attack_transition() -> void:
 				ever_chased[e.id] = true
 			if state == 2:  # ATTACK
 				ever_attacked[e.id] = true
-				var tgt = sim._find_entity_by_id(e.target_id)
+				var tgt = sim.get_entity(e.target_id)
 				if tgt != null and tgt.type == "castle":
 					attacked_castle[e.id] = true
 

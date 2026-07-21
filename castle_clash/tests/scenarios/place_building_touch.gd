@@ -31,7 +31,7 @@ func run() -> void:
 	check("single-finger touch placed building at (%d,%d)" % [TARGET.x, TARGET.y], eid >= 0,
 		"touch tap committed nothing — emulated-mouse twin cancelled placement")
 	if eid >= 0:
-		var ent = sim._find_entity_by_id(eid)
+		var ent = sim.get_entity(eid)
 		check("placed entity is a %s" % BUILDING,
 			ent != null and ent.get("building_type", &"") == BUILDING,
 			"got %s" % (str(ent.get("building_type", &"?")) if ent else "null"))

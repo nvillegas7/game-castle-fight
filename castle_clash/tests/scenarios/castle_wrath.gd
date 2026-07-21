@@ -72,7 +72,7 @@ func run() -> void:
 					damaged += 1
 			# Units may also have died outright (removed from entities) — count those too.
 			for id in before_hp:
-				if sim._find_entity_by_id(id) == null:
+				if sim.get_entity(id) == null:
 					damaged += 1
 			check("enemy units in range damaged by wrath", damaged > 0,
 				"%d in range before, %d damaged/killed" % [before_hp.size(), damaged])

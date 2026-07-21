@@ -829,7 +829,7 @@ func _sync_unit_positions() -> void:
 
 			# Facing: face toward target X position
 			if entity.target_id != -1:
-				var target = GameManager.simulation._find_entity_by_id(entity.target_id)
+				var target = GameManager.simulation.get_entity(entity.target_id)
 				if target:
 					var face_dir: float = 1.0 if FP.to_float(target.x) > curr_pos.x else -1.0
 					visual.facing = face_dir

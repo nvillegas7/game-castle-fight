@@ -33,7 +33,7 @@ func run() -> void:
 	check("barracks placed", eid >= 0)
 	if eid < 0:
 		return
-	var ent = sim._find_entity_by_id(eid)
+	var ent = sim.get_entity(eid)
 	await tap_right(world_to_screen(Vector2(360, 850)))
 	check("card deselected", grid.selected_building == null)
 

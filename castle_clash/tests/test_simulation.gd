@@ -1347,7 +1347,7 @@ func _test_lethal_attack_event_payload() -> void:
 			   and FP.lte(ev.get("target_hp", FP.ONE), FP.ZERO):
 				lethal_ev = ev
 		if not lethal_ev.is_empty():
-			removed_same_step = sim._find_entity_by_id(victim.id) == null
+			removed_same_step = sim.get_entity(victim.id) == null
 			break
 	_assert(not lethal_ev.is_empty(), "lethal unit_attacked event present in step events")
 	if lethal_ev.is_empty():

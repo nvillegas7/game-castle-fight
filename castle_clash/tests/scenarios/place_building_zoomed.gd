@@ -48,7 +48,7 @@ func run() -> void:
 		"nothing placed at target; derived cell would be %s (offset %s cells)" % [
 			str(derived_cell), str(offset_px / 28.0)])
 	if eid >= 0:
-		var ent = sim._find_entity_by_id(eid)
+		var ent = sim.get_entity(eid)
 		check("building origin cell == drag target cell",
 			ent != null and ent.grid_x == TARGET.x and ent.grid_y == TARGET.y,
 			"placed at (%s,%s), targeted (%d,%d)" % [

@@ -43,6 +43,8 @@ const ZOOM_MAX: float = 2.0
 const ZOOM_SPEED: float = 0.1
 const PAN_SPEED_KEYS: float = 600.0  # Pixels per second when panning with keys
 var _zoom_level: float = 1.0
+# 1A-3: live touch points (index -> viewport pos) for the ScreenTouch pinch
+var _touch_pts: Dictionary = {}
 
 # Camera pan state (middle-click drag)
 var _camera_pan_dragging: bool = false
@@ -216,16 +218,51 @@ func _input(event: InputEvent) -> void:
 			_camera_pan_last_pos = event.position
 			_clamp_camera_position()
 		get_viewport().set_input_as_handled()
-	# Pinch zoom (touch)
+	# Pinch zoom (macOS trackpad)
 	elif event is InputEventMagnifyGesture:
 		_apply_zoom(_zoom_level * event.factor, event.position)
 		get_viewport().set_input_as_handled()
-	# Two-finger pan gesture (touch)
+	# Two-finger pan gesture (macOS trackpad)
 	elif event is InputEventPanGesture:
 		if camera:
 			camera.position += event.delta / _zoom_level
 			_clamp_camera_position()
 		get_viewport().set_input_as_handled()
+	# 1A-3: hand-rolled two-finger pinch/pan — Android emits ONLY
+	# ScreenTouch/ScreenDrag (the gesture events above are trackpad-only).
+	elif event is InputEventScreenTouch:
+		if event.pressed:
+			_touch_pts[event.index] = event.position
+		else:
+			_touch_pts.erase(event.index)
+		if _touch_pts.size() >= 2:
+			get_viewport().set_input_as_handled()
+	elif event is InputEventScreenDrag and _touch_pts.has(event.index):
+		if _touch_pts.size() >= 2:
+			var keys: Array = _touch_pts.keys()
+			keys.sort()
+			var a: int = keys[0]
+			var b: int = keys[1]
+			var prev_a: Vector2 = _touch_pts[a]
+			var prev_b: Vector2 = _touch_pts[b]
+			_touch_pts[event.index] = event.position
+			if event.index == a or event.index == b:
+				var new_a: Vector2 = _touch_pts[a]
+				var new_b: Vector2 = _touch_pts[b]
+				var prev_dist: float = prev_a.distance_to(prev_b)
+				var new_dist: float = new_a.distance_to(new_b)
+				var mid: Vector2 = (new_a + new_b) * 0.5
+				if prev_dist > 1.0 and new_dist > 1.0:
+					_apply_zoom(_zoom_level * new_dist / prev_dist, mid)
+				# Pan by the midpoint travel (screen px -> world px at zoom)
+				var mid_delta: Vector2 = mid - (prev_a + prev_b) * 0.5
+				if camera and mid_delta != Vector2.ZERO:
+					camera.position -= mid_delta / _zoom_level
+					_clamp_camera_position()
+			get_viewport().set_input_as_handled()
+		else:
+			# Single tracked finger: just follow it (placement owns the drag).
+			_touch_pts[event.index] = event.position
 
 
 ## 1A-5: zoom anchored at the cursor/gesture point — the world point under it

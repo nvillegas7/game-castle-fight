@@ -182,14 +182,19 @@ func _input(event: InputEvent) -> void:
 				# transform or input propagation prevents events from reaching Area2D.
 				var menu_world_pos: Vector2 = _radial_menu.global_position
 				var hit_button: bool = false
+				# 1A-4: tap_pos and btn_screen are SCREEN px but btn_size is
+				# WORLD px — scale the hit radius by the camera zoom so the
+				# tappable circle matches what the player sees at any zoom.
+				var zoom_scale: float = get_viewport().get_canvas_transform().get_scale().x
 				for child in _radial_menu.get_children():
 					if child is _RadialButton:
 						var btn_world: Vector2 = child.global_position
 						var btn_screen: Vector2 = get_viewport().get_canvas_transform() * btn_world
 						var dist: float = tap_pos.distance_to(btn_screen)
-						if dist <= child.btn_size * 0.5:
+						if dist <= child.btn_size * 0.5 * zoom_scale:
 							_on_radial_action(child.action, child.entity)
 							hit_button = true
+							get_viewport().set_input_as_handled()
 							break
 				if not hit_button:
 					_dismiss_radial()
@@ -420,7 +425,15 @@ func _try_show_radial(screen_pos: Vector2) -> bool:
 	if entity.is_empty():
 		return false
 
-	_show_radial_menu(entity, local_pos)
+	# 1A-4: anchor the menu at the building's footprint center, not the tap —
+	# same view_flipped row formula as the ghost draw above.
+	var vis_top: int = entity.grid_y
+	if view_flipped:
+		vis_top = (GRID_ROWS - entity.grid_size_y) - entity.grid_y
+	var footprint_center := Vector2(
+		(entity.grid_x + entity.grid_size_x / 2.0) * CELL_SIZE,
+		(vis_top + entity.grid_size_y / 2.0) * CELL_SIZE)
+	_show_radial_menu(entity, footprint_center)
 	return true
 
 
@@ -667,17 +680,14 @@ class _RadialButton extends Node2D:
 		circle.radius = btn_size * 0.5
 		shape.shape = circle
 		area.add_child(shape)
+		# 1A-4: hover highlight ONLY — action dispatch lives solely in
+		# building_grid._input's hit-test (the Area2D used to ALSO dispatch,
+		# double-firing every mouse tap; sell survived only because the sim
+		# validates entity existence, info opened twice).
 		area.input_pickable = true
-		area.input_event.connect(_on_input_event)
 		area.mouse_entered.connect(func(): _hover = true; queue_redraw())
 		area.mouse_exited.connect(func(): _hover = false; queue_redraw())
 		add_child(area)
-
-	func _on_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
-		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			if grid_ref and grid_ref.has_method("_on_radial_action"):
-				grid_ref._on_radial_action(action, entity)
-			get_viewport().set_input_as_handled()
 
 	func _draw() -> void:
 		var r: float = btn_size * 0.5

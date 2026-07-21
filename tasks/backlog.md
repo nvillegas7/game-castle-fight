@@ -16,7 +16,6 @@ before the fix, or the passing criterion.
 | ~~1A-1~~ | ✅ DONE (2701d96) Canvas-transform-inverse for screen→grid — place under zoom fixed; place_building_zoomed 5/0 | A2 | 1A | — |
 | ~~1A-2~~ | ✅ DONE (fa508cb) Dedup emulated-mouse vs touch — mobile tap-to-place fixed; place_building_touch RED→GREEN + touch harness added | A2 | 1A | — |
 | 1A-3 | Hand-rolled two-finger pinch-zoom + pan from ScreenTouch/ScreenDrag; enable Android pan-and-scale | A2 | 1A | `pinch_zoom_pan` scenario asserts camera transform |
-| 1A-4 | Radial menu at true cell center; scale hit radius by zoom; kill double-fire path | A2 | 1A | `radial_menu_under_zoom` scenario (see BUG-34) |
 | 1A-5 | ⏳ PARTIAL (6ea781f: wheel event.pressed guard + ZOOM_MIN 1.0 done). TODO: reparent Blocked!/info popup to UILayer; zoom-to-cursor; fix middle-drag pan (consumed by STOP ColorRect) | A2 | 1A | popup renders in screen space regardless of pan/zoom |
 | ~~1B-2~~ | ✅ DONE Surface lobby aborts in main_menu (NetworkManager.match_error → message + retry, version_mismatch → "refresh browser") | A2 | 1B | — |
 | ~~1B-4~~ | ✅ DONE Freeze match on desync (GameManager._on_desync_detected → MATCH_OVER + set_process(false)) | A1 | 1B | — |

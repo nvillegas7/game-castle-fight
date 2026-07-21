@@ -40,6 +40,7 @@ run_headless "Determinism lint (banned APIs)"  tests/test_banned_api.gd
 run_headless "Replay determinism + golden"     tests/test_replay_determinism.gd
 run_headless "Behavior audit (movement)"       tests/test_behavior_audit.gd
 run_headless "Combat feel (walk cadence)"      tests/test_combat_feel.gd
+run_headless "Card layout (BUG-30)"            tests/test_card_layout.gd
 run_headless "Targeting diagnostics"           tests/test_targeting_diag.gd
 run_headless "Unit behavior scenarios"         tests/test_unit_behavior.gd
 run_headless "Arena AI (Phase 2.1 extraction)" tests/test_arena_ai.gd

@@ -114,6 +114,7 @@ func _init() -> void:
 	_check_social_not_navy()              # social cards warm paper, not cold-navy boxes
 	_check_settings_sliders_themed()      # volume sliders themed, not raw Godot gray
 	_check_reset_demoted()                # Reset All Progress is an outline, not a filled primary
+	_check_card_name_bounds()             # BUG-30: card names stay inside their card
 	_print_results()
 	quit(1 if _fail > 0 else 0)
 
@@ -1707,6 +1708,59 @@ func _check_reset_demoted() -> void:
 	else:
 		_assert_fail("Reset All Progress still a filled primary — red-fill px=%d (need <2500)" % red,
 			"restyle as an outline button at the bottom per audit main_menu.gd:2013")
+
+
+## BUG-30 (2026-07-21): card names rendered ACROSS icons + two-line names
+## clipped through the card bottom (draw_string y is a BASELINE; card_hand
+## anchored it at icon_bottom+4). The precise below-icon contract is pinned
+## headless by tests/test_card_layout.gd (pure math — per-card icon heights
+## aren't recoverable from pixels: text antialiasing halos defeat cream/icon
+## classification, measured 2026-07-21). THIS detector guards the two
+## robustly pixel-detectable symptoms on the in-match hand:
+##   (a) no name text in any card's bottom 3 rows (pre-fix: 8 of 14 cards
+##       clipped there — "Roost", "Workshop", "Barracks" descenders)
+##   (b) every unlocked card still SHOWS name text (vacuity guard: >= 10 of
+##       14 slots must have text, else this detector FAILS — a captureless
+##       or cardless frame cannot pass it)
+## Calibration 2026-07-21 on game_004.png @504x896 (0.7x of 720x1280 design):
+## card grid = 7 cols x 2 rows, design x = 34 + col*94, y = 1068 (top row) /
+## 1162 (bottom), card 88x90. TEXT_DARK (64,41,20) +-10 matches glyph cores
+## only (icon browns: 0 px at this tolerance, measured).
+func _check_card_name_bounds() -> void:
+	print("[Card name inside card bounds (BUG-30)]")
+	var img := _load_capture("game_004.png")
+	if img == null:
+		return
+	var clipped: Array = []
+	var with_text: int = 0
+	for i in 14:
+		var col: int = i % 7
+		var row: int = i / 7
+		var cx: int = int((34.0 + col * 94.0) * 0.7)
+		var cy: int = int((1068.0 + row * 94.0) * 0.7)
+		var cw: int = int(88.0 * 0.7)
+		var ch: int = int(90.0 * 0.7)
+		var name_px: int = 0
+		var bottom_px: int = 0
+		for y in range(cy + int(21 * 0.7), cy + ch):
+			for x in range(cx + 2, cx + cw - 2):
+				var c: Color = img.get_pixel(x, y)
+				if absf(c.r8 - 64) <= 10 and absf(c.g8 - 41) <= 10 and absf(c.b8 - 20) <= 10:
+					name_px += 1
+					if y >= cy + ch - 3:
+						bottom_px += 1
+		if name_px >= 4:
+			with_text += 1
+		if bottom_px > 0:
+			clipped.append("card %d (%d px in bottom rows)" % [i, bottom_px])
+	if with_text < 10:
+		_assert_fail("only %d/14 card slots show name text — capture lacks the card hand" % with_text,
+			"detector cannot vacuously pass; check game_004.png captured an in-match frame")
+	elif clipped.is_empty():
+		_assert_pass("no card name clips its card bottom (%d/14 slots show names)" % with_text)
+	else:
+		_assert_fail("card names clip through the card bottom: %s" % str(clipped),
+			"BUG-30 baseline overflow — see tests/test_card_layout.gd contract")
 
 
 func _print_results() -> void:

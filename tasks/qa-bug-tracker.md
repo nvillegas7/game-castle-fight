@@ -106,11 +106,12 @@ Root cause was in commit 9505d07: attack range used Y-only distance instead of f
 - **Fix**: Added `RED_EQUIVALENT` map (9 entries), team param to `get_unit_sprites()`, passed `entity.team` from game_arena.gd. 19 new tests verify.
 
 ### BUG-30: Card bottom text overlap in 2-row layout
-- **Status**: OPEN — Owner: A2
+- **Status**: FIXED 2026-07-21 (retriaged 2026-07-19; the entry above described a stale sub-symptom)
 - **Severity**: MEDIUM (readability)
-- **File**: `card_hand.gd:346-374`
-- **Root cause**: In 2-row layout card_h shrinks to ~96px. Building name y=68, type y=81, stats y=h-6=90. Only 9px gap → text overlap.
-- **Fix**: Hide stats when h<110, or compute info_y with minimum spacing from type text.
+- **File**: `card_hand.gd` `_draw_full` + new `scripts/ui/card_layout.gd`
+- **Actual root cause**: `draw_string`'s y is a BASELINE, but `_draw_full` anchored it at `icon_bottom + 4` — the ~14px ascent rendered the name ACROSS the icon on every card; and in the 2-row 90px layout a 44px icon + two 18px name lines (106px) overflowed the card bottom ("Gryphon Roost" clipped mid-glyph, 8 of 14 cards clipping 21-42px). Not icon-load timing.
+- **Fix**: layout math extracted to pure `CardLayout.layout` (fit order: drop to one ellipsized line, then shrink icon; name never above icon bottom + 4 nor below h - 6). Contract pinned headless by `tests/test_card_layout.gd` (28 asserts, in L0 gate).
+- **Detector**: `_check_card_name_bounds` (test_screen_layout.gd) — bottom-clip + name-presence guards, calibrated 2026-07-21 on game_004.png @504x896; RED pre-fix (8 cards), GREEN on fresh post-fix capture. Full-gate PASSED.
 
 ### BUG-32: Roof icon decorations barely visible on upgraded buildings
 - **Status**: FIXED + VERIFIED 2026-07-17 — icon targets doubled (wing 22→44,

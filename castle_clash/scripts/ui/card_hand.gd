@@ -336,26 +336,24 @@ class _CardVisual extends Control:
 				draw_string(font, Vector2(2, h * 0.28 + 64.0), _fit_text("Need: " + req_name, w - 4.0, fs), HORIZONTAL_ALIGNMENT_CENTER, w - 4, fs, Color(0.72, 0.77, 0.86))
 			return
 
-		# Building icon — centered, below the top-center badge.
-		var icon_bottom: float = 24.0
-		if _building_icon:
-			var icon_size: float = minf(w * 0.52, 44.0)
-			var tex_w: float = _building_icon.get_width()
-			var tex_h: float = _building_icon.get_height()
-			var icon_scale: float = icon_size / maxf(tex_w, tex_h)
-			var iw: float = tex_w * icon_scale
-			var ih: float = tex_h * icon_scale
-			var icon_y: float = 22.0
-			draw_texture_rect(_building_icon, Rect2((w - iw) * 0.5, icon_y, iw, ih), false,
-				Color.WHITE if enabled else Color(0.55, 0.5, 0.45))
-			icon_bottom = icon_y + ih
-
-		# Building name — DARK brown on cream (reference), up to two wrapped lines.
-		var name_top_y: float = icon_bottom + 4.0
+		# Icon + name geometry from CardLayout (pure math, contract pinned by
+		# tests/test_card_layout.gd). BUG-30: draw_string's y is a BASELINE —
+		# the old inline math anchored it at icon_bottom+4, drawing the ascent
+		# ACROSS the icon, and two-line names overflowed the 90px 2-row card.
 		var name_lines: PackedStringArray = _wrap_two_lines(bd.display_name, w - 8.0, fs)
+		var lay: Dictionary = CardLayout.layout(w, h,
+			_building_icon.get_width() if _building_icon else 0.0,
+			_building_icon.get_height() if _building_icon else 0.0,
+			name_lines.size(), font.get_ascent(fs), font.get_descent(fs))
+		if _building_icon:
+			draw_texture_rect(_building_icon, lay.icon, false,
+				Color.WHITE if enabled else Color(0.55, 0.5, 0.45))
+		if int(lay.lines) < name_lines.size():
+			# Two lines don't fit this card height — one ellipsized line.
+			name_lines = PackedStringArray([_fit_text(bd.display_name, w - 8.0, fs)])
 		for li in name_lines.size():
-			draw_string(font, Vector2(4, name_top_y + li * 18.0), name_lines[li], HORIZONTAL_ALIGNMENT_CENTER, w - 8, fs, UIStyle.TEXT_DARK)
-		var below_name_y: float = name_top_y + (name_lines.size() - 1) * 18.0 + 20.0
+			draw_string(font, Vector2(4, lay.baselines[li]), name_lines[li], HORIZONTAL_ALIGNMENT_CENTER, w - 8, fs, UIStyle.TEXT_DARK)
+		var below_name_y: float = float(lay.type_y)
 
 		# Type — dark colored word on cream (>=4.5:1).
 		var type_text: String = ""
@@ -369,7 +367,7 @@ class _CardVisual extends Control:
 		elif bd.spawns_unit:
 			type_text = "Spawner"
 			type_col = Color(0.22, 0.5, 0.16)
-		if type_text != "" and below_name_y <= h - 6.0:
+		if type_text != "" and below_name_y > 0.0:
 			draw_string(font, Vector2(4, below_name_y), type_text, HORIZONTAL_ALIGNMENT_CENTER, w - 8, fs, type_col)
 
 		# Stats line — dark on cream, tall single-row layout only.

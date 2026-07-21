@@ -56,6 +56,5 @@ before the fix, or the passing criterion.
 | ID | Item | Domain | Phase | Detector / Acceptance |
 |----|------|--------|-------|-----------------------|
 | BUG-40 | Walk animation cadence vs move speed (PENDING LIVE PLAYTEST) | A2 | 1C | HIGH; overlaps 1C-1; needs human eyes on windowed game |
-| BUG-34 | Radial menu dismiss races with button click (can't sell/inspect in MP) | A2 | 1A | MEDIUM; overlaps 1A-4; kill deferred double-dismiss |
 | BUG-30 | Card text overlap in 2-row layout — RETRIAGED 2026-07-19: the prescribed fix (hide stats h<110) ALREADY exists (card_hand.gd:376); the real artifact is NAMES drawn ACROSS the icons (capture game_004 crop, cards ~90px): name_top_y=icon_bottom+4 math says below-icon but renders mid-icon — needs draw-time instrumentation to root-cause (icon load timing vs draw pass?). Detector-first when picked up | A2 | 3 | MEDIUM; pixel detector for name/icon overlap TBD |
 | BUG-35 | MP command delivery unverified — no ACK/retransmit (P2 hardening, superseded by DESYNC1) | A1 | 1B | P2; overlaps 1B-6; explicit ACK + bounded retransmit |

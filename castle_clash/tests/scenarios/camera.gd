@@ -67,3 +67,52 @@ func run() -> void:
 
 	# Sanity: state dump agrees with the live camera
 	assert_state({"camera.zoom": 2.0, "camera.x": 180.0, "camera.y": 960.0}, "state_dump_camera")
+
+	# --- 1A-5: zoom must anchor at the CURSOR, not the camera center ---
+	# Pan off the clamp extremes first so clamping can't mask the assert.
+	await pan_keys(Vector2(1, -1), 1.2)
+	var world_before: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * Vector2(500, 400)
+	await wheel(-2, Vector2(500, 400))
+	var world_after: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * Vector2(500, 400)
+	check("zoom anchors at cursor (world point under (500,400) stays put)",
+		world_before.distance_to(world_after) < 8.0,
+		"world under cursor slid %s -> %s (center-anchored zoom)" % [world_before, world_after])
+	await capture("zoom_to_cursor")
+
+	# --- 1A-5: Blocked! popup must render in SCREEN space (UILayer) ---
+	# Root-parented canvas items are camera-transformed: under zoom/pan the
+	# popup drifts up to half a screen from the tap. Trigger: place a
+	# barracks, then tap the SAME cell with another card selected.
+	var sim = GameManager.simulation
+	var pi: int = sim.get_player_index(GameManager.local_player_id)
+	var selected := await select_card(&"barracks")
+	check("card selected for popup repro", selected)
+	await tap_touch(world_to_screen(tile_world_center(Vector2i(2, 4))))
+	await wait_ticks(3)
+	check("barracks placed for popup repro", sim.grid_cells[pi][4][2] >= 0)
+	selected = await select_card(&"wall")
+	check("second card selected", selected)
+	await tap_touch(world_to_screen(tile_world_center(Vector2i(2, 4))))
+	await _pump(4)
+	var popup := _find_blocked_popup()
+	check("Blocked! popup appeared", popup != null, "no node with a Blocked!/No gold! label")
+	if popup:
+		check("popup lives in a CanvasLayer (screen space, 1A-5)",
+			popup.get_parent() is CanvasLayer,
+			"parented to %s — root canvas items drift under camera zoom/pan" % popup.get_parent().name)
+	await capture("blocked_popup")
+
+
+## The Blocked!/No gold! toast is Effects.create_damage_number's Node2D with
+## a Label child — search the whole tree for it.
+func _find_blocked_popup() -> Node2D:
+	var queue: Array = [get_tree().root as Node]
+	while not queue.is_empty():
+		var n: Node = queue.pop_front()
+		if n is Node2D and n.get_child_count() > 0 and n.get_child(0) is Label:
+			var t: String = (n.get_child(0) as Label).text
+			if t == "Blocked!" or t == "No gold!":
+				return n
+		for c in n.get_children():
+			queue.append(c)
+	return null

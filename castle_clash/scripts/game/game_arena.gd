@@ -34,6 +34,7 @@ const GRID_MARGIN_X: int = 206      # (720 - 308) / 2
 @onready var card_hand: Control = $UILayer/CardHand
 @onready var gold_bar_label: Label = $UILayer/GoldBarBg/GoldBarLabel
 @onready var camera: Camera2D = $Camera2D
+@onready var ui_layer: CanvasLayer = $UILayer
 
 # 1.0 = arena exactly fills the 720x1280 viewport. Below 1.0 would reveal void
 # beyond the arena, so zoom only goes IN from the default.
@@ -128,6 +129,9 @@ func _ready() -> void:
 
 	grid_overlay_0.player_index = 0
 	grid_overlay_1.player_index = 1
+	# 1A-5: popups render in screen space regardless of camera zoom/pan
+	grid_overlay_0.ui_layer = ui_layer
+	grid_overlay_1.ui_layer = ui_layer
 
 	card_hand.building_selected.connect(_on_building_selected)
 	grid_overlay_0.building_deselected.connect(card_hand.force_deselect)
@@ -182,28 +186,26 @@ func _ready() -> void:
 		_show_tutorial()
 
 
-func _unhandled_input(event: InputEvent) -> void:
+# 1A-5: camera controls live in _input, NOT _unhandled_input — STOP-filter
+# Controls (terrain ColorRects, the card bar) consumed wheel/middle-drag in
+# the GUI phase, killing pan/zoom over most of the screen. Wheel and middle
+# button have no GUI use in-match, so consuming them up front is safe.
+func _input(event: InputEvent) -> void:
 	# Mouse wheel zoom. Guard on event.pressed: a wheel notch emits BOTH a
 	# pressed and a released event, so without this the step applied twice
 	# (effective 2x ZOOM_SPEED).
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
-			_zoom_level = clampf(_zoom_level + ZOOM_SPEED, ZOOM_MIN, ZOOM_MAX)
-			if camera:
-				camera.zoom = Vector2(_zoom_level, _zoom_level)
-				_clamp_camera_position()
+			_apply_zoom(_zoom_level + ZOOM_SPEED, event.position)
+			get_viewport().set_input_as_handled()
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
-			_zoom_level = clampf(_zoom_level - ZOOM_SPEED, ZOOM_MIN, ZOOM_MAX)
-			if camera:
-				camera.zoom = Vector2(_zoom_level, _zoom_level)
-				_clamp_camera_position()
+			_apply_zoom(_zoom_level - ZOOM_SPEED, event.position)
+			get_viewport().set_input_as_handled()
 		# Middle-click drag to pan camera
 		elif event.button_index == MOUSE_BUTTON_MIDDLE:
-			if event.pressed:
-				_camera_pan_dragging = true
-				_camera_pan_last_pos = event.position
-			else:
-				_camera_pan_dragging = false
+			_camera_pan_dragging = event.pressed
+			_camera_pan_last_pos = event.position
+			get_viewport().set_input_as_handled()
 	# Mouse drag while middle button held
 	elif event is InputEventMouseMotion and _camera_pan_dragging:
 		if camera:
@@ -213,17 +215,33 @@ func _unhandled_input(event: InputEvent) -> void:
 			camera.position += delta
 			_camera_pan_last_pos = event.position
 			_clamp_camera_position()
+		get_viewport().set_input_as_handled()
 	# Pinch zoom (touch)
 	elif event is InputEventMagnifyGesture:
-		_zoom_level = clampf(_zoom_level * event.factor, ZOOM_MIN, ZOOM_MAX)
-		if camera:
-			camera.zoom = Vector2(_zoom_level, _zoom_level)
-			_clamp_camera_position()
+		_apply_zoom(_zoom_level * event.factor, event.position)
+		get_viewport().set_input_as_handled()
 	# Two-finger pan gesture (touch)
 	elif event is InputEventPanGesture:
 		if camera:
 			camera.position += event.delta / _zoom_level
 			_clamp_camera_position()
+		get_viewport().set_input_as_handled()
+
+
+## 1A-5: zoom anchored at the cursor/gesture point — the world point under it
+## stays put (position clamps still win at the arena edges). screen_pos is in
+## viewport coords; the camera-centered visible point is (360,640).
+func _apply_zoom(new_zoom: float, screen_pos: Vector2) -> void:
+	new_zoom = clampf(new_zoom, ZOOM_MIN, ZOOM_MAX)
+	if camera == null:
+		_zoom_level = new_zoom
+		return
+	var offset: Vector2 = screen_pos - Vector2(360, 640)
+	var world_under: Vector2 = camera.position + offset / _zoom_level
+	_zoom_level = new_zoom
+	camera.zoom = Vector2(_zoom_level, _zoom_level)
+	camera.position = world_under - offset / _zoom_level
+	_clamp_camera_position()
 
 
 ## T-085: Apply visual perspective flip for Player 2.
@@ -827,7 +845,6 @@ func _show_perk_indicator() -> void:
 	if GameManager.selected_perk == &"":
 		return
 	var perk_name: String = PERK_NAMES.get(GameManager.selected_perk, str(GameManager.selected_perk))
-	var ui_layer = get_node_or_null("UILayer")
 	if ui_layer == null:
 		return
 	var indicator := Label.new()

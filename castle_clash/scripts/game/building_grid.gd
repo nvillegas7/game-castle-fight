@@ -10,6 +10,10 @@ const GRID_ROWS: int = 10
 
 ## Which player this grid belongs to (set by parent).
 var player_index: int = 0
+# 1A-5: screen-space host for popups (Blocked!/info panel). Root-parented
+# canvas items are camera-transformed and drift under zoom/pan; a CanvasLayer
+# ignores the camera. Wired by game_arena; falls back to root if unset.
+var ui_layer: CanvasLayer = null
 ## BUG-50: whether the arena view is Y-flipped (T-085 perspective flip). Set by
 ## game_arena alongside player_index; row inversion follows THIS, not the
 ## player index, so the overlay always agrees with grid_to_screen.
@@ -272,7 +276,7 @@ func _input(event: InputEvent) -> void:
 			if label:
 				label.text = msg
 				label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.3))
-			get_tree().root.add_child(err_node)
+			_popup_host().add_child(err_node)
 		_is_hovering = false
 		queue_redraw()
 		return
@@ -549,6 +553,10 @@ func _on_radial_action(action: String, entity: Dictionary) -> void:
 	_dismiss_radial()
 
 
+func _popup_host() -> Node:
+	return ui_layer if ui_layer != null else get_tree().root
+
+
 func _dismiss_radial() -> void:
 	if _radial_menu and is_instance_valid(_radial_menu):
 		# Animate out before freeing
@@ -571,7 +579,7 @@ func _show_building_info(entity: Dictionary) -> void:
 	info_panel.position = Vector2(110, 300)
 	info_panel.size = Vector2(500, 200)
 	info_panel.z_index = 150
-	get_tree().root.add_child(info_panel)
+	_popup_host().add_child(info_panel)
 
 	# Dark panel background
 	var panel := Panel.new()

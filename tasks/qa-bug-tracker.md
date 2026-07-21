@@ -143,12 +143,11 @@ Root cause was in commit 9505d07: attack range used Y-only distance instead of f
 - **Fix**: Add `Command.Type.USE_ABILITY: events.append_array(_handle_use_ability(cmd))` to the match statement in `_process_command()`. Implement `_handle_use_ability()` or at minimum add an empty handler that logs a warning.
 
 ### BUG-34: Radial menu dismiss races with button click
-- **Status**: OPEN — Owner: A2
+- **Status**: CLOSED 2026-07-21 — verified fixed by scenario (was OPEN with a stale prescription)
 - **Severity**: MEDIUM (building interaction — user reports can't click buildings)
-- **File**: `scripts/game/building_grid.gd:99-108`
-- **Root cause**: When radial menu is open and user taps, line 107 calls `_dismiss_radial.call_deferred()` BEFORE Area2D buttons process the input event. On slow frames or multiplayer lag, the deferred dismiss can fire in the same frame as the button's `_on_input_event()`, causing the menu to vanish before the action executes. The `_RadialButton._on_input_event()` calls `get_viewport().set_input_as_handled()` (line 517) as mitigation, but this only prevents further propagation — it doesn't cancel the already-queued deferred dismiss.
-- **Symptoms**: User reports "can't click buildings for information or to sell" in multiplayer sessions.
-- **Fix**: Remove the unconditional `_dismiss_radial.call_deferred()` at line 107. Instead, set a flag `_dismiss_pending = true`, and in `_process()` dismiss only if the flag is still true (button clicks would clear it). Or: use a short timer (0.1s) before dismissing, giving buttons time to process input first.
+- **File**: `scripts/game/building_grid.gd` (radial tap branch in `_input`)
+- **Resolution**: The prescribed fix above cited a `_dismiss_radial.call_deferred()` that no longer exists — a different fix (direct `_RadialButton` hit-testing inside `building_grid._input`, before any dismiss decision) shipped unverified in checkpoint `bdb34e6`. Verified 2026-07-21 by the new interaction scenario `tests/scenarios/radial_menu.gd` (17/17): sell/dismiss contract holds on BOTH the touch path and the mouse path, tap-outside dismisses without side effects, and the suspected double dispatch (the `_input` hit-test AND the button's Area2D handler both fire on mouse taps) cannot double-refund — the sim's `_handle_sell_building` validates entity existence, and the scenario asserts the EXACT single refund (+25 for barracks) end-to-end on each path.
+- **Detector**: `tests/scenarios/radial_menu.gd` — `godot --path castle_clash -- --scenario radial_menu`
 
 ### BUG-35: Multiplayer command delivery not verified
 - **Status**: OPEN (downgraded to P2 hardening — superseded by BUG-DESYNC1 fix 2026-04-18) — Owner: A1
